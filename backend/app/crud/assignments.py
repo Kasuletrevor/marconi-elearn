@@ -1,0 +1,72 @@
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.assignment import Assignment
+
+
+async def create_assignment(
+    db: AsyncSession,
+    *,
+    course_id: int,
+    module_id: int | None,
+    title: str,
+    description: str | None,
+) -> Assignment:
+    assignment = Assignment(
+        course_id=course_id,
+        module_id=module_id,
+        title=title.strip(),
+        description=description.strip() if description else None,
+    )
+    db.add(assignment)
+    await db.commit()
+    await db.refresh(assignment)
+    return assignment
+
+
+async def list_assignments(
+    db: AsyncSession,
+    *,
+    course_id: int,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[Assignment]:
+    offset = max(0, offset)
+    limit = min(max(1, limit), 500)
+    result = await db.execute(
+        select(Assignment)
+        .where(Assignment.course_id == course_id)
+        .order_by(Assignment.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def get_assignment(db: AsyncSession, *, assignment_id: int) -> Assignment | None:
+    return await db.get(Assignment, assignment_id)
+
+
+async def update_assignment(
+    db: AsyncSession,
+    *,
+    assignment: Assignment,
+    title: str | None,
+    description: str | None,
+    module_id: int | None,
+) -> Assignment:
+    if title is not None:
+        assignment.title = title.strip()
+    if description is not None:
+        assignment.description = description.strip() if description else None
+    if module_id is not None:
+        assignment.module_id = module_id
+    await db.commit()
+    await db.refresh(assignment)
+    return assignment
+
+
+async def delete_assignment(db: AsyncSession, *, assignment: Assignment) -> None:
+    await db.delete(assignment)
+    await db.commit()
+
