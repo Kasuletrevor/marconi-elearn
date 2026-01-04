@@ -5,10 +5,14 @@ import pytest
 async def test_orgs_crud(client):
     await client.get("/api/v1/health")
 
-    await client.post(
-        "/api/v1/orgs",
-        json={"name": "Org A"},
-    )
+    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
+    assert r.status_code == 201
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
+    assert r.status_code == 200
+
+    r = await client.post("/api/v1/orgs", json={"name": "Org A"})
+    assert r.status_code == 201
+
     r = await client.get("/api/v1/orgs")
     assert r.status_code == 200
     data = r.json()
@@ -30,6 +34,18 @@ async def test_auth_login_me_logout(client):
 
     r = await client.get("/api/v1/auth/me")
     assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_org_endpoints_require_auth(client):
+    r = await client.post("/api/v1/orgs", json={"name": "X"})
+    assert r.status_code == 401
+
+    r = await client.get("/api/v1/orgs")
+    assert r.status_code == 401
+
+    r = await client.post("/api/v1/users", json={"email": "a@example.com", "password": "password123"})
+    assert r.status_code == 201
 
     r = await client.post("/api/v1/auth/login", json={"email": "a@example.com", "password": "password123"})
     assert r.status_code == 200
