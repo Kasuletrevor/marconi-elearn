@@ -10,6 +10,11 @@ class UserEmailTakenError(Exception):
     pass
 
 
+async def get_user_by_email(db: AsyncSession, *, email: str) -> User | None:
+    result = await db.execute(select(User).where(User.email == email.lower()))
+    return result.scalars().first()
+
+
 async def create_user(db: AsyncSession, *, email: str, password: str) -> User:
     user = User(email=email.lower(), password_hash=hash_password(password))
     db.add(user)
@@ -31,4 +36,3 @@ async def list_users(db: AsyncSession, *, offset: int = 0, limit: int = 100) -> 
 
 async def get_user(db: AsyncSession, *, user_id: int) -> User | None:
     return await db.get(User, user_id)
-
