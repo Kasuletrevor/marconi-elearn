@@ -21,3 +21,26 @@ async def test_orgs_crud(client):
 
     r = await client.delete(f"/api/v1/orgs/{org_id}")
     assert r.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_auth_login_me_logout(client):
+    r = await client.post("/api/v1/users", json={"email": "a@example.com", "password": "password123"})
+    assert r.status_code == 201
+
+    r = await client.get("/api/v1/auth/me")
+    assert r.status_code == 401
+
+    r = await client.post("/api/v1/auth/login", json={"email": "a@example.com", "password": "password123"})
+    assert r.status_code == 200
+    assert "set-cookie" in r.headers
+
+    r = await client.get("/api/v1/auth/me")
+    assert r.status_code == 200
+    assert r.json()["email"] == "a@example.com"
+
+    r = await client.post("/api/v1/auth/logout")
+    assert r.status_code == 204
+
+    r = await client.get("/api/v1/auth/me")
+    assert r.status_code == 401
