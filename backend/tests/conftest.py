@@ -1,11 +1,9 @@
 import asyncio
 import os
 from collections.abc import AsyncGenerator
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -14,8 +12,6 @@ from app.main import app
 
 if os.name == "nt":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
-
-load_dotenv(Path(__file__).parent.parent / ".env")
 
 
 def _async_db_url() -> str:
