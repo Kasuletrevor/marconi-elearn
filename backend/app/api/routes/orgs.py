@@ -3,15 +3,20 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps.auth import get_current_user
+from app.api.deps.permissions import require_org_admin
 from app.crud.organizations import (
     OrgNameTakenError,
     create_organization,
     delete_organization,
     get_organization,
-    list_organizations,
+    list_admin_organizations,
     update_organization,
 )
+from app.crud.org_memberships import add_membership
 from app.db.deps import get_db
+from app.models.organization_membership import OrgRole
+from app.models.user import User
 from app.schemas.organization import OrganizationCreate, OrganizationOut, OrganizationUpdate
 
 router = APIRouter(prefix="/orgs")
@@ -21,9 +26,12 @@ router = APIRouter(prefix="/orgs")
 async def create_org(
     payload: OrganizationCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> OrganizationOut:
     try:
-        return await create_organization(db, name=payload.name)
+        org = await create_organization(db, name=payload.name)
+        await add_membership(db, organization_id=org.id, user_id=current_user.id, role=OrgRole.admin)
+        return org
     except OrgNameTakenError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -34,16 +42,19 @@ async def create_org(
 @router.get("", response_model=list[OrganizationOut])
 async def list_orgs(
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     offset: int = 0,
     limit: int = 100,
 ) -> list[OrganizationOut]:
-    return await list_organizations(db, offset=offset, limit=limit)
+    return await list_admin_organizations(db, user_id=current_user.id, offset=offset, limit=limit)
 
 
 @router.get("/{org_id}", response_model=OrganizationOut)
 async def get_org(
     org_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
+    _require_admin: Annotated[None, Depends(require_org_admin)],
 ) -> OrganizationOut:
     org = await get_organization(db, org_id=org_id)
     if org is None:
@@ -56,6 +67,8 @@ async def update_org(
     org_id: int,
     payload: OrganizationUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
+    _require_admin: Annotated[None, Depends(require_org_admin)],
 ) -> OrganizationOut:
     org = await get_organization(db, org_id=org_id)
     if org is None:
@@ -74,6 +87,8 @@ async def update_org(
 async def delete_org(
     org_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
+    _require_admin: Annotated[None, Depends(require_org_admin)],
 ) -> None:
     org = await get_organization(db, org_id=org_id)
     if org is None:
