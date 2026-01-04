@@ -59,13 +59,13 @@ Organization (tenant)
 ### 2.2 Authentication & User Management
 
 > [!CAUTION]
-> **No JWT for sessions.** Use server-side sessions (Auth.js + DB) for proper revocation, role changes, and session invalidation.
+> **No JWT for sessions.** Use server-side sessions (DB-backed) for proper revocation, role changes, and session invalidation.
 
 **Approach**: Invite-based with secure onboarding (no self-registration)
 
 | Feature | Description |
 |---------|-------------|
-| Session Management | Auth.js with PostgreSQL session store |
+| Session Management | Backend-managed sessions stored in PostgreSQL (HTTP-only cookie) |
 | Lecturer Onboarding | Super-admin sends invite link |
 | Student Enrollment | Single-use invite links (time-boxed, 7 days) |
 | First Login | Forced password set on first login |
@@ -299,7 +299,7 @@ Core entities (high-level):
 - InviteToken (single-use, time-boxed)
 - Extension (per-student deadline override)
 - AuditLog
-- Session (server-side, Auth.js)
+- Session (server-side, DB-backed cookie sessions)
 - AIReview (async job + stored feedback)
 
 Key relationships:
@@ -315,7 +315,7 @@ Key relationships:
 ### 4.3 Key API Routes
 
 ```
-/api/v1/auth/*        - Authentication (invite login, sessions)
+/api/v1/auth/*        - Authentication (login/logout/me, sessions)
 /api/v1/orgs/*        - Organization management
 /api/v1/courses/*     - Course CRUD
 /api/v1/modules/*     - Module management
@@ -376,8 +376,11 @@ Key relationships:
 ## 6. Development Phases
 
 ### Phase 1: Foundation (Week 1-2)
-- [ ] Project setup (Next.js, Prisma, PostgreSQL)
-- [ ] Auth.js with DB sessions
+- [x] Backend scaffold (FastAPI, SQLAlchemy, Alembic)
+- [x] Organization/User/Course membership models (initial)
+- [x] Alembic migrations (initial)
+- [x] API + CRUD test harness (pytest + async)
+- [x] DB-backed cookie sessions (login/logout/me)
 - [ ] Organization/tenant model
 - [ ] Role-based access control
 - [ ] Invite system with single-use tokens
@@ -463,7 +466,7 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_...
 |---------|------------|
 | Code Execution | Isolated JOBE container, resource limits, separate network |
 | Session Hijacking | Server-side sessions, secure cookies, CSRF protection |
-| SQL Injection | Prisma ORM with parameterized queries |
+| SQL Injection | SQLAlchemy parameterized queries |
 | XSS | React's built-in escaping + CSP headers |
 | Invite Token Leaks | Single-use, time-boxed, secure random generation |
 | File Uploads | Type validation, size limits, separate storage |
@@ -497,7 +500,7 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_...
 | AI Budget | Optional; budget-capped when enabled (amount TBD) |
 | Offline Work | Yes. Students can download assignments (PDF + starter code) |
 | Code Execution | JOBE Server (self-hosted on Render) |
-| Authentication | Auth.js with server-side DB sessions (not JWT) |
+| Authentication | FastAPI auth; DB-backed cookie sessions (not JWT) |
 | Invites | Single-use, time-boxed invite links |
 | Multi-Tenant | Organization model with course-scoped roles |
 | AI Reviews | Async, optional, budget-capped |
