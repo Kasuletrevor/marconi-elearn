@@ -6,7 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
 from app.crud.courses import create_course, delete_course, get_course, list_courses, update_course
+from app.crud.course_memberships import add_course_membership
 from app.db.deps import get_db
+from app.models.course_membership import CourseRole
+from app.models.user import User
 from app.schemas.course import CourseCreateInOrg, CourseOut, CourseUpdate
 
 router = APIRouter(
@@ -20,14 +23,17 @@ async def create_course_in_org(
     org_id: int,
     payload: CourseCreateInOrg,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> CourseOut:
-    return await create_course(
+    course = await create_course(
         db,
         organization_id=org_id,
         code=payload.code,
         title=payload.title,
         description=payload.description,
     )
+    await add_course_membership(db, course_id=course.id, user_id=current_user.id, role=CourseRole.owner)
+    return course
 
 
 @router.get("", response_model=list[CourseOut])
@@ -82,4 +88,3 @@ async def delete_course_in_org(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     await delete_course(db, course=course)
     return None
-
