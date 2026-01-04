@@ -1,10 +1,18 @@
 import pytest
 
 
+async def _login_admin(client) -> None:
+    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
+    assert r.status_code == 201
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
+    assert r.status_code == 200
+
+
 @pytest.mark.asyncio
 async def test_org_memberships_crud(client):
     await client.get("/api/v1/health")
 
+    await _login_admin(client)
     r = await client.post("/api/v1/orgs", json={"name": "Test Org"})
     assert r.status_code == 201
     org_id = r.json()["id"]
@@ -30,8 +38,8 @@ async def test_org_memberships_crud(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships")
     assert r.status_code == 200
     memberships = r.json()
-    assert len(memberships) == 1
-    assert memberships[0]["id"] == membership_id
+    assert len(memberships) == 2
+    assert membership_id in {m["id"] for m in memberships}
 
     r = await client.patch(
         f"/api/v1/orgs/{org_id}/memberships/{membership_id}",
@@ -47,11 +55,12 @@ async def test_org_memberships_crud(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships")
     assert r.status_code == 200
     memberships = r.json()
-    assert len(memberships) == 0
+    assert len(memberships) == 1
 
 
 @pytest.mark.asyncio
 async def test_duplicate_membership_returns_409(client):
+    await _login_admin(client)
     r = await client.post("/api/v1/orgs", json={"name": "Test Org"})
     org_id = r.json()["id"]
 
@@ -73,6 +82,7 @@ async def test_duplicate_membership_returns_409(client):
 
 @pytest.mark.asyncio
 async def test_membership_not_found_for_different_org(client):
+    await _login_admin(client)
     r = await client.post("/api/v1/orgs", json={"name": "Org 1"})
     org1_id = r.json()["id"]
 
@@ -105,6 +115,7 @@ async def test_membership_not_found_for_different_org(client):
 
 @pytest.mark.asyncio
 async def test_list_memberships_pagination(client):
+    await _login_admin(client)
     r = await client.post("/api/v1/orgs", json={"name": "Test Org"})
     org_id = r.json()["id"]
 
@@ -127,4 +138,4 @@ async def test_list_memberships_pagination(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships?offset=2&limit=2")
     assert r.status_code == 200
     memberships = r.json()
-    assert len(memberships) == 1
+    assert len(memberships) == 2
