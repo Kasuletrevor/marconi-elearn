@@ -11,18 +11,20 @@ router = APIRouter(prefix="/users")
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def create_user(
+async def create_user_endpoint(
     payload: UserCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserOut:
     try:
         return await create_user(db, email=str(payload.email), password=payload.password)
     except UserEmailTakenError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Email already exists"
+        ) from exc
 
 
 @router.get("", response_model=list[UserOut])
-async def list_users(
+async def list_users_endpoint(
     db: Annotated[AsyncSession, Depends(get_db)],
     offset: int = 0,
     limit: int = 100,
@@ -31,7 +33,7 @@ async def list_users(
 
 
 @router.get("/{user_id}", response_model=UserOut)
-async def get_user(
+async def get_user_endpoint(
     user_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserOut:
