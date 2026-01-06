@@ -1,4 +1,4 @@
- - Grading workflow upgrades: bulk actions (mark grading/graded), pagination, “next ungraded” navigation, per-course “missing submissions” list.
+  - Grading workflow upgrades: bulk actions (mark grading/graded), pagination, “next ungraded” navigation, per-course “missing submissions” list.
   - Auto-grading runner: compile/run C/C++ against hidden tests, store results/artifacts, timeouts, sandbox/JOBE integration.
   - Staff submissions UI: inline code viewer (zip browsing), rubric templates, comment threads, regrade button, download-all per assignment.
   - Roster + invites productionization: Gmail SMTP send, resend invites, invite status (sent/opened/accepted), CSV issues UI, rate-limit handling.        
