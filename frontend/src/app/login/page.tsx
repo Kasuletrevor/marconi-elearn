@@ -1,0 +1,228 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { GraduationCap, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { auth, ApiError } from "@/lib/api";
+import { useAuthStore, getRedirectPath } from "@/lib/store";
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1, delayChildren: 0.1 },
+  },
+};
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { setUser } = useAuthStore();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const user = await auth.login({ email, password });
+      setUser(user);
+      router.push(getRedirectPath(user));
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.detail);
+      } else {
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[var(--background)] flex">
+      {/* Left Panel - Decorative */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[var(--primary)] relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 -left-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-[var(--secondary)]/10 rounded-full blur-3xl" />
+          <div
+            className="absolute inset-0 opacity-5"
+            style={{
+              backgroundImage: `linear-gradient(white 1px, transparent 1px),
+                                linear-gradient(90deg, white 1px, transparent 1px)`,
+              backgroundSize: "40px 40px",
+            }}
+          />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-center px-16">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+              <span className="font-[family-name:var(--font-display)] text-2xl font-semibold text-white">
+                Marconi
+              </span>
+            </div>
+
+            <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold text-white leading-tight mb-4">
+              Welcome back to
+              <br />
+              your classroom.
+            </h1>
+
+            <p className="text-white/60 text-lg max-w-md">
+              Access your courses, submit assignments, and track your progress
+              in one unified platform.
+            </p>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="w-full max-w-md"
+        >
+          {/* Mobile Logo */}
+          <motion.div variants={fadeInUp} className="lg:hidden mb-8 text-center">
+            <Link href="/" className="inline-flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[var(--primary)] flex items-center justify-center">
+                <GraduationCap className="w-5 h-5 text-white" />
+              </div>
+              <span className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
+                Marconi
+              </span>
+            </Link>
+          </motion.div>
+
+          {/* Header */}
+          <motion.div variants={fadeInUp} className="mb-8">
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)] mb-2">
+              Sign in
+            </h2>
+            <p className="text-[var(--muted-foreground)]">
+              Enter your credentials to access your account
+            </p>
+          </motion.div>
+
+          {/* Error Message */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-lg"
+            >
+              <p className="text-sm text-[var(--secondary)]">{error}</p>
+            </motion.div>
+          )}
+
+          {/* Form */}
+          <motion.form variants={fadeInUp} onSubmit={handleSubmit} className="space-y-5">
+            {/* Email Field */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Email address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@university.ac.ug"
+                  required
+                  className="w-full pl-12 pr-4 py-3 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full pl-12 pr-4 py-3 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[var(--primary)] text-white font-medium rounded-xl hover:bg-[var(--primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 focus:ring-offset-[var(--background)] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </motion.form>
+
+          {/* Footer */}
+          <motion.div variants={fadeInUp} className="mt-8 text-center">
+            <p className="text-sm text-[var(--muted-foreground)]">
+              First time here?{" "}
+              <span className="text-[var(--foreground)]">
+                Use your invite link to set up your account.
+              </span>
+            </p>
+          </motion.div>
+
+          {/* Back to Home */}
+          <motion.div variants={fadeInUp} className="mt-6 text-center">
+            <Link
+              href="/"
+              className="text-sm text-[var(--primary)] hover:underline"
+            >
+              Back to home
+            </Link>
+          </motion.div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
