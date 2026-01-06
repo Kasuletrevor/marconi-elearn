@@ -8,10 +8,12 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
+from app.crud.notifications import create_notification
 from app.crud.staff_submissions import get_staff_submission_row, list_staff_submission_rows
 from app.db.deps import get_db
 from app.models.submission import SubmissionStatus
 from app.models.user import User
+from app.models.notification import NotificationKind
 from app.schemas.staff_submissions import StaffSubmissionDetail, StaffSubmissionQueueItem, StaffSubmissionUpdate
 from app.schemas.submission import SubmissionOut
 
@@ -87,6 +89,7 @@ async def update_submission(
 
     submission = row.submission
     assignment = row.assignment
+    prior_status = submission.status
 
     if payload.score is not None and payload.score > assignment.max_points:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Score exceeds max_points")
@@ -104,6 +107,17 @@ async def update_submission(
 
     await db.commit()
     await db.refresh(submission)
+
+    if prior_status != SubmissionStatus.graded and submission.status == SubmissionStatus.graded:
+        link = f"/dashboard/courses/{row.course.id}/assignments/{row.assignment.id}"
+        await create_notification(
+            db,
+            user_id=submission.user_id,
+            kind=NotificationKind.submission_graded,
+            title=f"Graded: {row.assignment.title}",
+            body=None,
+            link_url=link,
+        )
     return submission
 
 
@@ -126,4 +140,3 @@ async def download_submission(
         filename=row.submission.file_name,
         media_type=row.submission.content_type or "application/octet-stream",
     )
-

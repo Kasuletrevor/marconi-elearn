@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
-from app.api.deps.course_permissions import require_course_staff
 from app.api.deps.permissions import require_org_admin
 from app.crud.courses import get_course
 from app.crud.invites import create_course_student_invites, parse_roster_from_csv_bytes
@@ -24,7 +23,6 @@ async def import_roster_csv(
     course_id: int,
     file: Annotated[UploadFile, File()],
     db: Annotated[AsyncSession, Depends(get_db)],
-    _require_staff: Annotated[None, Depends(require_course_staff)],
 ) -> dict:
     course = await get_course(db, course_id=course_id)
     if course is None or course.organization_id != org_id:

@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
-from app.api.deps.course_permissions import require_course_staff
 from app.api.deps.permissions import require_org_admin
 from app.crud.course_memberships import (
     CourseMembershipExistsError,
@@ -35,7 +34,6 @@ async def enroll_user(
     course_id: int,
     payload: CourseMembershipCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _require_staff: Annotated[None, Depends(require_course_staff)],
 ) -> CourseMembershipOut:
     await _require_course_in_org(db, org_id=org_id, course_id=course_id)
     try:
@@ -49,7 +47,6 @@ async def list_course_roster(
     org_id: int,
     course_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _require_staff: Annotated[None, Depends(require_course_staff)],
     offset: int = 0,
     limit: int = 100,
 ) -> list[CourseMembershipOut]:
@@ -63,7 +60,6 @@ async def remove_from_course(
     course_id: int,
     membership_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _require_staff: Annotated[None, Depends(require_course_staff)],
 ) -> None:
     await _require_course_in_org(db, org_id=org_id, course_id=course_id)
     membership = await get_course_membership(db, membership_id=membership_id)
@@ -71,4 +67,3 @@ async def remove_from_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
     await delete_course_membership(db, membership=membership)
     return None
-

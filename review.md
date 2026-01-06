@@ -1,0 +1,10 @@
+ - Grading workflow upgrades: bulk actions (mark grading/graded), pagination, “next ungraded” navigation, per-course “missing submissions” list.
+  - Auto-grading runner: compile/run C/C++ against hidden tests, store results/artifacts, timeouts, sandbox/JOBE integration.
+  - Staff submissions UI: inline code viewer (zip browsing), rubric templates, comment threads, regrade button, download-all per assignment.
+  - Roster + invites productionization: Gmail SMTP send, resend invites, invite status (sent/opened/accepted), CSV issues UI, rate-limit handling.        
+  - Course content/resources: module resources (PDF/links/files), permissions, ordering, visibility toggles.
+  - Admin management: create/edit courses with semester/year, assign staff roles, manage org memberships in UI.
+  - Student experience: “My submissions” global page, per-assignment history view polish, download their own submissions, notifications.
+  - Audit & observability: activity log, basic metrics, error reporting, structured logs.
+  - Security hardening: file download auth checks across edge cases, content-type safety, size limits, session rotation, CSRF posture (since cookies).    
+  - Data model completeness: assignment “published” state, late policy, multiple attempts policy, submission versioning

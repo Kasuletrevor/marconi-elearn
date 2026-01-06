@@ -3,18 +3,21 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.course_permissions import require_course_student_or_staff
 from app.crud.assignments import get_assignment
 from app.crud.submissions import create_submission, list_submissions
+from app.crud.student_submissions import get_student_submission_row, list_student_submission_rows
 from app.crud.student_views import list_course_assignments, list_course_modules, list_my_courses
 from app.db.deps import get_db
 from app.models.user import User
 from app.schemas.assignment import AssignmentOut
 from app.schemas.course import CourseOut
 from app.schemas.module import ModuleOut
+from app.schemas.student_submissions import StudentSubmissionItem
 from app.schemas.submission import SubmissionOut
 
 router = APIRouter(prefix="/student", dependencies=[Depends(get_current_user)])
@@ -128,3 +131,57 @@ async def submit_assignment(
         storage_path=str(dest),
     )
     return submission
+
+
+@router.get("/submissions", response_model=list[StudentSubmissionItem])
+async def my_submissions(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    course_id: int | None = None,
+    assignment_id: int | None = None,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[StudentSubmissionItem]:
+    rows = await list_student_submission_rows(
+        db,
+        user_id=current_user.id,
+        course_id=course_id,
+        assignment_id=assignment_id,
+        offset=offset,
+        limit=limit,
+    )
+    return [
+        StudentSubmissionItem(
+            id=r.submission.id,
+            course_id=r.course.id,
+            course_code=r.course.code,
+            course_title=r.course.title,
+            assignment_id=r.assignment.id,
+            assignment_title=r.assignment.title,
+            max_points=r.assignment.max_points,
+            submitted_at=r.submission.submitted_at,
+            status=r.submission.status,
+            score=r.submission.score,
+            feedback=r.submission.feedback,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/submissions/{submission_id}/download")
+async def download_my_submission(
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> FileResponse:
+    row = await get_student_submission_row(db, user_id=current_user.id, submission_id=submission_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    storage_path = Path(row.submission.storage_path)
+    if not storage_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(
+        path=storage_path,
+        filename=row.submission.file_name,
+        media_type=row.submission.content_type or "application/octet-stream",
+    )
