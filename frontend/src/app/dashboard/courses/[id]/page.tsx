@@ -1,0 +1,402 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import {
+  ArrowLeft,
+  BookOpen,
+  Calendar,
+  Clock,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  ChevronRight,
+  FolderOpen,
+} from "lucide-react";
+import {
+  student,
+  type Course,
+  type Module,
+  type Assignment,
+  ApiError,
+} from "@/lib/api";
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
+  },
+};
+
+interface ModuleWithAssignments extends Module {
+  assignments: Assignment[];
+}
+
+export default function CourseDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const courseId = Number(params.id);
+
+  const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchCourseData() {
+      if (!courseId || isNaN(courseId)) {
+        setError("Invalid course ID");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch course, modules, and assignments in parallel
+        const [courseData, modulesData, assignmentsData] = await Promise.all([
+          student.getCourse(courseId),
+          student.getModules(courseId),
+          student.getAssignments(courseId),
+        ]);
+
+        setCourse(courseData);
+        setModules(modulesData);
+        setAssignments(assignmentsData);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          if (err.status === 404) {
+            setError("Course not found");
+          } else if (err.status === 403) {
+            setError("You don't have access to this course");
+          } else {
+            setError(err.detail);
+          }
+        } else {
+          setError("Failed to load course data");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchCourseData();
+  }, [courseId]);
+
+  // Group assignments by module
+  const modulesWithAssignments: ModuleWithAssignments[] = modules
+    .sort((a, b) => a.position - b.position)
+    .map((module) => ({
+      ...module,
+      assignments: assignments.filter((a) => a.module_id === module.id),
+    }));
+
+  // Assignments not in any module (shouldn't happen, but just in case)
+  const unassignedAssignments = assignments.filter(
+    (a) => !modules.some((m) => m.id === a.module_id)
+  );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to courses</span>
+        </button>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-2xl text-center"
+        >
+          <AlertCircle className="w-8 h-8 text-[var(--secondary)] mx-auto mb-3" />
+          <p className="text-[var(--secondary)]">{error}</p>
+          <Link
+            href="/dashboard"
+            className="inline-block mt-4 text-[var(--primary)] hover:underline"
+          >
+            Go to dashboard
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!course) return null;
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      {/* Back button */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to courses</span>
+        </Link>
+      </motion.div>
+
+      {/* Course Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8"
+      >
+        <div className="flex items-start gap-4 mb-4">
+          <div className="w-14 h-14 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+            <BookOpen className="w-7 h-7 text-[var(--primary)]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="inline-block px-2 py-1 text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] rounded-md mb-2">
+              {course.code}
+            </span>
+            <h1 className="font-[family-name:var(--font-display)] text-2xl md:text-3xl font-bold text-[var(--foreground)]">
+              {course.title}
+            </h1>
+          </div>
+        </div>
+
+        {course.description && (
+          <p className="text-[var(--muted-foreground)] mb-4">
+            {course.description}
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--muted-foreground)]">
+          {course.semester && course.year && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4" />
+              <span>
+                {course.semester}, {course.year}
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5">
+            <FolderOpen className="w-4 h-4" />
+            <span>{modules.length} modules</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <FileText className="w-4 h-4" />
+            <span>{assignments.length} assignments</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Empty state */}
+      {modules.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-16 bg-[var(--card)] border border-[var(--border)] rounded-2xl"
+        >
+          <FolderOpen className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
+          <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mb-2">
+            No content yet
+          </h2>
+          <p className="text-[var(--muted-foreground)] max-w-md mx-auto">
+            Your instructor hasn&apos;t added any modules or assignments to this
+            course yet. Check back later!
+          </p>
+        </motion.div>
+      )}
+
+      {/* Modules List */}
+      {modules.length > 0 && (
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
+          {modulesWithAssignments.map((module) => (
+            <ModuleCard key={module.id} module={module} courseId={courseId} />
+          ))}
+
+          {/* Unassigned assignments (fallback) */}
+          {unassignedAssignments.length > 0 && (
+            <motion.div variants={fadeInUp}>
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+                <div className="p-4 bg-[var(--background)] border-b border-[var(--border)]">
+                  <h2 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
+                    Other Assignments
+                  </h2>
+                </div>
+                <div className="divide-y divide-[var(--border)]">
+                  {unassignedAssignments.map((assignment) => (
+                    <AssignmentRow
+                      key={assignment.id}
+                      assignment={assignment}
+                      courseId={courseId}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+interface ModuleCardProps {
+  module: ModuleWithAssignments;
+  courseId: number;
+}
+
+function ModuleCard({ module, courseId }: ModuleCardProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  return (
+    <motion.div variants={fadeInUp}>
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        {/* Module Header */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full p-4 flex items-center gap-3 bg-[var(--background)] border-b border-[var(--border)] hover:bg-[var(--card)] transition-colors text-left"
+        >
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+            <span className="text-sm font-semibold text-[var(--primary)]">
+              {module.position}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
+              {module.title}
+            </h2>
+            {module.description && (
+              <p className="text-sm text-[var(--muted-foreground)] truncate">
+                {module.description}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--muted-foreground)] bg-[var(--background)] px-2 py-1 rounded-md">
+              {module.assignments.length} assignment
+              {module.assignments.length !== 1 ? "s" : ""}
+            </span>
+            <ChevronRight
+              className={`w-5 h-5 text-[var(--muted-foreground)] transition-transform ${
+                isExpanded ? "rotate-90" : ""
+              }`}
+            />
+          </div>
+        </button>
+
+        {/* Assignments List */}
+        {isExpanded && (
+          <div className="divide-y divide-[var(--border)]">
+            {module.assignments.length === 0 ? (
+              <div className="p-6 text-center text-[var(--muted-foreground)] text-sm">
+                No assignments in this module yet
+              </div>
+            ) : (
+              module.assignments.map((assignment) => (
+                <AssignmentRow
+                  key={assignment.id}
+                  assignment={assignment}
+                  courseId={courseId}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+interface AssignmentRowProps {
+  assignment: Assignment;
+  courseId: number;
+}
+
+function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
+  const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;
+  const isPastDue = dueDate && dueDate < new Date();
+  const isUpcoming =
+    dueDate &&
+    dueDate > new Date() &&
+    dueDate.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000; // within 7 days
+
+  return (
+    <Link
+      href={`/dashboard/courses/${courseId}/assignments/${assignment.id}`}
+      className="group flex items-center gap-4 p-4 hover:bg-[var(--background)] transition-colors"
+    >
+      <div
+        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+          isPastDue
+            ? "bg-[var(--secondary)]/10"
+            : isUpcoming
+            ? "bg-amber-500/10"
+            : "bg-[var(--primary)]/10"
+        }`}
+      >
+        <FileText
+          className={`w-5 h-5 ${
+            isPastDue
+              ? "text-[var(--secondary)]"
+              : isUpcoming
+              ? "text-amber-600"
+              : "text-[var(--primary)]"
+          }`}
+        />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <h3 className="font-medium text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
+          {assignment.title}
+        </h3>
+        <div className="flex items-center gap-3 mt-1">
+          {dueDate && (
+            <span
+              className={`flex items-center gap-1 text-xs ${
+                isPastDue
+                  ? "text-[var(--secondary)]"
+                  : isUpcoming
+                  ? "text-amber-600"
+                  : "text-[var(--muted-foreground)]"
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              {isPastDue ? "Past due: " : "Due: "}
+              {dueDate.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+          <span className="text-xs text-[var(--muted-foreground)]">
+            {assignment.max_points} pts
+          </span>
+        </div>
+      </div>
+
+      <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
+    </Link>
+  );
+}
