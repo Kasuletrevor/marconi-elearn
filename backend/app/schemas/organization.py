@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -14,4 +16,5 @@ class OrganizationOut(BaseModel):
 
     id: int
     name: str
-
+    created_at: datetime
+    updated_at: datetime

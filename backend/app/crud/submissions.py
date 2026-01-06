@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.submission import Submission
+from app.models.submission import Submission, SubmissionStatus
 
 
 async def create_submission(
@@ -21,6 +21,7 @@ async def create_submission(
         content_type=content_type,
         size_bytes=size_bytes,
         storage_path=storage_path,
+        status=SubmissionStatus.pending,
     )
     db.add(submission)
     await db.commit()
@@ -43,4 +44,3 @@ async def list_submissions(
         stmt = stmt.where(Submission.user_id == user_id)
     result = await db.execute(stmt.offset(offset).limit(limit))
     return list(result.scalars().all())
-

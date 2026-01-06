@@ -11,12 +11,16 @@ async def create_course(
     code: str,
     title: str,
     description: str | None,
+    semester: str | None = None,
+    year: int | None = None,
 ) -> Course:
     course = Course(
         organization_id=organization_id,
         code=code.strip(),
         title=title.strip(),
         description=description.strip() if description else None,
+        semester=semester.strip() if semester else None,
+        year=year,
     )
     db.add(course)
     await db.commit()
@@ -52,6 +56,8 @@ async def update_course(
     code: str | None,
     title: str | None,
     description: str | None,
+    semester: str | None,
+    year: int | None,
 ) -> Course:
     if code is not None:
         course.code = code.strip()
@@ -59,6 +65,10 @@ async def update_course(
         course.title = title.strip()
     if description is not None:
         course.description = description.strip() if description else None
+    if semester is not None:
+        course.semester = semester.strip() if semester else None
+    if year is not None:
+        course.year = year
     await db.commit()
     await db.refresh(course)
     return course
@@ -67,4 +77,3 @@ async def update_course(
 async def delete_course(db: AsyncSession, *, course: Course) -> None:
     await db.delete(course)
     await db.commit()
-

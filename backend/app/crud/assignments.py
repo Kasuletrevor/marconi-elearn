@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,12 +13,16 @@ async def create_assignment(
     module_id: int | None,
     title: str,
     description: str | None,
+    due_date: datetime | None,
+    max_points: int,
 ) -> Assignment:
     assignment = Assignment(
         course_id=course_id,
         module_id=module_id,
         title=title.strip(),
         description=description.strip() if description else None,
+        due_date=due_date,
+        max_points=max_points,
     )
     db.add(assignment)
     await db.commit()
@@ -54,6 +60,8 @@ async def update_assignment(
     title: str | None,
     description: str | None,
     module_id: int | None,
+    due_date: datetime | None,
+    max_points: int | None,
 ) -> Assignment:
     if title is not None:
         assignment.title = title.strip()
@@ -61,6 +69,10 @@ async def update_assignment(
         assignment.description = description.strip() if description else None
     if module_id is not None:
         assignment.module_id = module_id
+    if due_date is not None:
+        assignment.due_date = due_date
+    if max_points is not None:
+        assignment.max_points = max_points
     await db.commit()
     await db.refresh(assignment)
     return assignment
@@ -69,4 +81,3 @@ async def update_assignment(
 async def delete_assignment(db: AsyncSession, *, assignment: Assignment) -> None:
     await db.delete(assignment)
     await db.commit()
-

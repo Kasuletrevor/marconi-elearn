@@ -1,4 +1,6 @@
-from sqlalchemy import ForeignKey, String
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -12,4 +14,5 @@ class Assignment(Base):
     module_id: Mapped[int | None] = mapped_column(ForeignKey("modules.id", ondelete="SET NULL"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(String(10_000), default=None)
-
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    max_points: Mapped[int] = mapped_column(Integer, default=100)
