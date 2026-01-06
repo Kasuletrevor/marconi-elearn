@@ -9,7 +9,6 @@ import {
   Loader2,
   FileText,
   ChevronRight,
-  Download,
   RefreshCw,
 } from "lucide-react";
 import { courseStaff, staffSubmissions, type Course, type StaffSubmissionQueueItem, ApiError } from "@/lib/api";
@@ -38,10 +37,12 @@ export default function StaffSubmissionsQueuePage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
 
+  type CourseOption = { id: number | "all"; title: string; code: string };
+
   const courseOptions = useMemo(() => {
-    return [{ id: "all" as const, title: "All courses", code: "All" }].concat(
-      courses.map((c) => ({ id: c.id, title: c.title, code: c.code }))
-    );
+    const options: CourseOption[] = [{ id: "all", title: "All courses", code: "All" }];
+    options.push(...courses.map((c) => ({ id: c.id, title: c.title, code: c.code })));
+    return options;
   }, [courses]);
 
   async function fetchData(refresh = false) {
@@ -237,4 +238,3 @@ export default function StaffSubmissionsQueuePage() {
     </div>
   );
 }
-
