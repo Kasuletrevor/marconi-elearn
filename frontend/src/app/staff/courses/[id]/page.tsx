@@ -18,6 +18,8 @@ import {
   Calendar,
   Clock,
   ChevronRight,
+  Filter,
+  RefreshCw,
   MoreVertical,
   Pencil,
   Trash2,
@@ -25,6 +27,8 @@ import {
 import {
   student,
   courseStaff,
+  staffSubmissions,
+  type StaffSubmissionQueueItem,
   type Course,
   type Module,
   type Assignment,
@@ -46,7 +50,7 @@ const staggerContainer = {
   },
 };
 
-type TabType = "overview" | "roster" | "assignments" | "modules";
+type TabType = "overview" | "submissions" | "roster" | "assignments" | "modules";
 
 export default function StaffCoursePage() {
   const params = useParams();
@@ -112,8 +116,9 @@ export default function StaffCoursePage() {
     fetchCourseData();
   }, [courseId]);
 
-  const tabs: { id: TabType; label: string; icon: typeof BookOpen }[] = [
+  const tabs: { id: TabType; label: string; icon: typeof BookOpen }[] = [       
     { id: "overview", label: "Overview", icon: BookOpen },
+    { id: "submissions", label: "Submissions", icon: FileText },
     { id: "roster", label: "Roster", icon: Users },
     { id: "assignments", label: "Assignments", icon: FileText },
     { id: "modules", label: "Modules", icon: FolderOpen },
@@ -342,6 +347,9 @@ export default function StaffCoursePage() {
             memberships={memberships}
           />
         )}
+        {activeTab === "submissions" && (
+          <CourseSubmissionsTab courseId={courseId} />
+        )}
         {activeTab === "roster" && (
           <RosterTab
             course={course}
@@ -470,6 +478,183 @@ function OverviewTab({
             Description
           </h2>
           <p className="text-[var(--muted-foreground)]">{course.description}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Submissions Tab (per-course)
+interface CourseSubmissionsTabProps {
+  courseId: number;
+}
+
+const submissionStatusBadge: Record<
+  StaffSubmissionQueueItem["status"],
+  { label: string; className: string }
+> = {
+  pending: { label: "Pending", className: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
+  grading: { label: "Grading", className: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
+  graded: { label: "Graded", className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+  error: { label: "Error", className: "bg-[var(--secondary)]/10 text-[var(--secondary)] border-[var(--secondary)]/20" },
+};
+
+function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
+  const [items, setItems] = useState<StaffSubmissionQueueItem[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StaffSubmissionQueueItem["status"] | "all">("pending");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  async function fetchQueue(refresh = false) {
+    try {
+      setError("");
+      refresh ? setIsRefreshing(true) : setIsLoading(true);
+      const data = await staffSubmissions.listQueue({
+        course_id: courseId,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        limit: 100,
+      });
+      setItems(data);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to load submissions");
+    } finally {
+      refresh ? setIsRefreshing(false) : setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchQueue(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, statusFilter]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div className="flex-1">
+          <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)] mb-1">
+            Course Submissions
+          </h2>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Filter, grade, and download — without leaving the course context.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchQueue(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] transition-colors"
+          >
+            {isRefreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Refresh
+          </button>
+          <Link
+            href="/staff/submissions"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors"
+          >
+            Open full queue
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+
+      <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl">
+        <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+          Status
+        </label>
+        <div className="relative max-w-sm">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value === "all" ? "all" : (e.target.value as StaffSubmissionQueueItem["status"]))
+            }
+            className="w-full pl-10 pr-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          >
+            <option value="pending">Pending</option>
+            <option value="grading">Grading</option>
+            <option value="graded">Graded</option>
+            <option value="error">Error</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-7 h-7 text-[var(--primary)] animate-spin" />
+        </div>
+      )}
+
+      {!isLoading && error && (
+        <div className="p-6 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-2xl">
+          <p className="text-[var(--secondary)]">{error}</p>
+        </div>
+      )}
+
+      {!isLoading && !error && items.length === 0 && (
+        <div className="p-10 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center">
+            <FileText className="w-7 h-7 text-[var(--muted-foreground)]" />
+          </div>
+          <p className="text-[var(--foreground)] font-medium mb-1">No submissions found</p>
+          <p className="text-sm text-[var(--muted-foreground)]">Try a different status filter.</p>
+        </div>
+      )}
+
+      {!isLoading && !error && items.length > 0 && (
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+          <div className="grid grid-cols-12 gap-0 px-5 py-3 border-b border-[var(--border)] text-xs text-[var(--muted-foreground)]">
+            <div className="col-span-6">Student / Assignment</div>
+            <div className="col-span-3">File</div>
+            <div className="col-span-2">Submitted</div>
+            <div className="col-span-1 text-right">Status</div>
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {items.map((s) => (
+              <Link
+                key={s.id}
+                href={`/staff/submissions/${s.id}`}
+                className="group grid grid-cols-12 gap-0 px-5 py-4 hover:bg-[var(--background)] transition-colors"
+              >
+                <div className="col-span-6 min-w-0">
+                  <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                    {s.student_full_name || s.student_email}
+                  </p>
+                  <p className="text-xs text-[var(--muted-foreground)] truncate">
+                    {s.assignment_title}
+                  </p>
+                </div>
+
+                <div className="col-span-3 min-w-0">
+                  <p className="text-sm text-[var(--foreground)] truncate">{s.file_name}</p>
+                  {s.score !== null && (
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      {s.score} / {s.max_points}
+                    </p>
+                  )}
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-sm text-[var(--foreground)]">
+                    {new Date(s.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    {new Date(s.submitted_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                  </p>
+                </div>
+
+                <div className="col-span-1 flex items-center justify-end gap-2">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-medium ${submissionStatusBadge[s.status].className}`}
+                  >
+                    {submissionStatusBadge[s.status].label}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] transition-colors" />
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>
