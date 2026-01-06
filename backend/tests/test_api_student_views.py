@@ -57,6 +57,11 @@ async def test_student_can_list_their_courses_modules_assignments(client):
     assert r.status_code == 200
     assert len(r.json()) == 1
 
+    assignment_id = r.json()[0]["id"]
+    r = await client.get(f"/api/v1/student/courses/{course_id}/assignments/{assignment_id}/submissions")
+    assert r.status_code == 200
+    assert r.json() == []
+
 
 @pytest.mark.asyncio
 async def test_student_cannot_view_unenrolled_course(client):
@@ -80,3 +85,5 @@ async def test_student_cannot_view_unenrolled_course(client):
     )
     assert r.status_code == 403
 
+    r = await client.get(f"/api/v1/student/courses/{course_id}/assignments/{assignment_id}/submissions")
+    assert r.status_code == 403

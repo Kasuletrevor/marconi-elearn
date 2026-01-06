@@ -53,7 +53,11 @@ async def test_org_endpoints_require_auth(client):
 
     r = await client.get("/api/v1/auth/me")
     assert r.status_code == 200
-    assert r.json()["email"] == "a@example.com"
+    data = r.json()
+    assert data["email"] == "a@example.com"
+    assert data["is_superadmin"] is False
+    assert data["org_admin_of"] == []
+    assert data["course_roles"] == []
 
     r = await client.post("/api/v1/auth/logout")
     assert r.status_code == 204

@@ -18,7 +18,7 @@ from app.schemas.submission import SubmissionOut
 
 router = APIRouter(prefix="/orgs/{org_id}/courses/{course_id}/assignments/{assignment_id}/submissions")
 
-_ALLOWED_EXTENSIONS = {".c", ".cpp", ".zip"}
+_ALLOWED_EXTENSIONS = {".c", ".cpp", ".h", ".hpp", ".zip"}
 _MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 

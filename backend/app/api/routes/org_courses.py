@@ -31,6 +31,8 @@ async def create_course_in_org(
         code=payload.code,
         title=payload.title,
         description=payload.description,
+        semester=payload.semester,
+        year=payload.year,
     )
     await add_course_membership(db, course_id=course.id, user_id=current_user.id, role=CourseRole.owner)
     return course
@@ -74,6 +76,8 @@ async def update_course_in_org(
         code=payload.code,
         title=payload.title,
         description=payload.description,
+        semester=payload.semester,
+        year=payload.year,
     )
 
 

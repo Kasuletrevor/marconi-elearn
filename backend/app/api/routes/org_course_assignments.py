@@ -46,6 +46,8 @@ async def create_assignment_in_course(
         module_id=payload.module_id,
         title=payload.title,
         description=payload.description,
+        due_date=payload.due_date,
+        max_points=payload.max_points,
     )
 
 
@@ -94,6 +96,8 @@ async def update_assignment_in_course(
         title=payload.title,
         description=payload.description,
         module_id=payload.module_id,
+        due_date=payload.due_date,
+        max_points=payload.max_points,
     )
 
 
@@ -110,4 +114,3 @@ async def delete_assignment_in_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
     await delete_assignment(db, assignment=assignment)
     return None
-

@@ -69,3 +69,6 @@ async def test_student_can_submit_but_cannot_list_submissions(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/courses/{course_id}/assignments/{assignment_id}/submissions")
     assert r.status_code == 403
 
+    r = await client.get(f"/api/v1/student/courses/{course_id}/assignments/{assignment_id}/submissions")
+    assert r.status_code == 200
+    assert len(r.json()) == 1
