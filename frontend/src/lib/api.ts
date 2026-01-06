@@ -176,20 +176,20 @@ export interface StaffSubmissionUpdate {
    MODULE RESOURCES TYPES
    ============================================ */
 
+export type ModuleResourceKind = "link" | "file";
+
 export interface ModuleResource {
   id: number;
   module_id: number;
   title: string;
-  resource_type: "link" | "file";
+  kind: ModuleResourceKind;
   url: string | null;
-  file_path: string | null;
   file_name: string | null;
   content_type: string | null;
   size_bytes: number | null;
   position: number;
   is_published: boolean;
   created_at: string;
-  updated_at: string;
 }
 
 export interface ModuleResourceLinkCreate {
@@ -229,14 +229,15 @@ export interface StudentSubmission {
    NOTIFICATION TYPES
    ============================================ */
 
+export type NotificationKind = "submission_graded";
+
 export interface Notification {
   id: number;
-  user_id: number;
-  notification_type: "assignment_due" | "grade_posted" | "feedback" | "system";
+  kind: NotificationKind;
   title: string;
-  message: string;
-  link: string | null;
-  is_read: boolean;
+  body: string | null;
+  link_url: string | null;
+  read_at: string | null;
   created_at: string;
 }
 
@@ -469,7 +470,7 @@ export const notifications = {
     return handleResponse<Notification[]>(res);
   },
 
-  async markRead(notificationId: number): Promise<void> {
+  async markRead(notificationId: number): Promise<Notification> {
     const res = await fetch(
       `${API_BASE}/api/v1/student/notifications/${notificationId}/read`,
       {
@@ -477,7 +478,7 @@ export const notifications = {
         credentials: "include",
       }
     );
-    return handleResponse<void>(res);
+    return handleResponse<Notification>(res);
   },
 };
 
