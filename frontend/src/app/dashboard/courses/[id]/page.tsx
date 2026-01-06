@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -15,12 +15,17 @@ import {
   Loader2,
   ChevronRight,
   FolderOpen,
+  Link as LinkIcon,
+  Download,
+  ExternalLink,
+  File,
 } from "lucide-react";
 import {
   student,
   type Course,
   type Module,
   type Assignment,
+  type ModuleResource,
   ApiError,
 } from "@/lib/api";
 
@@ -267,6 +272,63 @@ interface ModuleCardProps {
 
 function ModuleCard({ module, courseId }: ModuleCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [resources, setResources] = useState<ModuleResource[]>([]);
+  const [isLoadingResources, setIsLoadingResources] = useState(false);
+  const [resourcesLoaded, setResourcesLoaded] = useState(false);
+
+  // Fetch resources when expanded for the first time
+  useEffect(() => {
+    if (isExpanded && !resourcesLoaded) {
+      fetchResources();
+    }
+  }, [isExpanded, resourcesLoaded]);
+
+  async function fetchResources() {
+    setIsLoadingResources(true);
+    try {
+      const data = await student.getModuleResources(courseId, module.id);
+      setResources(data.sort((a, b) => a.position - b.position));
+      setResourcesLoaded(true);
+    } catch (err) {
+      // Silently fail - resources are optional
+      console.error("Failed to load resources:", err);
+      setResourcesLoaded(true);
+    } finally {
+      setIsLoadingResources(false);
+    }
+  }
+
+  async function handleDownload(resource: ModuleResource) {
+    try {
+      const blob = await student.downloadResource(resource.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = resource.file_name || "download";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download:", err);
+    }
+  }
+
+  function formatFileSize(bytes: number | null) {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function getFileIcon(contentType: string | null) {
+    if (!contentType) return <File className="w-4 h-4" />;
+    if (contentType.includes("pdf")) return <FileText className="w-4 h-4" />;
+    if (contentType.includes("image")) return <File className="w-4 h-4" />;
+    return <File className="w-4 h-4" />;
+  }
+
+  const hasContent = module.assignments.length > 0 || resources.length > 0;
 
   return (
     <motion.div variants={fadeInUp}>
@@ -304,22 +366,103 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
           </div>
         </button>
 
-        {/* Assignments List */}
+        {/* Content (Resources + Assignments) */}
         {isExpanded && (
-          <div className="divide-y divide-[var(--border)]">
-            {module.assignments.length === 0 ? (
-              <div className="p-6 text-center text-[var(--muted-foreground)] text-sm">
-                No assignments in this module yet
+          <div>
+            {/* Resources Section */}
+            {isLoadingResources && (
+              <div className="p-4 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 text-[var(--primary)] animate-spin" />
               </div>
-            ) : (
-              module.assignments.map((assignment) => (
-                <AssignmentRow
-                  key={assignment.id}
-                  assignment={assignment}
-                  courseId={courseId}
-                />
-              ))
             )}
+
+            {!isLoadingResources && resources.length > 0 && (
+              <div className="p-4 bg-[var(--primary)]/[0.02] border-b border-[var(--border)]">
+                <h3 className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide mb-3">
+                  Resources
+                </h3>
+                <div className="grid gap-2">
+                  {resources.map((resource) => (
+                    <div
+                      key={resource.id}
+                      className="flex items-center gap-3 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)]/30 transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                        {resource.kind === "link" ? (
+                          <LinkIcon className="w-4 h-4 text-[var(--primary)]" />
+                        ) : (
+                          <span className="text-[var(--primary)]">
+                            {getFileIcon(resource.content_type)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                          {resource.title}
+                        </p>
+                        {resource.kind === "file" && resource.size_bytes != null && (
+                          <p className="text-xs text-[var(--muted-foreground)]">
+                            {formatFileSize(resource.size_bytes)}
+                          </p>
+                        )}
+                      </div>
+                      {resource.kind === "link" ? (
+                        <a
+                          href={resource.url || "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-lg transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Open
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => handleDownload(resource)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-lg transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assignments List */}
+            <div className="divide-y divide-[var(--border)]">
+              {!isLoadingResources && !hasContent && (
+                <div className="p-6 text-center text-[var(--muted-foreground)] text-sm">
+                  No content in this module yet
+                </div>
+              )}
+              {module.assignments.length === 0 && resources.length > 0 && (
+                <div className="p-4 text-center text-[var(--muted-foreground)] text-sm">
+                  No assignments in this module
+                </div>
+              )}
+              {module.assignments.length > 0 && (
+                <>
+                  {resources.length > 0 && (
+                    <div className="px-4 pt-4 pb-2">
+                      <h3 className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide">
+                        Assignments
+                      </h3>
+                    </div>
+                  )}
+                  {module.assignments.map((assignment) => (
+                    <AssignmentRow
+                      key={assignment.id}
+                      assignment={assignment}
+                      courseId={courseId}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
