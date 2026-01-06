@@ -1,4 +1,4 @@
-﻿# Marconi Elearn - Educational Platform Specification
+# Marconi Elearn - Educational Platform Specification
 
 > A modern Learning Management System for lecturers to manage courses, assignments, and provide AI-powered feedback on student code submissions.
 
@@ -26,6 +26,40 @@
 - Semester-based course organization
 
 ---
+
+## Branding & UI Direction
+
+**Aesthetic**: Modern Academic Archive (warm paper + editorial typography) with a restrained “tech lab” precision.
+
+**Primary Brand Anchor**: EmergentAI-style deep navy (from `emergentai.png`) for a credible, institutional feel.
+
+### Typography
+
+- Headings: Playfair Display (serif)
+- Body: DM Sans (sans)
+- Code: JetBrains Mono (monospace)
+
+### Color Tokens (Design System)
+
+Core:
+- Primary (Emergent Navy): `#193E74`
+- Primary Hover: `#2C5FA8`
+- Secondary Accent (CEDAT brick): `#B24A3A`
+- Canvas (Warm Paper): `#F5F2ED`
+- Surface (Ice Blue): `#EEF6FB`
+- Text (Ink): `#1A1A1A`
+- Muted Text: `#475569`
+- Border: `#D8E3EE`
+
+AI “dot” accents (use sparingly for badges/charts, not as primary UI):
+- Red `#E94B4B`, Orange `#F28C3A`, Yellow `#F5C542`, Green `#2FBF71`, Cyan `#2EC5D3`, Blue `#3B82F6`, Purple `#8B5CF6`
+
+### Frontend Libraries (Planned)
+
+- Icons: `lucide-react`
+- Motion: `framer-motion`
+- Class utilities: `clsx`, `tailwind-merge`, `class-variance-authority`
+- Client state: `zustand`
 
 ## 2. Core Features
 
@@ -505,6 +539,40 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_...
 | Multi-Tenant | Organization model with course-scoped roles |
 | AI Reviews | Async, optional, budget-capped |
 | Operational | Audit logs, CSV exports, late policy, observability |
+
+---
+
+## 11. Frontend Design System
+
+**Aesthetic**: Modern Academic Archive — editorial, trustworthy, tech-forward.
+
+### Color Palette
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--background` | `#F5F2ED` | Warm Paper canvas |
+| `--foreground` | `#1A1A1A` | Ink Black text |
+| `--primary` | `#193E74` | Emergent Navy (buttons, links, nav) |
+| `--primary-hover` | `#2C5FA8` | Navy hover state |
+| `--secondary` | `#B24A3A` | CEDAT Brick accent |
+| `--secondary-hover` | `#8F3B2E` | Brick hover state |
+| `--card` | `#EEF6FB` | Ice Blue surfaces |
+| `--muted-foreground` | `#475569` | Secondary text |
+| `--border` | `#D8E3EE` | Dividers, outlines |
+
+### Typography
+
+| Role | Font | Fallback |
+|------|------|----------|
+| Display (h1-h6) | Playfair Display | Georgia, serif |
+| Body | DM Sans | system-ui, sans-serif |
+| Mono (code) | JetBrains Mono | monospace |
+
+### Brand References
+
+- **EmergentAI** (emergentai.ug) — Navy wordmark, multicolor AI dots
+- **CEDAT** — Warm brick tones from campus architecture
+- **Marconi Lab** — Technical precision, code-centric
 
 
 
