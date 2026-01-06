@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/* ============================================
+   MARCONI ELEARN - DESIGN TOKENS
+   Aesthetic: Modern Academic Archive
+   Palette: Emergent Navy + Warm Paper
+   ============================================ */
+
+:root {
+  /* Canvas - The warm paper background */
+  --background: #F5F2ED;
+  --foreground: #1A1A1A;
+
+  /* Brand - Emergent Navy (Primary) */
+  --primary: #193E74;
+  --primary-hover: #2C5FA8;
+  --primary-foreground: #FFFFFF;
+
+  /* Accent - CEDAT Brick (Secondary) */
+  --secondary: #B24A3A;
+  --secondary-hover: #8F3B2E;
+  --secondary-foreground: #FFFFFF;
+
+  /* Surface - Ice Blue cards */
+  --card: #EEF6FB;
+  --card-foreground: #1A1A1A;
+
+  /* Muted elements */
+  --muted: #F1F5F9;
+  --muted-foreground: #475569;
+
+  /* Borders */
+  --border: #D8E3EE;
+  --ring: #193E74;
+
+  /* Status colors */
+  --success: #16A34A;
+  --warning: #CA8A04;
+  --destructive: #DC2626;
+}
+
+/* Tailwind v4 theme configuration */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+
+  /* Typography */
+  --font-display: var(--font-playfair), Georgia, serif;
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), monospace;
+}
+
+/* Base styles */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+/* Headings use display font */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+/* Code blocks use mono font */
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus ring styles */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
