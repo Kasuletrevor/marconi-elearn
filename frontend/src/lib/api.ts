@@ -173,6 +173,74 @@ export interface StaffSubmissionUpdate {
 }
 
 /* ============================================
+   MODULE RESOURCES TYPES
+   ============================================ */
+
+export interface ModuleResource {
+  id: number;
+  module_id: number;
+  title: string;
+  resource_type: "link" | "file";
+  url: string | null;
+  file_path: string | null;
+  file_name: string | null;
+  content_type: string | null;
+  size_bytes: number | null;
+  position: number;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModuleResourceLinkCreate {
+  title: string;
+  url: string;
+  position?: number;
+  is_published?: boolean;
+}
+
+export interface ModuleResourceUpdate {
+  title?: string;
+  url?: string;
+  position?: number;
+  is_published?: boolean;
+}
+
+/* ============================================
+   STUDENT SUBMISSIONS TYPES (global view)
+   ============================================ */
+
+export interface StudentSubmission {
+  id: number;
+  assignment_id: number;
+  assignment_title: string;
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  file_name: string;
+  submitted_at: string;
+  status: "pending" | "grading" | "graded" | "error";
+  score: number | null;
+  max_points: number;
+  feedback: string | null;
+}
+
+/* ============================================
+   NOTIFICATION TYPES
+   ============================================ */
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  notification_type: "assignment_due" | "grade_posted" | "feedback" | "system";
+  title: string;
+  message: string;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+/* ============================================
    API ERROR HANDLING
    ============================================ */
 
@@ -306,6 +374,110 @@ export const student = {
       }
     );
     return handleResponse<Submission>(res);
+  },
+
+  // Module resources (published only)
+  async getModuleResources(courseId: number, moduleId: number): Promise<ModuleResource[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/student/courses/${courseId}/modules/${moduleId}/resources`,
+      { credentials: "include" }
+    );
+    return handleResponse<ModuleResource[]>(res);
+  },
+
+  async downloadResource(resourceId: number): Promise<Blob> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/student/resources/${resourceId}/download`,
+      { credentials: "include" }
+    );
+    if (!res.ok) {
+      let detail = "Failed to download file";
+      try {
+        const data = await res.json();
+        detail = data.detail || detail;
+      } catch {
+        // ignore
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.blob();
+  },
+};
+
+/* ============================================
+   STUDENT SUBMISSIONS (global view)
+   ============================================ */
+
+export const studentSubmissions = {
+  async list(params?: {
+    course_id?: number;
+    assignment_id?: number;
+    offset?: number;
+    limit?: number;
+  }): Promise<StudentSubmission[]> {
+    const query = new URLSearchParams();
+    if (params?.course_id !== undefined) query.set("course_id", String(params.course_id));
+    if (params?.assignment_id !== undefined) query.set("assignment_id", String(params.assignment_id));
+    if (params?.offset !== undefined) query.set("offset", String(params.offset));
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+
+    const qs = query.toString();
+    const res = await fetch(`${API_BASE}/api/v1/student/submissions${qs ? `?${qs}` : ""}`, {
+      credentials: "include",
+    });
+    return handleResponse<StudentSubmission[]>(res);
+  },
+
+  async download(submissionId: number): Promise<Blob> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/student/submissions/${submissionId}/download`,
+      { credentials: "include" }
+    );
+    if (!res.ok) {
+      let detail = "Failed to download file";
+      try {
+        const data = await res.json();
+        detail = data.detail || detail;
+      } catch {
+        // ignore
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.blob();
+  },
+};
+
+/* ============================================
+   STUDENT NOTIFICATIONS
+   ============================================ */
+
+export const notifications = {
+  async list(params?: {
+    unread_only?: boolean;
+    offset?: number;
+    limit?: number;
+  }): Promise<Notification[]> {
+    const query = new URLSearchParams();
+    if (params?.unread_only) query.set("unread_only", "true");
+    if (params?.offset !== undefined) query.set("offset", String(params.offset));
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+
+    const qs = query.toString();
+    const res = await fetch(`${API_BASE}/api/v1/student/notifications${qs ? `?${qs}` : ""}`, {
+      credentials: "include",
+    });
+    return handleResponse<Notification[]>(res);
+  },
+
+  async markRead(notificationId: number): Promise<void> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/student/notifications/${notificationId}/read`,
+      {
+        method: "POST",
+        credentials: "include",
+      }
+    );
+    return handleResponse<void>(res);
   },
 };
 
@@ -647,6 +819,104 @@ export const courseStaff = {
       body: form,
     });
     return handleResponse<ImportCsvResult>(res);
+  },
+
+  // Module resources (staff - includes unpublished)
+  async listModuleResources(courseId: number, moduleId: number): Promise<ModuleResource[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/modules/${moduleId}/resources`,
+      { credentials: "include" }
+    );
+    return handleResponse<ModuleResource[]>(res);
+  },
+
+  async createLinkResource(
+    courseId: number,
+    moduleId: number,
+    data: ModuleResourceLinkCreate
+  ): Promise<ModuleResource> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/modules/${moduleId}/resources/link`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse<ModuleResource>(res);
+  },
+
+  async uploadFileResource(
+    courseId: number,
+    moduleId: number,
+    file: File,
+    title: string,
+    position?: number,
+    isPublished?: boolean
+  ): Promise<ModuleResource> {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("title", title);
+    if (position !== undefined) form.append("position", String(position));
+    if (isPublished !== undefined) form.append("is_published", String(isPublished));
+
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/modules/${moduleId}/resources/file`,
+      {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      }
+    );
+    return handleResponse<ModuleResource>(res);
+  },
+
+  async updateModuleResource(
+    courseId: number,
+    moduleId: number,
+    resourceId: number,
+    data: ModuleResourceUpdate
+  ): Promise<ModuleResource> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/modules/${moduleId}/resources/${resourceId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse<ModuleResource>(res);
+  },
+
+  async deleteModuleResource(courseId: number, moduleId: number, resourceId: number): Promise<void> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/modules/${moduleId}/resources/${resourceId}`,
+      {
+        method: "DELETE",
+        credentials: "include",
+      }
+    );
+    return handleResponse<void>(res);
+  },
+
+  async downloadModuleResource(courseId: number, moduleId: number, resourceId: number): Promise<Blob> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/modules/${moduleId}/resources/${resourceId}/download`,
+      { credentials: "include" }
+    );
+    if (!res.ok) {
+      let detail = "Failed to download file";
+      try {
+        const data = await res.json();
+        detail = data.detail || detail;
+      } catch {
+        // ignore
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.blob();
   },
 };
 
