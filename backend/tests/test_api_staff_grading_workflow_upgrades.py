@@ -6,9 +6,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_staff_queue_upgrades_pagination_bulk_next_and_missing(client):
     # Admin creates org/course/assignment and enrolls two students
-    r = await client.post("/api/v1/users", json={"email": "admin2@example.com", "password": "password123"})
-    assert r.status_code == 201
-    r = await client.post("/api/v1/auth/login", json={"email": "admin2@example.com", "password": "password123"})
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
     r = await client.post("/api/v1/orgs", json={"name": "Org B"})
@@ -60,7 +58,7 @@ async def test_staff_queue_upgrades_pagination_bulk_next_and_missing(client):
 
     # Admin checks paginated queue and "next ungraded"
     await client.post("/api/v1/auth/logout")
-    r = await client.post("/api/v1/auth/login", json={"email": "admin2@example.com", "password": "password123"})
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
     r = await client.get(f"/api/v1/staff/submissions/page?course_id={course_id}&offset=0&limit=1")
@@ -100,4 +98,3 @@ async def test_staff_queue_upgrades_pagination_bulk_next_and_missing(client):
     r = await client.get("/api/v1/student/notifications?unread_only=true")
     assert r.status_code == 200
     assert any(n["kind"] == "submission_graded" for n in r.json())
-
