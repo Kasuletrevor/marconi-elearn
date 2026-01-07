@@ -12,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
-import { orgs, staff, users, type Organization, type OrgMembership, ApiError } from "@/lib/api";
+import { orgUsers, orgs, staff, type Organization, type OrgMembership, ApiError } from "@/lib/api";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -35,30 +35,14 @@ export default function AdminMembersPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
   const [memberships, setMemberships] = useState<OrgMembership[]>([]);
-  const [userEmailById, setUserEmailById] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [newUserId, setNewUserId] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<OrgMembership["role"]>("lecturer");
   const [isAdding, setIsAdding] = useState(false);
 
   const adminOrgIds = useMemo(() => new Set(user?.org_admin_of ?? []), [user]);
-
-  async function hydrateEmails(rows: OrgMembership[]) {
-    const ids = Array.from(new Set(rows.map((m) => m.user_id))).filter((id) => !userEmailById[id]);
-    if (ids.length === 0) return;
-    try {
-      const pairs = await Promise.all(ids.map(async (id) => [id, (await users.get(id)).email] as const));
-      setUserEmailById((prev) => {
-        const next = { ...prev };
-        for (const [id, email] of pairs) next[id] = email;
-        return next;
-      });
-    } catch {
-      // ignore
-    }
-  }
 
   async function loadOrganizations() {
     if (!user) return;
@@ -82,7 +66,6 @@ export default function AdminMembersPage() {
     try {
       const rows = await staff.listOrgMemberships(orgId, 0, 500);
       setMemberships(rows);
-      await hydrateEmails(rows);
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load organization members");
@@ -101,16 +84,16 @@ export default function AdminMembersPage() {
 
   async function addMember() {
     if (!selectedOrgId) return;
-    const id = Number(newUserId);
-    if (!id || Number.isNaN(id)) return;
+    const email = newEmail.trim();
+    if (!email) return;
     setIsAdding(true);
     setError("");
     try {
-      const created = await staff.addOrgMembership(selectedOrgId, { user_id: id, role: newRole });
+      const lookedUp = await orgUsers.lookup(selectedOrgId, email);
+      const created = await staff.addOrgMembership(selectedOrgId, { user_id: lookedUp.id, role: newRole });
       const next = [...memberships, created];
       setMemberships(next);
-      setNewUserId("");
-      await hydrateEmails(next);
+      setNewEmail("");
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to add member");
@@ -208,19 +191,19 @@ export default function AdminMembersPage() {
             <div>
               <p className="text-sm font-medium text-[var(--foreground)]">Add member</p>
               <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                Temporary input: user ID. Later we should support email-based invites.
+                Add by email. If the user doesn’t exist yet, ask a superadmin to create/invite them.
               </p>
             </div>
           </div>
 
           <div className="mt-4 grid md:grid-cols-3 gap-3 items-end">
             <div>
-              <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">User ID</label>
+              <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Email</label>
               <input
-                value={newUserId}
-                onChange={(e) => setNewUserId(e.target.value)}
-                inputMode="numeric"
-                placeholder="e.g. 42"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                inputMode="email"
+                placeholder="e.g. lecturer@university.edu"
                 className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               />
             </div>
@@ -236,11 +219,11 @@ export default function AdminMembersPage() {
                 <option value="ta">{roleLabel("ta")}</option>
               </select>
             </div>
-            <button
-              onClick={addMember}
-              disabled={!selectedOrgId || isAdding || !newUserId.trim()}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            >
+              <button
+                onClick={addMember}
+                disabled={!selectedOrgId || isAdding || !newEmail.trim()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
               {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Add
             </button>
@@ -279,7 +262,7 @@ export default function AdminMembersPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-[var(--foreground)] truncate">
-                      {userEmailById[m.user_id] ?? `User #${m.user_id}`}
+                      {m.user_email ?? `User #${m.user_id}`}
                     </p>
                     <p className="text-xs text-[var(--muted-foreground)]">User ID: {m.user_id}</p>
                   </div>
@@ -308,4 +291,3 @@ export default function AdminMembersPage() {
     </div>
   );
 }
-
