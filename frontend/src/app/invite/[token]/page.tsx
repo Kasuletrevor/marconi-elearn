@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   GraduationCap,
+  Building2,
   Lock,
   ArrowRight,
   Loader2,
@@ -145,6 +146,8 @@ export default function InvitePage({ params }: InvitePageProps) {
     );
   }
 
+  const isCourseInvite = inviteInfo?.course_id != null;
+
   return (
     <div className="min-h-screen bg-[var(--background)] flex">
       {/* Left Panel - Decorative */}
@@ -180,12 +183,13 @@ export default function InvitePage({ params }: InvitePageProps) {
             <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold text-white leading-tight mb-4">
               You&apos;re invited to
               <br />
-              join a course.
+              {isCourseInvite ? "join a course." : "join the staff team."}
             </h1>
 
             <p className="text-white/60 text-lg max-w-md">
-              Set up your password to complete your enrollment and start
-              learning.
+              {isCourseInvite
+                ? "Set up your password to complete your enrollment and start learning."
+                : "Set up your password to activate your staff account and start managing courses."}
             </p>
           </motion.div>
         </div>
@@ -219,21 +223,29 @@ export default function InvitePage({ params }: InvitePageProps) {
             >
               <div className="flex items-start gap-4">
                 <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 h-5 text-[var(--primary)]" />
+                  {isCourseInvite ? (
+                    <BookOpen className="w-5 h-5 text-[var(--primary)]" />
+                  ) : (
+                    <Building2 className="w-5 h-5 text-[var(--primary)]" />
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-[var(--muted-foreground)] mb-1">
-                    You&apos;re being enrolled in
+                    {isCourseInvite
+                      ? "You're being enrolled in"
+                      : "You're being added to"}
                   </p>
                   <p className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)]">
-                    {inviteInfo.course_title || "A course"}
+                    {isCourseInvite
+                      ? inviteInfo.course_title || "A course"
+                      : inviteInfo.organization_name || "an organization"}
                   </p>
-                  {inviteInfo.organization_name && (
+                  {isCourseInvite && inviteInfo.organization_name && (
                     <p className="text-sm text-[var(--muted-foreground)] mt-1">
                       {inviteInfo.organization_name}
                     </p>
                   )}
-                  {inviteInfo.course_code && (
+                  {isCourseInvite && inviteInfo.course_code && (
                     <p className="mt-2 inline-flex items-center rounded-full bg-[var(--primary)]/10 px-3 py-1 text-xs font-medium text-[var(--primary)]">
                       {inviteInfo.course_code}
                     </p>
