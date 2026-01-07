@@ -168,6 +168,10 @@ export interface OrgMembershipUpdate {
   role?: "admin" | "lecturer" | "ta" | null;
 }
 
+export interface OrgMembershipInviteResult extends OrgMembership {
+  invite_link?: string | null;
+}
+
 export interface UserPublic {
   id: number;
   email: string;
@@ -829,6 +833,19 @@ export const staff = {
       body: JSON.stringify(data),
     });
     return handleResponse<OrgMembership>(res);
+  },
+
+  async addOrgMembershipByEmail(
+    orgId: number,
+    data: { email: string; role: OrgMembership["role"] }
+  ): Promise<OrgMembershipInviteResult> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}/memberships/by-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<OrgMembershipInviteResult>(res);
   },
 
   async updateOrgMembership(orgId: number, membershipId: number, data: OrgMembershipUpdate): Promise<OrgMembership> {
