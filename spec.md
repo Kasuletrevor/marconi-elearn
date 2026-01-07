@@ -259,6 +259,13 @@ All sensitive actions are logged with timestamp, user, IP, and details:
 | Submission Retractions | If allowed, who and when |
 | Login/Logout | User, IP, user agent |
 
+MVP (implemented now):
+- Storage: `audit_events` table in Postgres (org-scoped).
+- API: `GET /api/v1/orgs/{org_id}/audit` (org admin or superadmin).
+- UI: `/admin/audit` (org admin view).
+- Logged today: org creation, org membership add/update/remove, course create/update/delete, roster import, invite acceptance, grading/submission updates, assignment extension upsert/delete.
+- Not yet: IP/user agent capture, export to CSV, and full coverage of every action.
+
 ### 3.2 Data Export
 
 | Export | Format | Access |
@@ -283,6 +290,21 @@ Late Policy Options:
 - Lecturer can grant per-student deadline extensions
 - Extension reason logged for audit
 - Student sees adjusted deadline in their view
+
+MVP (implemented now):
+- Data model:
+  - `courses.late_policy` (JSONB, optional default policy)
+  - `assignments.late_policy` (JSONB, optional override)
+  - `assignment_extensions` (per-assignment per-student `extended_due_date`)
+- API:
+  - Set late policy via assignment/course create/update payloads (`late_policy`).
+  - Manage extensions via `PUT /api/v1/staff/courses/{course_id}/assignments/{assignment_id}/extensions/{user_id}`.
+- Student-facing:
+  - Student submission history endpoints return `effective_due_date`, `late_seconds`, `late_penalty_percent`.
+- Not yet:
+  - UI for staff to edit late policy / extensions.
+  - "No late submissions" enforcement.
+  - Applying late penalties to stored grades (currently computed and returned, not persisted).
 
 ### 3.4 Observability
 

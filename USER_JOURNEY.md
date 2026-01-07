@@ -50,7 +50,7 @@ Org admin:
 - `/admin` - org overview (your orgs, counts, links to staff pages)
 - `/admin/members` - manage org memberships
 - `/admin/courses` - create/edit org courses, assign course staff roles
-- `/admin/audit` - placeholder activity log
+- `/admin/audit` - activity log (audit events)
 - `/admin/settings` - placeholder settings
 
 Course staff:
@@ -63,12 +63,16 @@ Student:
 - `/dashboard` - student dashboard (courses + upcoming assignments)
 - `/dashboard/courses/[id]` - course detail (modules + published resources + assignments)
 - `/dashboard/courses/[id]/assignments/[assignmentId]` - assignment detail + submission history + upload
+- `/dashboard/submissions` - global submission history (download + deep links)
 
 ## Backend API Overview (Prefix)
 
 All API routes are under: `/api/v1` (see `backend/app/main.py`).
 
 Auth uses HTTP-only cookie sessions. All frontend `fetch()` calls include `credentials: "include"`.
+
+Audit events:
+- `GET /api/v1/orgs/{org_id}/audit` (org admin or superadmin)
 
 ## Common Flows and Their API Calls
 
@@ -257,8 +261,13 @@ Goal: manage content and grade submissions for the courses you teach.
   - Assignments (staff-only):
     - `GET /api/v1/staff/courses/{course_id}/assignments`
     - `POST /api/v1/staff/courses/{course_id}/assignments`
-    - `PATCH /api/v1/staff/courses/{course_id}/assignments/{assignment_id}`
-    - `DELETE /api/v1/staff/courses/{course_id}/assignments/{assignment_id}`
+    - `PATCH /api/v1/staff/courses/{course_id}/assignments/{assignment_id}`     
+    - `DELETE /api/v1/staff/courses/{course_id}/assignments/{assignment_id}`    
+  - Per-student extensions (staff-only):
+    - `GET /api/v1/staff/courses/{course_id}/assignments/{assignment_id}/extensions`
+    - `GET /api/v1/staff/courses/{course_id}/assignments/{assignment_id}/extensions/{user_id}`
+    - `PUT /api/v1/staff/courses/{course_id}/assignments/{assignment_id}/extensions/{user_id}`
+    - `DELETE /api/v1/staff/courses/{course_id}/assignments/{assignment_id}/extensions/{user_id}`
   - Resources (staff-only):
     - `GET /api/v1/staff/courses/{course_id}/modules/{module_id}/resources`
     - `POST /api/v1/staff/courses/{course_id}/modules/{module_id}/resources/link`
@@ -334,7 +343,7 @@ Goal: enroll via invite, access course content, submit assignments, track histor
   - `POST /api/v1/student/courses/{course_id}/assignments/{assignment_id}/submissions` (multipart file upload)
 
 5) Global submission history (across assignments)
-- Route: (frontend not wired yet; API exists)
+- Route: `/dashboard/submissions`
 - API:
   - `GET /api/v1/student/submissions?course_id=...&assignment_id=...&offset=...&limit=...`
   - `GET /api/v1/student/submissions/{submission_id}/download`
@@ -349,4 +358,3 @@ Goal: enroll via invite, access course content, submit assignments, track histor
 
 - Cross-site cookies: on Vercel, if your API is on a different origin, cookies require `SameSite=None; Secure` and correct CORS `allow_origins` + `allow_credentials`.
 - Frontend API base: the frontend client currently reads `NEXT_PUBLIC_API_URL` (not `NEXT_PUBLIC_API_BASE_URL`).
-
