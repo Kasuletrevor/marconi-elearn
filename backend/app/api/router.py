@@ -18,6 +18,7 @@ from app.api.routes.staff_course_modules import router as staff_course_modules_r
 from app.api.routes.staff_course_resources import router as staff_course_resources_router
 from app.api.routes.staff_course_submissions import router as staff_course_submissions_router
 from app.api.routes.staff_courses import router as staff_courses_router
+from app.api.routes.staff_missing_submissions import router as staff_missing_submissions_router
 from app.api.routes.staff_submissions import router as staff_submissions_router
 from app.api.routes.student import router as student_router
 from app.api.routes.student_notifications import router as student_notifications_router
@@ -35,6 +36,7 @@ api_router.include_router(staff_course_submissions_router, tags=["staff"])
 api_router.include_router(staff_course_memberships_router, tags=["staff"])
 api_router.include_router(staff_course_invites_router, tags=["staff"])
 api_router.include_router(staff_course_resources_router, tags=["staff"])
+api_router.include_router(staff_missing_submissions_router, tags=["staff"])
 api_router.include_router(staff_submissions_router, tags=["staff"])
 api_router.include_router(orgs_router, tags=["orgs"])
 api_router.include_router(users_router, tags=["users"])
