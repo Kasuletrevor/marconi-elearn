@@ -4,8 +4,6 @@ import pytest
 
 
 async def _login_admin(client) -> None:
-    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
-    assert r.status_code == 201
     r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
@@ -77,4 +75,3 @@ async def test_submission_rejects_bad_extension(client):
         files={"file": ("payload.exe", BytesIO(b"x"), "application/octet-stream")},
     )
     assert r.status_code == 400
-
