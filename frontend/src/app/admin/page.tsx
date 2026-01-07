@@ -149,8 +149,8 @@ export default function AdminDashboardPage() {
   ];
 
   const quickActions = [
-    { label: "Create Course", href: "/admin/courses/new", icon: BookOpen },
-    { label: "Invite Staff", href: "/admin/members/invite", icon: UserPlus },
+    { label: "Create Course", href: "/admin/courses", icon: BookOpen },
+    { label: "Manage Members", href: "/admin/members", icon: UserPlus },
     { label: "View Activity", href: "/admin/audit", icon: Clock },
   ];
 
