@@ -91,12 +91,16 @@ export interface CourseCreateInOrg {
   code: string;
   title: string;
   description?: string | null;
+  semester?: string | null;
+  year?: number | null;
 }
 
 export interface CourseUpdate {
   code?: string | null;
   title?: string | null;
   description?: string | null;
+  semester?: string | null;
+  year?: number | null;
 }
 
 export interface ModuleCreate {
@@ -126,12 +130,37 @@ export interface CourseMembership {
   course_id: number;
   user_id: number;
   role: "owner" | "co_lecturer" | "ta" | "student";
-  student_number: string | null;
+  student_number?: string | null;
 }
 
 export interface CourseMembershipCreate {
   user_id: number;
   role: "owner" | "co_lecturer" | "ta" | "student";
+}
+
+export interface CourseMembershipUpdate {
+  role?: "owner" | "co_lecturer" | "ta" | "student" | null;
+}
+
+export interface OrgMembership {
+  id: number;
+  organization_id: number;
+  user_id: number;
+  role: "admin" | "lecturer" | "ta";
+}
+
+export interface OrgMembershipCreate {
+  user_id: number;
+  role: "admin" | "lecturer" | "ta";
+}
+
+export interface OrgMembershipUpdate {
+  role?: "admin" | "lecturer" | "ta" | null;
+}
+
+export interface UserPublic {
+  id: number;
+  email: string;
 }
 
 export interface ImportCsvResult {
@@ -714,6 +743,24 @@ export const staff = {
     return handleResponse<void>(res);
   },
 
+  async updateMembership(
+    orgId: number,
+    courseId: number,
+    membershipId: number,
+    data: CourseMembershipUpdate
+  ): Promise<CourseMembership> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/orgs/${orgId}/courses/${courseId}/memberships/${membershipId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse<CourseMembership>(res);
+  },
+
   async importRosterCsv(orgId: number, courseId: number, file: File): Promise<ImportCsvResult> {
     const form = new FormData();
     form.append("file", file);
@@ -723,6 +770,49 @@ export const staff = {
       body: form,
     });
     return handleResponse<ImportCsvResult>(res);
+  },
+
+  // Organization memberships (org-wide roles)
+  async listOrgMemberships(orgId: number, offset = 0, limit = 200): Promise<OrgMembership[]> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}/memberships?offset=${offset}&limit=${limit}`, {
+      credentials: "include",
+    });
+    return handleResponse<OrgMembership[]>(res);
+  },
+
+  async addOrgMembership(orgId: number, data: OrgMembershipCreate): Promise<OrgMembership> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}/memberships`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<OrgMembership>(res);
+  },
+
+  async updateOrgMembership(orgId: number, membershipId: number, data: OrgMembershipUpdate): Promise<OrgMembership> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}/memberships/${membershipId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<OrgMembership>(res);
+  },
+
+  async removeOrgMembership(orgId: number, membershipId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}/memberships/${membershipId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    return handleResponse<void>(res);
+  },
+};
+
+export const users = {
+  async get(userId: number): Promise<UserPublic> {
+    const res = await fetch(`${API_BASE}/api/v1/users/${userId}`, { credentials: "include" });
+    return handleResponse<UserPublic>(res);
   },
 };
 
