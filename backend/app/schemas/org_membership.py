@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.organization_membership import OrgRole
 
@@ -18,4 +18,5 @@ class OrgMembershipOut(BaseModel):
     id: int
     organization_id: int
     user_id: int
+    user_email: EmailStr | None = None
     role: OrgRole
