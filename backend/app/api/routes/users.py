@@ -3,11 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps.superadmin import require_superadmin
 from app.crud.users import UserEmailTakenError, create_user, get_user, list_users
 from app.db.deps import get_db
 from app.schemas.user import UserCreate, UserOut
 
-router = APIRouter(prefix="/users")
+router = APIRouter(prefix="/users", dependencies=[Depends(require_superadmin)])
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
