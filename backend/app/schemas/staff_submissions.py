@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from enum import Enum
+
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
@@ -39,3 +41,29 @@ class StaffSubmissionUpdate(BaseModel):
     score: int | None = Field(default=None, ge=0, le=1_000_000)
     feedback: str | None = Field(default=None, max_length=10_000)
 
+
+class StaffSubmissionsPage(BaseModel):
+    items: list[StaffSubmissionQueueItem]
+    total: int
+    offset: int
+    limit: int
+
+
+class StaffSubmissionBulkAction(str, Enum):
+    mark_pending = "mark_pending"
+    mark_grading = "mark_grading"
+    mark_graded = "mark_graded"
+
+
+class StaffSubmissionsBulkRequest(BaseModel):
+    submission_ids: list[int] = Field(min_length=1, max_length=200)
+    action: StaffSubmissionBulkAction
+
+
+class StaffSubmissionsBulkResult(BaseModel):
+    updated_ids: list[int]
+    skipped_ids: list[int]
+
+
+class StaffNextSubmissionOut(BaseModel):
+    submission_id: int | None
