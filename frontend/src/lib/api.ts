@@ -66,6 +66,9 @@ export interface Submission {
   score: number | null;
   feedback: string | null;
   status: "pending" | "grading" | "graded" | "error";
+  effective_due_date?: string | null;
+  late_seconds?: number | null;
+  late_penalty_percent?: number | null;
 }
 
 export interface InvitePreview {
@@ -90,6 +93,18 @@ export interface SuperadminStats {
   courses_total: number;
   submissions_total: number;
   submissions_today: number;
+}
+
+export interface AuditEvent {
+  id: number;
+  organization_id: number | null;
+  actor_user_id: number | null;
+  actor_email: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: number | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface OrganizationCreate {
@@ -306,6 +321,10 @@ export interface StudentSubmission {
   score: number | null;
   max_points: number;
   feedback: string | null;
+  due_date?: string | null;
+  effective_due_date?: string | null;
+  late_seconds?: number | null;
+  late_penalty_percent?: number | null;
 }
 
 /* ============================================
@@ -606,6 +625,16 @@ export const orgs = {
       body: JSON.stringify(data),
     });
     return handleResponse<Organization>(res);
+  },
+};
+
+export const audit = {
+  async listOrgEvents(orgId: number, offset = 0, limit = 100): Promise<AuditEvent[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/orgs/${orgId}/audit?offset=${offset}&limit=${limit}`,
+      { credentials: "include" }
+    );
+    return handleResponse<AuditEvent[]>(res);
   },
 };
 
