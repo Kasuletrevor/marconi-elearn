@@ -46,6 +46,10 @@ export default function AdminMembersPage() {
   const [newRole, setNewRole] = useState<OrgMembership["role"]>("lecturer");
   const [isAdding, setIsAdding] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [addResult, setAddResult] = useState<{
+    email: string;
+    inviteLink: string | null;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const adminOrgIds = useMemo(() => new Set(user?.org_admin_of ?? []), [user]);
@@ -101,13 +105,16 @@ export default function AdminMembersPage() {
     setIsAdding(true);
     setError("");
     setInviteLink(null);
+    setAddResult(null);
     setCopied(false);
     try {
       const created = await staff.addOrgMembershipByEmail(selectedOrgId, { email, role: newRole });
       const next = [...memberships, created];
       setMemberships(next);
       setNewEmail("");
-      if (created.invite_link) setInviteLink(created.invite_link);
+      const nextInviteLink = created.invite_link ?? null;
+      setInviteLink(nextInviteLink);
+      setAddResult({ email, inviteLink: nextInviteLink });
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to add member");
@@ -216,7 +223,7 @@ export default function AdminMembersPage() {
             <div>
               <p className="text-sm font-medium text-[var(--foreground)]">Add member</p>
               <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                Add by email. If the user doesn’t exist yet, ask a superadmin to create/invite them.
+                Add by email. If the user doesn&apos;t have an account yet, we create an invite link. If they already have an account, they can log in immediately.
               </p>
             </div>
           </div>
@@ -254,30 +261,42 @@ export default function AdminMembersPage() {
             </button>
           </div>
 
-          {inviteLink ? (
+          {addResult ? (
             <div className="mt-4 p-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] flex flex-col md:flex-row md:items-center gap-3">
               <div className="flex items-start gap-3 flex-1 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
                   <Mail className="w-5 h-5 text-[var(--primary)]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--foreground)]">Invite created</p>
-                  <p className="text-xs text-[var(--muted-foreground)] truncate">
-                    {inviteLink}
+                  <p className="text-sm font-medium text-[var(--foreground)]">
+                    {addResult.inviteLink ? "Invite created" : "Member added"}
                   </p>
-                  <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                    Send this link to the staff member so they can set a password and log in.
-                  </p>
+                  {addResult.inviteLink ? (
+                    <>
+                      <p className="text-xs text-[var(--muted-foreground)] truncate">
+                        {addResult.inviteLink}
+                      </p>
+                      <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                        Send this link to {addResult.email} so they can set a password and log in.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                      No invite link was generated. {addResult.email} already has an account; ask them to log in. If they forgot their password, we should add a password-reset flow (not built yet).
+                    </p>
+                  )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={copyInvite}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] transition-colors text-sm"
-              >
-                <Copy className="w-4 h-4" />
-                {copied ? "Copied" : "Copy link"}
-              </button>
+              {addResult.inviteLink ? (
+                <button
+                  type="button"
+                  onClick={copyInvite}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] transition-colors text-sm"
+                >
+                  <Copy className="w-4 h-4" />
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
