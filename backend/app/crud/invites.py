@@ -152,6 +152,31 @@ async def get_invite_by_token(db: AsyncSession, *, token: str) -> InviteToken | 
     return result.scalars().first()
 
 
-async def mark_invite_used(db: AsyncSession, *, invite: InviteToken) -> None:
+async def mark_invite_used(db: AsyncSession, *, invite: InviteToken) -> None:   
     invite.used_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+async def create_org_member_invite(
+    db: AsyncSession,
+    *,
+    organization_id: int,
+    email: str,
+    expires_in_days: int = 7,
+) -> str:
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+    invite = InviteToken(
+        organization_id=organization_id,
+        course_id=None,
+        email=email.strip().lower(),
+        full_name=None,
+        student_number=None,
+        programme=None,
+        token_hash=_hash_token(token),
+        expires_at=expires_at,
+        used_at=None,
+    )
+    db.add(invite)
+    await db.commit()
+    return token
