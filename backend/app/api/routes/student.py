@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
@@ -9,16 +10,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps.auth import get_current_user
 from app.api.deps.course_permissions import require_course_student_or_staff
 from app.crud.assignments import get_assignment
+from app.crud.assignment_extensions import (
+    get_assignment_extension,
+    list_assignment_extensions_for_user,
+)
+from app.crud.late_policy import (
+    compute_effective_due_date,
+    compute_late_penalty_percent,
+    resolve_late_policy,
+)
 from app.crud.submissions import create_submission, list_submissions
 from app.crud.student_submissions import get_student_submission_row, list_student_submission_rows
 from app.crud.student_views import list_course_assignments, list_course_modules, list_my_courses
 from app.db.deps import get_db
+from app.models.course import Course
 from app.models.user import User
 from app.schemas.assignment import AssignmentOut
 from app.schemas.course import CourseOut
 from app.schemas.module import ModuleOut
 from app.schemas.student_submissions import StudentSubmissionItem
-from app.schemas.submission import SubmissionOut
+from app.schemas.submission import SubmissionOut, SubmissionStudentOut
 
 router = APIRouter(prefix="/student", dependencies=[Depends(get_current_user)])
 
@@ -68,7 +79,7 @@ async def course_assignments(
 
 @router.get(
     "/courses/{course_id}/assignments/{assignment_id}/submissions",
-    response_model=list[SubmissionOut],
+    response_model=list[SubmissionStudentOut],
 )
 async def my_assignment_submissions(
     course_id: int,
@@ -82,13 +93,54 @@ async def my_assignment_submissions(
     assignment = await get_assignment(db, assignment_id=assignment_id)
     if assignment is None or assignment.course_id != course_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-    return await list_submissions(
+    course = await db.get(Course, course_id)
+    extension = await get_assignment_extension(
+        db, assignment_id=assignment_id, user_id=current_user.id
+    )
+    effective_due_date = compute_effective_due_date(
+        assignment_due_date=assignment.due_date,
+        extension_due_date=None if extension is None else extension.extended_due_date,
+    )
+    policy = resolve_late_policy(
+        course_policy=None if course is None else course.late_policy,
+        assignment_policy=assignment.late_policy,
+    )
+
+    submissions = await list_submissions(
         db,
         assignment_id=assignment_id,
         user_id=current_user.id,
         offset=offset,
         limit=limit,
     )
+
+    out: list[SubmissionStudentOut] = []
+    for submission in submissions:
+        late_seconds, late_penalty_percent = compute_late_penalty_percent(
+            submitted_at=submission.created_at,
+            effective_due_date=effective_due_date,
+            policy=policy,
+        )
+        out.append(
+            SubmissionStudentOut(
+                id=submission.id,
+                assignment_id=submission.assignment_id,
+                user_id=submission.user_id,
+                file_name=submission.file_name,
+                file_path=submission.file_path,
+                content_type=submission.content_type,
+                size_bytes=submission.size_bytes,
+                created_at=submission.created_at,
+                submitted_at=submission.submitted_at,
+                status=submission.status,
+                score=submission.score,
+                feedback=submission.feedback,
+                effective_due_date=effective_due_date,
+                late_seconds=late_seconds,
+                late_penalty_percent=late_penalty_percent,
+            )
+        )
+    return out
 
 
 @router.post(
@@ -150,22 +202,50 @@ async def my_submissions(
         offset=offset,
         limit=limit,
     )
-    return [
-        StudentSubmissionItem(
-            id=r.submission.id,
-            course_id=r.course.id,
-            course_code=r.course.code,
-            course_title=r.course.title,
-            assignment_id=r.assignment.id,
-            assignment_title=r.assignment.title,
-            max_points=r.assignment.max_points,
-            submitted_at=r.submission.submitted_at,
-            status=r.submission.status,
-            score=r.submission.score,
-            feedback=r.submission.feedback,
+    assignment_ids = sorted({r.assignment.id for r in rows})
+    extensions = await list_assignment_extensions_for_user(
+        db, user_id=current_user.id, assignment_ids=assignment_ids
+    )
+    extension_by_assignment: dict[int, datetime] = {
+        e.assignment_id: e.extended_due_date for e in extensions
+    }
+
+    out: list[StudentSubmissionItem] = []
+    for row in rows:
+        effective_due_date = compute_effective_due_date(
+            assignment_due_date=row.assignment.due_date,
+            extension_due_date=extension_by_assignment.get(row.assignment.id),
         )
-        for r in rows
-    ]
+        policy = resolve_late_policy(
+            course_policy=row.course.late_policy,
+            assignment_policy=row.assignment.late_policy,
+        )
+        late_seconds, late_penalty_percent = compute_late_penalty_percent(
+            submitted_at=row.submission.created_at,
+            effective_due_date=effective_due_date,
+            policy=policy,
+        )
+        out.append(
+            StudentSubmissionItem(
+                id=row.submission.id,
+                course_id=row.course.id,
+                course_code=row.course.code,
+                course_title=row.course.title,
+                assignment_id=row.assignment.id,
+                assignment_title=row.assignment.title,
+                max_points=row.assignment.max_points,
+                file_name=row.submission.file_name,
+                submitted_at=row.submission.submitted_at,
+                status=row.submission.status,
+                score=row.submission.score,
+                feedback=row.submission.feedback,
+                due_date=row.assignment.due_date,
+                effective_due_date=effective_due_date,
+                late_seconds=late_seconds,
+                late_penalty_percent=late_penalty_percent,
+            )
+        )
+    return out
 
 
 @router.get("/submissions/{submission_id}/download")
