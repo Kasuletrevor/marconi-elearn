@@ -15,7 +15,14 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
-import { orgs, staff, type Organization, type OrgMembership, ApiError } from "@/lib/api";
+import {
+  orgs,
+  staff,
+  superadmin,
+  type Organization,
+  type OrgMembership,
+  ApiError,
+} from "@/lib/api";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -59,13 +66,20 @@ export default function AdminMembersPage() {
     setIsLoading(true);
     setError("");
     try {
-      const all = await orgs.list();
-      const mine = all.filter((o) => adminOrgIds.has(o.id));
+      const all = user.is_superadmin
+        ? await superadmin.listOrganizations(0, 500)
+        : await orgs.list();
+      const mine = user.is_superadmin ? all : all.filter((o) => adminOrgIds.has(o.id));
       setOrganizations(mine);
       const qp = searchParams.get("org");
       const requestedOrgId = qp ? Number(qp) : null;
+      const storedOrgId =
+        typeof window !== "undefined"
+          ? Number(window.localStorage.getItem("marconi:admin_org_id") || "")
+          : null;
       setSelectedOrgId((prev) => {
         if (requestedOrgId && mine.some((o) => o.id === requestedOrgId)) return requestedOrgId;
+        if (storedOrgId && mine.some((o) => o.id === storedOrgId)) return storedOrgId;
         if (prev && mine.some((o) => o.id === prev)) return prev;
         return mine[0]?.id ?? null;
       });
@@ -96,6 +110,12 @@ export default function AdminMembersPage() {
   useEffect(() => {
     if (selectedOrgId) loadMembers(selectedOrgId);
     else setMemberships([]);
+  }, [selectedOrgId]);
+
+  useEffect(() => {
+    if (selectedOrgId && typeof window !== "undefined") {
+      window.localStorage.setItem("marconi:admin_org_id", String(selectedOrgId));
+    }
   }, [selectedOrgId]);
 
   async function addMember() {
