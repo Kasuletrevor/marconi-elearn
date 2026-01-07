@@ -1,7 +1,7 @@
 import enum
 
 from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -22,3 +22,10 @@ class CourseMembership(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     role: Mapped[CourseRole] = mapped_column(Enum(CourseRole, name="course_role"), index=True)
     student_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    user = relationship("User")
+
+    @property
+    def user_email(self) -> str | None:
+        user = getattr(self, "user", None)
+        return getattr(user, "email", None)
