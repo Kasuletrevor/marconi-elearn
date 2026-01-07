@@ -83,6 +83,14 @@ export interface Organization {
   updated_at: string;
 }
 
+export interface SuperadminStats {
+  organizations_total: number;
+  users_total: number;
+  courses_total: number;
+  submissions_total: number;
+  submissions_today: number;
+}
+
 export interface OrganizationCreate {
   name: string;
 }
@@ -563,6 +571,13 @@ export const superadmin = {
       { credentials: "include" }
     );
     return handleResponse<Organization[]>(res);
+  },
+
+  async getStats(): Promise<SuperadminStats> {
+    const res = await fetch(`${API_BASE}/api/v1/superadmin/stats`, {
+      credentials: "include",
+    });
+    return handleResponse<SuperadminStats>(res);
   },
 };
 
