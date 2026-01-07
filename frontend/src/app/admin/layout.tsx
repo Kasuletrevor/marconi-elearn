@@ -16,9 +16,10 @@ import {
   ChevronRight,
   User,
   ClipboardList,
+  Shield,
 } from "lucide-react";
-import { auth, ApiError } from "@/lib/api";
-import { useAuthStore, getRedirectPath, isOrgAdmin } from "@/lib/store";
+import { auth, ApiError, type User as UserType } from "@/lib/api";
+import { useAuthStore, getRedirectPath, isOrgAdmin, isSuperadmin } from "@/lib/store";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -45,9 +46,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       try {
         const currentUser = await auth.me();
         setUser(currentUser);
-        
+
         // Redirect if not org admin
-        if (!isOrgAdmin(currentUser)) {
+        if (!isOrgAdmin(currentUser) && !isSuperadmin(currentUser)) {
           router.push(getRedirectPath(currentUser));
         }
       } catch (err) {
@@ -86,7 +87,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  if (user && !isOrgAdmin(user)) {
+  if (user && !isOrgAdmin(user) && !isSuperadmin(user)) {
     return null; // Will redirect in useEffect
   }
 
@@ -162,7 +163,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
 interface SidebarContentProps {
   pathname: string;
-  user: { id: number; email: string } | null;
+  user: UserType | null;
   onLogout: () => void;
   isLoggingOut: boolean;
   onClose?: () => void;
@@ -177,6 +178,10 @@ function SidebarContent({
 }: SidebarContentProps) {
   const router = useRouter();
   const { enterStudentView } = useAuthStore();
+
+  const navLinks = user?.is_superadmin
+    ? [{ href: "/superadmin", label: "Platform", icon: Shield }, ...sidebarLinks]
+    : sidebarLinks;
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -206,9 +211,9 @@ function SidebarContent({
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
-        {sidebarLinks.map((link) => {
-          const isActive = pathname === link.href || 
-            (link.href !== "/admin" && pathname.startsWith(link.href));
+        {navLinks.map((link) => {
+          const isActive = pathname === link.href ||
+            (link.href !== "/admin" && pathname.startsWith(link.href));     
           return (
             <Link
               key={link.href}
