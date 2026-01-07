@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
+from app.crud.invites import create_org_member_invite
 from app.crud.org_memberships import (
     OrgMembershipExistsError,
     add_membership,
@@ -13,9 +14,16 @@ from app.crud.org_memberships import (
     list_memberships,
     update_membership,
 )
+from app.crud.users import get_user_by_email, create_pending_user
 from app.db.deps import get_db
 from app.models.user import User
-from app.schemas.org_membership import OrgMembershipCreate, OrgMembershipOut, OrgMembershipUpdate
+from app.schemas.org_membership import (
+    OrgMembershipCreate,
+    OrgMembershipCreateByEmail,
+    OrgMembershipInviteOut,
+    OrgMembershipOut,
+    OrgMembershipUpdate,
+)
 
 router = APIRouter(prefix="/orgs/{org_id}/memberships")
 
@@ -32,6 +40,39 @@ async def add_member(
         return await add_membership(db, organization_id=org_id, user_id=payload.user_id, role=payload.role)
     except OrgMembershipExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in organization") from exc
+
+
+@router.post("/by-email", response_model=OrgMembershipInviteOut, status_code=status.HTTP_201_CREATED)
+async def add_member_by_email(
+    org_id: int,
+    payload: OrgMembershipCreateByEmail,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
+    _require_admin: Annotated[None, Depends(require_org_admin)],
+) -> OrgMembershipInviteOut:
+    email = str(payload.email).strip().lower()
+    user = await get_user_by_email(db, email=email)
+    if user is None:
+        user = await create_pending_user(db, email=email)
+
+    try:
+        membership = await add_membership(db, organization_id=org_id, user_id=user.id, role=payload.role)
+    except OrgMembershipExistsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in organization") from exc
+
+    invite_link: str | None = None
+    if user.password_hash is None:
+        token = await create_org_member_invite(db, organization_id=org_id, email=email, expires_in_days=7)
+        invite_link = f"/invite/{token}"
+
+    return OrgMembershipInviteOut(
+        id=membership.id,
+        organization_id=membership.organization_id,
+        user_id=membership.user_id,
+        user_email=membership.user_email,
+        role=membership.role,
+        invite_link=invite_link,
+    )
 
 
 @router.get("", response_model=list[OrgMembershipOut])
