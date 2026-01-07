@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     session_cookie_samesite: SameSitePolicy = "lax"
     # Comma-separated list. Kept as string to avoid Pydantic JSON parsing for list types in .env.
     superadmin_emails: str = ""
+    # Optional: enables first-login bootstrap for configured superadmins.
+    # If empty, superadmins must be created via DB or an admin-only endpoint.
+    superadmin_password: str = ""
     cors_allow_origins: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(
