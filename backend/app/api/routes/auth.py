@@ -20,9 +20,46 @@ from app.models.course_membership import CourseMembership, CourseRole
 from app.models.organization_membership import OrgRole, OrganizationMembership
 from app.models.student_profile import StudentProfile
 from app.api.deps.superadmin import is_superadmin
-from app.schemas.auth import AcceptInviteRequest, CourseRoleItem, LoginRequest, MeResponse
+from app.schemas.auth import (
+    AcceptInviteRequest,
+    CourseRoleItem,
+    LoginRequest,
+    MeResponse,
+    OrgRoleItem,
+)
 
 router = APIRouter(prefix="/auth")
+
+
+async def _build_me_response(db: AsyncSession, *, user: User) -> MeResponse:
+    is_sa = is_superadmin(user)
+
+    org_result = await db.execute(
+        select(OrganizationMembership.organization_id, OrganizationMembership.role).where(
+            OrganizationMembership.user_id == user.id
+        )
+    )
+    org_rows = list(org_result.all())
+    org_admin_of = [org_id for org_id, role in org_rows if role == OrgRole.admin]
+    org_roles = [OrgRoleItem(org_id=org_id, role=role) for org_id, role in org_rows]
+
+    course_result = await db.execute(
+        select(CourseMembership.course_id, CourseMembership.role).where(
+            CourseMembership.user_id == user.id
+        )
+    )
+    course_roles = [
+        CourseRoleItem(course_id=course_id, role=role) for course_id, role in course_result.all()
+    ]
+
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        is_superadmin=is_sa,
+        org_admin_of=org_admin_of,
+        org_roles=org_roles,
+        course_roles=course_roles,
+    )
 
 
 @router.post("/login", response_model=MeResponse)
@@ -56,7 +93,7 @@ async def login(
         samesite=settings.session_cookie_samesite,
         path="/",
     )
-    return MeResponse(id=user.id, email=user.email)
+    return await _build_me_response(db, user=user)
 
 
 @router.get("/me", response_model=MeResponse)
@@ -64,32 +101,7 @@ async def me(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> MeResponse:
-    is_sa = is_superadmin(current_user)
-
-    org_result = await db.execute(
-        select(OrganizationMembership.organization_id).where(
-            OrganizationMembership.user_id == current_user.id,
-            OrganizationMembership.role == OrgRole.admin,
-        )
-    )
-    org_admin_of = list(org_result.scalars().all())
-
-    course_result = await db.execute(
-        select(CourseMembership.course_id, CourseMembership.role).where(
-            CourseMembership.user_id == current_user.id
-        )
-    )
-    course_roles = [
-        CourseRoleItem(course_id=course_id, role=role) for course_id, role in course_result.all()
-    ]
-
-    return MeResponse(
-        id=current_user.id,
-        email=current_user.email,
-        is_superadmin=is_sa,
-        org_admin_of=org_admin_of,
-        course_roles=course_roles,
-    )
+    return await _build_me_response(db, user=current_user)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -176,4 +188,4 @@ async def accept_invite(
         samesite=settings.session_cookie_samesite,
         path="/",
     )
-    return MeResponse(id=user.id, email=user.email)
+    return await _build_me_response(db, user=user)
