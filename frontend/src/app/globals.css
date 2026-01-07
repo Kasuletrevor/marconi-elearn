@@ -7,6 +7,10 @@
    ============================================ */
 
 :root {
+  --font-playfair: "Playfair Display";
+  --font-dm-sans: "DM Sans";
+  --font-jetbrains: "JetBrains Mono";
+
   /* Canvas - The warm paper background */
   --background: #F5F2ED;
   --foreground: #1A1A1A;
