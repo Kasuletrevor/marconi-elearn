@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from app.crud.course_memberships import CourseMembershipExistsError, add_course_membership
 from app.crud.invites import get_invite_by_token, mark_invite_used
 from app.crud.sessions import create_session, delete_session, get_session_by_token
-from app.crud.users import get_user_by_email
+from app.crud.users import create_user, get_user_by_email
 from app.db.deps import get_db
 from app.models.user import User
 from sqlalchemy import select
@@ -32,6 +32,14 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> MeResponse:
     user = await get_user_by_email(db, email=str(payload.email))
+    if (
+        user is None
+        and settings.superadmin_password
+        and str(payload.email).strip().lower()
+        in {e.strip().lower() for e in settings.superadmin_emails.split(",") if e.strip()}
+        and payload.password == settings.superadmin_password
+    ):
+        user = await create_user(db, email=str(payload.email), password=payload.password)
     if (
         user is None
         or user.password_hash is None
