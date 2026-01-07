@@ -54,3 +54,15 @@ async def delete_course_membership(db: AsyncSession, *, membership: CourseMember
     await db.delete(membership)
     await db.commit()
 
+
+async def update_course_membership(
+    db: AsyncSession,
+    *,
+    membership: CourseMembership,
+    role: CourseRole | None = None,
+) -> CourseMembership:
+    if role is not None:
+        membership.role = role
+    await db.commit()
+    await db.refresh(membership)
+    return membership
