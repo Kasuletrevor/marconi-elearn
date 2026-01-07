@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Building2,
@@ -9,7 +11,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  ArrowRight,
+  GraduationCap,
 } from "lucide-react";
+import { ApiError, superadmin, type SuperadminStats } from "@/lib/api";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -41,6 +46,35 @@ const systemStatus = [
 ];
 
 export default function SuperadminPage() {
+  const router = useRouter();
+  const [stats, setStats] = useState<SuperadminStats | null>(null);
+  const [metricsError, setMetricsError] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      setMetricsError("");
+      try {
+        const data = await superadmin.getStats();
+        setStats(data);
+      } catch (err) {
+        if (err instanceof ApiError) setMetricsError(err.detail);
+        else setMetricsError("Failed to load metrics");
+      }
+    }
+    load();
+  }, []);
+
+  const liveMetrics = [
+    {
+      label: "Organizations",
+      value: stats ? String(stats.organizations_total) : "—",
+      icon: Building2,
+    },
+    { label: "Total Users", value: stats ? String(stats.users_total) : "—", icon: Users },
+    { label: "Active Courses", value: stats ? String(stats.courses_total) : "—", icon: BookOpen },
+    { label: "Submissions Today", value: stats ? String(stats.submissions_today) : "—", icon: TrendingUp },
+  ] as const;
+
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
@@ -64,7 +98,7 @@ export default function SuperadminPage() {
         animate="visible"
         className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
       >
-        {metrics.map((metric) => (
+        {liveMetrics.map((metric) => (
           <motion.div
             key={metric.label}
             variants={fadeInUp}
@@ -84,6 +118,20 @@ export default function SuperadminPage() {
           </motion.div>
         ))}
       </motion.div>
+
+      {metricsError ? (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl flex items-start gap-3"
+        >
+          <AlertCircle className="w-5 h-5 text-[var(--secondary)] shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-[var(--foreground)]">Metrics unavailable</p>
+            <p className="text-sm text-[var(--muted-foreground)]">{metricsError}</p>
+          </div>
+        </motion.div>
+      ) : null}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* System Status */}
@@ -120,11 +168,15 @@ export default function SuperadminPage() {
             Quick Actions
           </h2>
           <div className="space-y-3">
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left">
+            <button
+              type="button"
+              onClick={() => router.push("/superadmin/organizations?new=1")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left"
+            >
               <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
                 <Building2 className="w-5 h-5 text-[var(--primary)]" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-medium text-[var(--foreground)]">
                   Create Organization
                 </p>
@@ -132,19 +184,43 @@ export default function SuperadminPage() {
                   Add a new organization to the platform
                 </p>
               </div>
+              <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)]" />
             </button>
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left">
-              <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-[var(--primary)]" />
+            <button
+              type="button"
+              onClick={() => router.push("/admin/members")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[var(--secondary)]/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-[var(--secondary)]" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-medium text-[var(--foreground)]">
-                  Manage Superadmins
+                  Add Org Staff
                 </p>
                 <p className="text-sm text-[var(--muted-foreground)]">
-                  Add or remove platform administrators
+                  Add lecturers/TAs/admins to an organization
                 </p>
               </div>
+              <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)]" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/courses")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
+                <GraduationCap className="w-5 h-5 text-[var(--primary)]" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-[var(--foreground)]">
+                  Create Courses
+                </p>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Create courses and assign course staff roles
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)]" />
             </button>
           </div>
         </motion.div>
