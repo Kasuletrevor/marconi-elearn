@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 from app.models.course_membership import CourseRole
 
@@ -18,4 +18,5 @@ class CourseMembershipOut(BaseModel):
     id: int
     course_id: int
     user_id: int
+    user_email: EmailStr | None = None
     role: CourseRole
