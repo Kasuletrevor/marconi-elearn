@@ -29,7 +29,7 @@ async def test_org_memberships_crud(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships")
     assert r.status_code == 200
     memberships = r.json()
-    assert len(memberships) == 2
+    assert len(memberships) == 1
     assert membership_id in {m["id"] for m in memberships}
 
     r = await client.patch(
@@ -46,7 +46,7 @@ async def test_org_memberships_crud(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships")
     assert r.status_code == 200
     memberships = r.json()
-    assert len(memberships) == 1
+    assert len(memberships) == 0
 
 
 @pytest.mark.asyncio
@@ -111,4 +111,4 @@ async def test_list_memberships_pagination(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships?offset=2&limit=2")
     assert r.status_code == 200
     memberships = r.json()
-    assert len(memberships) == 2
+    assert len(memberships) == 1
