@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import Select, and_, select
+from sqlalchemy import Select, and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -88,6 +88,87 @@ async def list_staff_submission_rows(
     return rows
 
 
+async def count_staff_submission_rows(
+    db: AsyncSession,
+    *,
+    staff_user_id: int,
+    course_id: int | None = None,
+    status: SubmissionStatus | None = None,
+) -> int:
+    stmt = _base_staff_submission_query(staff_user_id=staff_user_id)
+    if course_id is not None:
+        stmt = stmt.where(Course.id == course_id)
+    if status is not None:
+        stmt = stmt.where(Submission.status == status)
+    count_stmt = stmt.with_only_columns(func.count(Submission.id)).order_by(None)
+    result = await db.execute(count_stmt)
+    return int(result.scalar_one())
+
+
+async def list_staff_submission_rows_by_ids(
+    db: AsyncSession,
+    *,
+    staff_user_id: int,
+    submission_ids: list[int],
+) -> list[StaffSubmissionRow]:
+    if not submission_ids:
+        return []
+    stmt = _base_staff_submission_query(staff_user_id=staff_user_id).where(
+        Submission.id.in_(submission_ids)
+    )
+    result = await db.execute(stmt)
+    rows: list[StaffSubmissionRow] = []
+    for submission, assignment, course, student, profile, student_number in result.all():
+        rows.append(
+            StaffSubmissionRow(
+                submission=submission,
+                assignment=assignment,
+                course=course,
+                student=student,
+                student_profile=profile,
+                student_number=student_number,
+            )
+        )
+    return rows
+
+
+async def get_next_ungraded_staff_submission_row(
+    db: AsyncSession,
+    *,
+    staff_user_id: int,
+    course_id: int | None = None,
+    status: SubmissionStatus | None = None,
+) -> StaffSubmissionRow | None:
+    stmt = _base_staff_submission_query(staff_user_id=staff_user_id)
+    if course_id is not None:
+        stmt = stmt.where(Course.id == course_id)
+    if status is not None:
+        stmt = stmt.where(Submission.status == status)
+    else:
+        stmt = stmt.where(Submission.status != SubmissionStatus.graded)
+
+    priority = case(
+        (Submission.status == SubmissionStatus.pending, 0),
+        (Submission.status == SubmissionStatus.grading, 1),
+        (Submission.status == SubmissionStatus.error, 2),
+        else_=3,
+    )
+    stmt = stmt.order_by(priority, Submission.created_at.asc(), Submission.id.asc())
+    result = await db.execute(stmt.limit(1))
+    row = result.first()
+    if row is None:
+        return None
+    submission, assignment, course, student, profile, student_number = row
+    return StaffSubmissionRow(
+        submission=submission,
+        assignment=assignment,
+        course=course,
+        student=student,
+        student_profile=profile,
+        student_number=student_number,
+    )
+
+
 async def get_staff_submission_row(
     db: AsyncSession, *, staff_user_id: int, submission_id: int
 ) -> StaffSubmissionRow | None:
@@ -105,4 +186,3 @@ async def get_staff_submission_row(
         student_profile=profile,
         student_number=student_number,
     )
-
