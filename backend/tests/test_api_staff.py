@@ -4,8 +4,6 @@ import pytest
 @pytest.mark.asyncio
 async def test_staff_endpoints_allow_course_staff(client):
     # Admin sets up org + course
-    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
-    assert r.status_code == 201
     r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
@@ -69,9 +67,7 @@ async def test_staff_endpoints_allow_course_staff(client):
 @pytest.mark.asyncio
 async def test_staff_endpoints_reject_students(client):
     # Admin sets up org + course and enrolls a student
-    r = await client.post("/api/v1/users", json={"email": "admin2@example.com", "password": "password123"})
-    assert r.status_code == 201
-    r = await client.post("/api/v1/auth/login", json={"email": "admin2@example.com", "password": "password123"})
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
     r = await client.post("/api/v1/orgs", json={"name": "Org B"})
@@ -105,4 +101,3 @@ async def test_staff_endpoints_reject_students(client):
     # Course management endpoints should be forbidden
     r = await client.get(f"/api/v1/staff/courses/{course_id}")
     assert r.status_code == 403
-
