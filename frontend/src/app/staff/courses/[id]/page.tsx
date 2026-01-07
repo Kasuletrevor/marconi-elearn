@@ -18,11 +18,15 @@ import {
   Calendar,
   Clock,
   ChevronRight,
+  ChevronLeft,
+  ArrowRight,
   Filter,
   RefreshCw,
   MoreVertical,
   Pencil,
   Trash2,
+  Copy,
+  UserX,
   Link as LinkIcon,
   Download,
   ExternalLink,
@@ -38,6 +42,8 @@ import {
   courseStaff,
   staffSubmissions,
   type StaffSubmissionQueueItem,
+  type MissingSubmissionsSummaryItem,
+  type MissingStudentOut,
   type Course,
   type Module,
   type Assignment,
@@ -510,22 +516,140 @@ const submissionStatusBadge: Record<
 };
 
 function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
+  const router = useRouter();
   const [items, setItems] = useState<StaffSubmissionQueueItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StaffSubmissionQueueItem["status"] | "all">("pending");
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(25);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isBulkWorking, setIsBulkWorking] = useState(false);
+  const [isNavigatingNext, setIsNavigatingNext] = useState(false);
   const [error, setError] = useState("");
+
+  const [missingSummary, setMissingSummary] = useState<MissingSubmissionsSummaryItem[]>([]);
+  const [missingAssignmentId, setMissingAssignmentId] = useState<number | null>(null);
+  const [missingStudents, setMissingStudents] = useState<MissingStudentOut[]>([]);
+  const [isMissingLoading, setIsMissingLoading] = useState(false);
+  const [missingError, setMissingError] = useState("");
+
+  const selectedCount = selectedIds.size;
+  const allOnPageSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
+  const canGoPrev = offset > 0;
+  const canGoNext = offset + items.length < total;
+
+  function resetPaging() {
+    setOffset(0);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        for (const item of items) next.delete(item.id);
+      } else {
+        for (const item of items) next.add(item.id);
+      }
+      return next;
+    });
+  }
+
+  async function runBulk(action: "mark_pending" | "mark_grading" | "mark_graded") {
+    if (selectedIds.size === 0) return;
+    setIsBulkWorking(true);
+    try {
+      await staffSubmissions.bulkUpdate({
+        submission_ids: Array.from(selectedIds),
+        action,
+      });
+      setSelectedIds(new Set());
+      await fetchQueue(true);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Bulk update failed");
+    } finally {
+      setIsBulkWorking(false);
+    }
+  }
+
+  async function goNextUngraded() {
+    setIsNavigatingNext(true);
+    try {
+      const status = statusFilter === "all" || statusFilter === "graded" ? undefined : statusFilter;
+      const res = await staffSubmissions.nextUngraded({ course_id: courseId, status });
+      if (res.submission_id) {
+        router.push(`/staff/submissions/${res.submission_id}`);
+      } else {
+        setError("No ungraded submissions match this filter.");
+      }
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to find next ungraded submission");
+    } finally {
+      setIsNavigatingNext(false);
+    }
+  }
+
+  async function fetchMissingSummary() {
+    try {
+      setMissingError("");
+      const summary = await courseStaff.missingSubmissionsSummary(courseId);
+      setMissingSummary(summary);
+      const firstWithMissing = summary.find((s) => s.missing_count > 0);
+      setMissingAssignmentId(firstWithMissing ? firstWithMissing.assignment_id : null);
+    } catch (err) {
+      if (err instanceof ApiError) setMissingError(err.detail);
+      else setMissingError("Failed to load missing submissions summary");
+    }
+  }
+
+  async function fetchMissingStudents(assignmentId: number) {
+    setIsMissingLoading(true);
+    try {
+      setMissingError("");
+      const students = await courseStaff.missingSubmissions(courseId, assignmentId);
+      setMissingStudents(students);
+    } catch (err) {
+      if (err instanceof ApiError) setMissingError(err.detail);
+      else setMissingError("Failed to load missing students");
+    } finally {
+      setIsMissingLoading(false);
+    }
+  }
+
+  async function copyMissingEmails() {
+    const emails = missingStudents.map((s) => s.email).join(", ");
+    try {
+      await navigator.clipboard.writeText(emails);
+    } catch {
+      // ignore
+    }
+  }
 
   async function fetchQueue(refresh = false) {
     try {
       setError("");
       refresh ? setIsRefreshing(true) : setIsLoading(true);
-      const data = await staffSubmissions.listQueue({
+      const page = await staffSubmissions.listPage({
         course_id: courseId,
         status: statusFilter === "all" ? undefined : statusFilter,
-        limit: 100,
+        offset,
+        limit,
       });
-      setItems(data);
+      setItems(page.items);
+      setTotal(page.total);
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load submissions");
@@ -537,7 +661,26 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
   useEffect(() => {
     fetchQueue(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId, statusFilter]);
+  }, [courseId, statusFilter, offset, limit]);
+
+  useEffect(() => {
+    resetPaging();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  useEffect(() => {
+    fetchMissingSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId]);
+
+  useEffect(() => {
+    if (missingAssignmentId !== null) {
+      fetchMissingStudents(missingAssignmentId);
+    } else {
+      setMissingStudents([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingAssignmentId]);
 
   return (
     <div className="space-y-6">
@@ -557,6 +700,14 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
           >
             {isRefreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Refresh
+          </button>
+          <button
+            onClick={goNextUngraded}
+            disabled={isNavigatingNext || statusFilter === "graded"}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {isNavigatingNext ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+            Next ungraded
           </button>
           <Link
             href="/staff/submissions"
@@ -590,6 +741,142 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
         </div>
       </div>
 
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-1 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
+                Missing submissions
+              </h3>
+              <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                Who hasn&apos;t submitted yet for each assignment.
+              </p>
+            </div>
+            <button
+              onClick={fetchMissingSummary}
+              className="p-2 rounded-lg border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors"
+              aria-label="Refresh missing submissions"
+              title="Refresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+
+          {missingError && (
+            <div className="mt-3 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
+              {missingError}
+            </div>
+          )}
+
+          <div className="mt-4">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Assignment
+            </label>
+            <select
+              value={missingAssignmentId ?? ""}
+              onChange={(e) => setMissingAssignmentId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            >
+              <option value="">Select an assignment</option>
+              {missingSummary.map((a) => (
+                <option key={a.assignment_id} value={a.assignment_id}>
+                  {a.assignment_title} — {a.missing_count}/{a.total_students} missing
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {missingAssignmentId !== null && (
+            <div className="mt-4 space-y-2">
+              {(() => {
+                const active = missingSummary.find((s) => s.assignment_id === missingAssignmentId);
+                if (!active) return null;
+                return (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                      <p className="text-[var(--foreground)] font-semibold">{active.total_students}</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">Enrolled</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                      <p className="text-emerald-800 font-semibold">{active.submitted_count}</p>
+                      <p className="text-xs text-emerald-800/80">Submitted</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-amber-800 font-semibold">{active.missing_count}</p>
+                      <p className="text-xs text-amber-800/80">Missing</p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+
+        <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <UserX className="w-4 h-4 text-[var(--muted-foreground)]" />
+              <p className="text-sm font-medium text-[var(--foreground)]">Students missing</p>
+            </div>
+            <button
+              onClick={copyMissingEmails}
+              disabled={missingStudents.length === 0}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs"
+            >
+              <Copy className="w-4 h-4" />
+              Copy emails
+            </button>
+          </div>
+
+          {missingAssignmentId === null && (
+            <div className="p-8 text-center text-[var(--muted-foreground)]">
+              Select an assignment to see who is missing.
+            </div>
+          )}
+
+          {missingAssignmentId !== null && isMissingLoading && (
+            <div className="p-8 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-[var(--primary)] animate-spin" />
+            </div>
+          )}
+
+          {missingAssignmentId !== null && !isMissingLoading && missingStudents.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center">
+                <UserX className="w-7 h-7 text-[var(--muted-foreground)]" />
+              </div>
+              <p className="text-[var(--foreground)] font-medium mb-1">No one is missing</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Everyone submitted for this assignment.</p>
+            </div>
+          )}
+
+          {missingAssignmentId !== null && !isMissingLoading && missingStudents.length > 0 && (
+            <div className="divide-y divide-[var(--border)] max-h-[420px] overflow-y-auto">
+              {missingStudents.map((s) => (
+                <div key={s.user_id} className="px-5 py-3 hover:bg-[var(--background)] transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                        {s.full_name || s.email}
+                      </p>
+                      <p className="text-xs text-[var(--muted-foreground)] truncate">{s.email}</p>
+                    </div>
+                    <div className="text-right">
+                      {s.student_number && (
+                        <p className="text-xs text-[var(--foreground)]">{s.student_number}</p>
+                      )}
+                      {s.programme && (
+                        <p className="text-xs text-[var(--muted-foreground)]">{s.programme}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {isLoading && (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-7 h-7 text-[var(--primary)] animate-spin" />
@@ -614,20 +901,115 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
 
       {!isLoading && !error && items.length > 0 && (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--background)]">
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-xs text-[var(--muted-foreground)] select-none">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={toggleSelectAllOnPage}
+                  className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                />
+                Select page
+              </label>
+              <span className="text-xs text-[var(--muted-foreground)]">
+                {total === 0 ? "0" : `${offset + 1}–${offset + items.length}`} of {total}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--muted-foreground)]">{selectedCount} selected</span>
+                  <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+                    <button
+                      onClick={() => runBulk("mark_grading")}
+                      disabled={isBulkWorking}
+                      className="px-3 py-2 text-xs font-medium hover:bg-[var(--background)] disabled:opacity-60"
+                    >
+                      Mark grading
+                    </button>
+                    <div className="w-px h-7 bg-[var(--border)]" />
+                    <button
+                      onClick={() => runBulk("mark_graded")}
+                      disabled={isBulkWorking}
+                      className="px-3 py-2 text-xs font-medium hover:bg-[var(--background)] disabled:opacity-60"
+                    >
+                      Mark graded
+                    </button>
+                    <div className="w-px h-7 bg-[var(--border)]" />
+                    <button
+                      onClick={() => runBulk("mark_pending")}
+                      disabled={isBulkWorking}
+                      className="px-3 py-2 text-xs font-medium hover:bg-[var(--background)] disabled:opacity-60"
+                    >
+                      Reset pending
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setOffset((o) => Math.max(0, o - limit))}
+                  disabled={!canGoPrev}
+                  className="p-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setOffset((o) => o + limit)}
+                  disabled={!canGoNext}
+                  className="p-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  resetPaging();
+                }}
+                className="px-2.5 py-2 text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                aria-label="Rows per page"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+
           <div className="grid grid-cols-12 gap-0 px-5 py-3 border-b border-[var(--border)] text-xs text-[var(--muted-foreground)]">
-            <div className="col-span-6">Student / Assignment</div>
+            <div className="col-span-1" />
+            <div className="col-span-5">Student / Assignment</div>
             <div className="col-span-3">File</div>
             <div className="col-span-2">Submitted</div>
             <div className="col-span-1 text-right">Status</div>
           </div>
           <div className="divide-y divide-[var(--border)]">
             {items.map((s) => (
-              <Link
+              <div
                 key={s.id}
-                href={`/staff/submissions/${s.id}`}
-                className="group grid grid-cols-12 gap-0 px-5 py-4 hover:bg-[var(--background)] transition-colors"
+                onClick={() => router.push(`/staff/submissions/${s.id}`)}
+                className="group grid grid-cols-12 gap-0 px-5 py-4 hover:bg-[var(--background)] transition-colors cursor-pointer"
               >
-                <div className="col-span-6 min-w-0">
+                <div className="col-span-1 flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(s.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleSelect(s.id)}
+                    className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                    aria-label={`Select submission ${s.id}`}
+                  />
+                </div>
+
+                <div className="col-span-5 min-w-0">
                   <p className="text-sm font-medium text-[var(--foreground)] truncate">
                     {s.student_full_name || s.student_email}
                   </p>
@@ -662,7 +1044,7 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
                   </span>
                   <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] transition-colors" />
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
