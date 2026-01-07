@@ -34,6 +34,39 @@ async def test_course_membership_enroll_and_list(client):
 
 
 @pytest.mark.asyncio
+async def test_org_admin_can_update_course_membership_role(client):
+    await _login_admin(client, email="admin3@example.com")
+    r = await client.post("/api/v1/orgs", json={"name": "Org B"})
+    assert r.status_code == 201
+    org_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/courses",
+        json={"code": "CS202", "title": "OOP", "description": None},
+    )
+    assert r.status_code == 201
+    course_id = r.json()["id"]
+
+    r = await client.post("/api/v1/users", json={"email": "ta1@example.com", "password": "password123"})
+    assert r.status_code == 201
+    ta_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/courses/{course_id}/memberships",
+        json={"user_id": ta_id, "role": "student"},
+    )
+    assert r.status_code == 201
+    membership_id = r.json()["id"]
+
+    r = await client.patch(
+        f"/api/v1/orgs/{org_id}/courses/{course_id}/memberships/{membership_id}",
+        json={"role": "ta"},
+    )
+    assert r.status_code == 200
+    assert r.json()["role"] == "ta"
+
+
+@pytest.mark.asyncio
 async def test_student_can_submit_but_cannot_list_submissions(client):
     await _login_admin(client, email="admin2@example.com")
     r = await client.post("/api/v1/orgs", json={"name": "Org A"})
