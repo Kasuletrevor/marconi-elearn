@@ -6,8 +6,6 @@ import pytest
 @pytest.mark.asyncio
 async def test_staff_submissions_queue_grade_and_download(client):
     # Admin creates org/course/assignment and enrolls a student
-    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
-    assert r.status_code == 201
     r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
@@ -78,8 +76,13 @@ async def test_staff_submissions_queue_grade_and_download(client):
 
 @pytest.mark.asyncio
 async def test_students_cannot_access_staff_submissions(client):
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
+    assert r.status_code == 200
+
     r = await client.post("/api/v1/users", json={"email": "stud2@example.com", "password": "password123"})
     assert r.status_code == 201
+    await client.post("/api/v1/auth/logout")
+
     r = await client.post("/api/v1/auth/login", json={"email": "stud2@example.com", "password": "password123"})
     assert r.status_code == 200
 
@@ -89,4 +92,3 @@ async def test_students_cannot_access_staff_submissions(client):
 
     r = await client.get("/api/v1/staff/submissions/12345")
     assert r.status_code in (403, 404)
-
