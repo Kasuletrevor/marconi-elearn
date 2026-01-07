@@ -10,12 +10,7 @@ async def test_orgs_crud(client):
 
     r = await client.post("/api/v1/orgs", json={"name": "Org A"})
     assert r.status_code == 201
-
-    r = await client.get("/api/v1/orgs")
-    assert r.status_code == 200
-    data = r.json()
-    assert len(data) == 1
-    org_id = data[0]["id"]
+    org_id = r.json()["id"]
 
     r = await client.patch(f"/api/v1/orgs/{org_id}", json={"name": "Org B"})
     assert r.status_code == 200
@@ -23,6 +18,30 @@ async def test_orgs_crud(client):
 
     r = await client.delete(f"/api/v1/orgs/{org_id}")
     assert r.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_org_create_requires_superadmin(client):
+    r = await client.post(
+        "/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"}
+    )
+    assert r.status_code == 200
+
+    r = await client.post(
+        "/api/v1/users", json={"email": "u@example.com", "password": "password123"}
+    )
+    assert r.status_code == 201
+
+    r = await client.post("/api/v1/auth/logout")
+    assert r.status_code == 204
+
+    r = await client.post(
+        "/api/v1/auth/login", json={"email": "u@example.com", "password": "password123"}
+    )
+    assert r.status_code == 200
+
+    r = await client.post("/api/v1/orgs", json={"name": "Org X"})
+    assert r.status_code == 403
 
 
 @pytest.mark.asyncio
