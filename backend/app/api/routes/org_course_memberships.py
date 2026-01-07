@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
+from app.crud.audit import create_audit_event
 from app.crud.course_memberships import (
     CourseMembershipExistsError,
     add_course_membership,
@@ -15,6 +16,7 @@ from app.crud.course_memberships import (
 )
 from app.crud.courses import get_course
 from app.db.deps import get_db
+from app.models.user import User
 from app.schemas.course_membership import CourseMembershipCreate, CourseMembershipOut, CourseMembershipUpdate
 
 router = APIRouter(
@@ -35,10 +37,26 @@ async def enroll_user(
     course_id: int,
     payload: CourseMembershipCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
 ) -> CourseMembershipOut:
     await _require_course_in_org(db, org_id=org_id, course_id=course_id)
     try:
-        return await add_course_membership(db, course_id=course_id, user_id=payload.user_id, role=payload.role)
+        membership = await add_course_membership(
+            db, course_id=course_id, user_id=payload.user_id, role=payload.role
+        )
+        try:
+            await create_audit_event(
+                db,
+                organization_id=org_id,
+                actor_user_id=_current_user.id,
+                action="course_membership.added",
+                target_type="user",
+                target_id=membership.user_id,
+                metadata={"course_id": course_id, "role": membership.role},
+            )
+        except Exception:
+            pass
+        return membership
     except CourseMembershipExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in course") from exc
 
@@ -61,12 +79,25 @@ async def remove_from_course(
     course_id: int,
     membership_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     await _require_course_in_org(db, org_id=org_id, course_id=course_id)
     membership = await get_course_membership(db, membership_id=membership_id)
     if membership is None or membership.course_id != course_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
     await delete_course_membership(db, membership=membership)
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=_current_user.id,
+            action="course_membership.removed",
+            target_type="user",
+            target_id=membership.user_id,
+            metadata={"course_id": course_id, "role": membership.role},
+        )
+    except Exception:
+        pass
     return None
 
 
@@ -77,9 +108,23 @@ async def update_membership_role(
     membership_id: int,
     payload: CourseMembershipUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
 ) -> CourseMembershipOut:
     await _require_course_in_org(db, org_id=org_id, course_id=course_id)
     membership = await get_course_membership(db, membership_id=membership_id)
     if membership is None or membership.course_id != course_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
-    return await update_course_membership(db, membership=membership, role=payload.role)
+    updated = await update_course_membership(db, membership=membership, role=payload.role)
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=_current_user.id,
+            action="course_membership.updated",
+            target_type="user",
+            target_id=updated.user_id,
+            metadata={"course_id": course_id, "role": updated.role},
+        )
+    except Exception:
+        pass
+    return updated

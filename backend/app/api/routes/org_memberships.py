@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
+from app.crud.audit import create_audit_event
 from app.crud.invites import create_org_member_invite
 from app.crud.org_memberships import (
     OrgMembershipExistsError,
@@ -37,7 +38,22 @@ async def add_member(
     _require_admin: Annotated[None, Depends(require_org_admin)],
 ) -> OrgMembershipOut:
     try:
-        return await add_membership(db, organization_id=org_id, user_id=payload.user_id, role=payload.role)
+        membership = await add_membership(
+            db, organization_id=org_id, user_id=payload.user_id, role=payload.role
+        )
+        try:
+            await create_audit_event(
+                db,
+                organization_id=org_id,
+                actor_user_id=_current_user.id,
+                action="org_membership.added",
+                target_type="user",
+                target_id=membership.user_id,
+                metadata={"role": membership.role},
+            )
+        except Exception:
+            pass
+        return membership
     except OrgMembershipExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in organization") from exc
 
@@ -64,6 +80,19 @@ async def add_member_by_email(
     if user.password_hash is None:
         token = await create_org_member_invite(db, organization_id=org_id, email=email, expires_in_days=7)
         invite_link = f"/invite/{token}"
+
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=_current_user.id,
+            action="org_membership.invited",
+            target_type="user",
+            target_id=membership.user_id,
+            metadata={"email": email, "role": membership.role, "invite": bool(invite_link)},
+        )
+    except Exception:
+        pass
 
     return OrgMembershipInviteOut(
         id=membership.id,
@@ -100,7 +129,20 @@ async def update_member(
     if membership is None or membership.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
 
-    return await update_membership(db, membership=membership, role=payload.role)
+    updated = await update_membership(db, membership=membership, role=payload.role)
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=_current_user.id,
+            action="org_membership.updated",
+            target_type="user",
+            target_id=updated.user_id,
+            metadata={"role": updated.role},
+        )
+    except Exception:
+        pass
+    return updated
 
 
 @router.delete("/{membership_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,4 +158,16 @@ async def remove_member(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
 
     await delete_membership(db, membership=membership)
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=_current_user.id,
+            action="org_membership.removed",
+            target_type="user",
+            target_id=membership.user_id,
+            metadata={"role": membership.role},
+        )
+    except Exception:
+        pass
     return None

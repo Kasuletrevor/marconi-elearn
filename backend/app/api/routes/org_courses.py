@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
+from app.crud.audit import create_audit_event
 from app.crud.courses import create_course, delete_course, get_course, list_courses, update_course
 from app.crud.course_memberships import add_course_membership
 from app.db.deps import get_db
@@ -33,8 +34,21 @@ async def create_course_in_org(
         description=payload.description,
         semester=payload.semester,
         year=payload.year,
+        late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
     )
     await add_course_membership(db, course_id=course.id, user_id=current_user.id, role=CourseRole.owner)
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=current_user.id,
+            action="course.created",
+            target_type="course",
+            target_id=course.id,
+            metadata={"code": course.code, "title": course.title},
+        )
+    except Exception:
+        pass
     return course
 
 
@@ -66,11 +80,12 @@ async def update_course_in_org(
     course_id: int,
     payload: CourseUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> CourseOut:
     course = await get_course(db, course_id=course_id)
     if course is None or course.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    return await update_course(
+    updated = await update_course(
         db,
         course=course,
         code=payload.code,
@@ -78,7 +93,21 @@ async def update_course_in_org(
         description=payload.description,
         semester=payload.semester,
         year=payload.year,
+        late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
     )
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=current_user.id,
+            action="course.updated",
+            target_type="course",
+            target_id=updated.id,
+            metadata={"code": updated.code, "title": updated.title},
+        )
+    except Exception:
+        pass
+    return updated
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -86,9 +115,22 @@ async def delete_course_in_org(
     org_id: int,
     course_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     course = await get_course(db, course_id=course_id)
     if course is None or course.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     await delete_course(db, course=course)
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org_id,
+            actor_user_id=current_user.id,
+            action="course.deleted",
+            target_type="course",
+            target_id=course_id,
+            metadata={"code": course.code, "title": course.title},
+        )
+    except Exception:
+        pass
     return None
