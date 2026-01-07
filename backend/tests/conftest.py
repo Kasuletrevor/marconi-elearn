@@ -9,13 +9,23 @@ from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.main import app
 
 
 if os.name == "nt":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+backend_env = Path(__file__).parent.parent / ".env"
+root_env = Path(__file__).resolve().parents[2] / ".env"
+if backend_env.exists():
+    load_dotenv(backend_env)
+else:
+    load_dotenv(root_env)
+
+# Deterministic superadmin credentials for tests.
+os.environ["SUPERADMIN_EMAILS"] = "admin@example.com"
+os.environ["SUPERADMIN_PASSWORD"] = "password123"
+
+from app.main import app  # noqa: E402
 
 
 def _async_db_url() -> str:
