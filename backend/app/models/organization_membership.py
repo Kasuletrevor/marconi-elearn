@@ -23,3 +23,8 @@ class OrganizationMembership(Base):
 
     organization = relationship("Organization")
     user = relationship("User")
+
+    @property
+    def user_email(self) -> str | None:
+        user = getattr(self, "user", None)
+        return getattr(user, "email", None)
