@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.course_membership import CourseMembership, CourseRole
 
@@ -23,8 +24,12 @@ async def add_course_membership(
     except IntegrityError as exc:
         await db.rollback()
         raise CourseMembershipExistsError from exc
-    await db.refresh(membership)
-    return membership
+    result = await db.execute(
+        select(CourseMembership)
+        .options(selectinload(CourseMembership.user))
+        .where(CourseMembership.id == membership.id)
+    )
+    return result.scalars().one()
 
 
 async def list_course_memberships(
@@ -38,6 +43,7 @@ async def list_course_memberships(
     limit = min(max(1, limit), 500)
     result = await db.execute(
         select(CourseMembership)
+        .options(selectinload(CourseMembership.user))
         .where(CourseMembership.course_id == course_id)
         .order_by(CourseMembership.id)
         .offset(offset)
@@ -47,7 +53,12 @@ async def list_course_memberships(
 
 
 async def get_course_membership(db: AsyncSession, *, membership_id: int) -> CourseMembership | None:
-    return await db.get(CourseMembership, membership_id)
+    result = await db.execute(
+        select(CourseMembership)
+        .options(selectinload(CourseMembership.user))
+        .where(CourseMembership.id == membership_id)
+    )
+    return result.scalars().first()
 
 
 async def delete_course_membership(db: AsyncSession, *, membership: CourseMembership) -> None:
@@ -64,5 +75,9 @@ async def update_course_membership(
     if role is not None:
         membership.role = role
     await db.commit()
-    await db.refresh(membership)
-    return membership
+    result = await db.execute(
+        select(CourseMembership)
+        .options(selectinload(CourseMembership.user))
+        .where(CourseMembership.id == membership.id)
+    )
+    return result.scalars().one()
