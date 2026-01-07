@@ -20,3 +20,12 @@ class OrgMembershipOut(BaseModel):
     user_id: int
     user_email: EmailStr | None = None
     role: OrgRole
+
+
+class OrgMembershipCreateByEmail(BaseModel):
+    email: EmailStr
+    role: OrgRole
+
+
+class OrgMembershipInviteOut(OrgMembershipOut):
+    invite_link: str | None = None
