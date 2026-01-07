@@ -10,10 +10,12 @@ import {
   Loader2,
   AlertCircle,
   Plus,
+  Copy,
+  Mail,
   Trash2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
-import { orgUsers, orgs, staff, type Organization, type OrgMembership, ApiError } from "@/lib/api";
+import { orgs, staff, type Organization, type OrgMembership, ApiError } from "@/lib/api";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -43,6 +45,8 @@ export default function AdminMembersPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<OrgMembership["role"]>("lecturer");
   const [isAdding, setIsAdding] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const adminOrgIds = useMemo(() => new Set(user?.org_admin_of ?? []), [user]);
 
@@ -96,17 +100,30 @@ export default function AdminMembersPage() {
     if (!email) return;
     setIsAdding(true);
     setError("");
+    setInviteLink(null);
+    setCopied(false);
     try {
-      const lookedUp = await orgUsers.lookup(selectedOrgId, email);
-      const created = await staff.addOrgMembership(selectedOrgId, { user_id: lookedUp.id, role: newRole });
+      const created = await staff.addOrgMembershipByEmail(selectedOrgId, { email, role: newRole });
       const next = [...memberships, created];
       setMemberships(next);
       setNewEmail("");
+      if (created.invite_link) setInviteLink(created.invite_link);
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to add member");
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  async function copyInvite() {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
     }
   }
 
@@ -227,15 +244,42 @@ export default function AdminMembersPage() {
                 <option value="ta">{roleLabel("ta")}</option>
               </select>
             </div>
-              <button
-                onClick={addMember}
-                disabled={!selectedOrgId || isAdding || !newEmail.trim()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-              >
+            <button
+              onClick={addMember}
+              disabled={!selectedOrgId || isAdding || !newEmail.trim()}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
               {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Add
             </button>
           </div>
+
+          {inviteLink ? (
+            <div className="mt-4 p-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] flex flex-col md:flex-row md:items-center gap-3">
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5 text-[var(--primary)]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--foreground)]">Invite created</p>
+                  <p className="text-xs text-[var(--muted-foreground)] truncate">
+                    {inviteLink}
+                  </p>
+                  <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                    Send this link to the staff member so they can set a password and log in.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={copyInvite}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] transition-colors text-sm"
+              >
+                <Copy className="w-4 h-4" />
+                {copied ? "Copied" : "Copy link"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </motion.div>
 
