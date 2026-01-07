@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import {
   Building2,
   Users as UsersIcon,
@@ -32,6 +33,7 @@ function roleLabel(role: OrgMembership["role"]): string {
 
 export default function AdminMembersPage() {
   const { user } = useAuthStore();
+  const searchParams = useSearchParams();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
   const [memberships, setMemberships] = useState<OrgMembership[]>([]);
@@ -52,7 +54,13 @@ export default function AdminMembersPage() {
       const all = await orgs.list();
       const mine = all.filter((o) => adminOrgIds.has(o.id));
       setOrganizations(mine);
-      setSelectedOrgId((prev) => (prev && mine.some((o) => o.id === prev) ? prev : mine[0]?.id ?? null));
+      const qp = searchParams.get("org");
+      const requestedOrgId = qp ? Number(qp) : null;
+      setSelectedOrgId((prev) => {
+        if (requestedOrgId && mine.some((o) => o.id === requestedOrgId)) return requestedOrgId;
+        if (prev && mine.some((o) => o.id === prev)) return prev;
+        return mine[0]?.id ?? null;
+      });
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load organizations");
