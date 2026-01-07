@@ -129,6 +129,7 @@ export interface CourseMembership {
   id: number;
   course_id: number;
   user_id: number;
+  user_email?: string | null;
   role: "owner" | "co_lecturer" | "ta" | "student";
   student_number?: string | null;
 }
@@ -146,6 +147,7 @@ export interface OrgMembership {
   id: number;
   organization_id: number;
   user_id: number;
+  user_email?: string | null;
   role: "admin" | "lecturer" | "ta";
 }
 
@@ -551,6 +553,20 @@ export const notifications = {
 };
 
 /* ============================================
+   SUPERADMIN ENDPOINTS (platform-wide)
+   ============================================ */
+
+export const superadmin = {
+  async listOrganizations(offset = 0, limit = 100): Promise<Organization[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/superadmin/organizations?offset=${offset}&limit=${limit}`,
+      { credentials: "include" }
+    );
+    return handleResponse<Organization[]>(res);
+  },
+};
+
+/* ============================================
    ORG ADMIN ENDPOINTS (organization-wide management)
    ============================================ */
 
@@ -570,6 +586,16 @@ export const orgs = {
       body: JSON.stringify(data),
     });
     return handleResponse<Organization>(res);
+  },
+};
+
+export const orgUsers = {
+  async lookup(orgId: number, email: string): Promise<UserPublic> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/orgs/${orgId}/users/lookup?email=${encodeURIComponent(email)}`,
+      { credentials: "include" }
+    );
+    return handleResponse<UserPublic>(res);
   },
 };
 
