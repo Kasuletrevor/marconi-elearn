@@ -4,6 +4,8 @@ from app.models.invite_token import InviteToken
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.assignment import Assignment
+from app.models.assignment_extension import AssignmentExtension
+from app.models.audit_event import AuditEvent
 from app.models.module import Module
 from app.models.module_resource import ModuleResource
 from app.models.notification import Notification
@@ -14,6 +16,8 @@ from app.models.user import User
 
 __all__ = [
     "Assignment",
+    "AssignmentExtension",
+    "AuditEvent",
     "Course",
     "CourseMembership",
     "InviteToken",

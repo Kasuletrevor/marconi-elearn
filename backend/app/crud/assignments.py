@@ -15,6 +15,7 @@ async def create_assignment(
     description: str | None,
     due_date: datetime | None,
     max_points: int,
+    late_policy: dict | None = None,
 ) -> Assignment:
     assignment = Assignment(
         course_id=course_id,
@@ -23,6 +24,7 @@ async def create_assignment(
         description=description.strip() if description else None,
         due_date=due_date,
         max_points=max_points,
+        late_policy=late_policy,
     )
     db.add(assignment)
     await db.commit()
@@ -62,6 +64,7 @@ async def update_assignment(
     module_id: int | None,
     due_date: datetime | None,
     max_points: int | None,
+    late_policy: dict | None,
 ) -> Assignment:
     if title is not None:
         assignment.title = title.strip()
@@ -73,6 +76,8 @@ async def update_assignment(
         assignment.due_date = due_date
     if max_points is not None:
         assignment.max_points = max_points
+    if late_policy is not None:
+        assignment.late_policy = late_policy
     await db.commit()
     await db.refresh(assignment)
     return assignment

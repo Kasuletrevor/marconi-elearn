@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -16,3 +17,4 @@ class Assignment(Base):
     description: Mapped[str | None] = mapped_column(String(10_000), default=None)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     max_points: Mapped[int] = mapped_column(Integer, default=100)
+    late_policy: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
