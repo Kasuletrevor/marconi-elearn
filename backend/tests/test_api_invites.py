@@ -5,8 +5,6 @@ from sqlalchemy import select
 
 
 async def _login_admin(client) -> None:
-    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
-    assert r.status_code == 201
     r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
