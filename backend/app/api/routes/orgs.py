@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
+from app.api.deps.superadmin import require_superadmin
 from app.crud.organizations import (
     OrgNameTakenError,
     create_organization,
@@ -13,9 +14,7 @@ from app.crud.organizations import (
     list_admin_organizations,
     update_organization,
 )
-from app.crud.org_memberships import add_membership
 from app.db.deps import get_db
-from app.models.organization_membership import OrgRole
 from app.models.user import User
 from app.schemas.organization import OrganizationCreate, OrganizationOut, OrganizationUpdate
 
@@ -26,12 +25,10 @@ router = APIRouter(prefix="/orgs")
 async def create_org(
     payload: OrganizationCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    _current_user: Annotated[User, Depends(require_superadmin)],
 ) -> OrganizationOut:
     try:
-        org = await create_organization(db, name=payload.name)
-        await add_membership(db, organization_id=org.id, user_id=current_user.id, role=OrgRole.admin)
-        return org
+        return await create_organization(db, name=payload.name)
     except OrgNameTakenError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
