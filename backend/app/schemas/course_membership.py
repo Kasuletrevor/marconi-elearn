@@ -8,6 +8,10 @@ class CourseMembershipCreate(BaseModel):
     role: CourseRole
 
 
+class CourseMembershipUpdate(BaseModel):
+    role: CourseRole | None = None
+
+
 class CourseMembershipOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -15,4 +19,3 @@ class CourseMembershipOut(BaseModel):
     course_id: int
     user_id: int
     role: CourseRole
-
