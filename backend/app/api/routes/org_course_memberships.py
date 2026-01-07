@@ -11,10 +11,11 @@ from app.crud.course_memberships import (
     delete_course_membership,
     get_course_membership,
     list_course_memberships,
+    update_course_membership,
 )
 from app.crud.courses import get_course
 from app.db.deps import get_db
-from app.schemas.course_membership import CourseMembershipCreate, CourseMembershipOut
+from app.schemas.course_membership import CourseMembershipCreate, CourseMembershipOut, CourseMembershipUpdate
 
 router = APIRouter(
     prefix="/orgs/{org_id}/courses/{course_id}/memberships",
@@ -67,3 +68,18 @@ async def remove_from_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
     await delete_course_membership(db, membership=membership)
     return None
+
+
+@router.patch("/{membership_id}", response_model=CourseMembershipOut)
+async def update_membership_role(
+    org_id: int,
+    course_id: int,
+    membership_id: int,
+    payload: CourseMembershipUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CourseMembershipOut:
+    await _require_course_in_org(db, org_id=org_id, course_id=course_id)
+    membership = await get_course_membership(db, membership_id=membership_id)
+    if membership is None or membership.course_id != course_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
+    return await update_course_membership(db, membership=membership, role=payload.role)
