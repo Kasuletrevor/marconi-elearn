@@ -16,25 +16,13 @@ async def test_org_memberships_crud(client):
     org_id = r.json()["id"]
 
     r = await client.post(
-        "/api/v1/users",
-        json={"email": "member@example.com", "password": "password123"},
-    )
-    assert r.status_code == 201
-    user_id = r.json()["id"]
-
-    r = await client.get(f"/api/v1/orgs/{org_id}/users/lookup?email=member@example.com")
-    assert r.status_code == 200
-    assert r.json()["id"] == user_id
-    assert r.json()["email"] == "member@example.com"
-
-    r = await client.post(
-        f"/api/v1/orgs/{org_id}/memberships",
-        json={"user_id": user_id, "role": "lecturer"},
+        f"/api/v1/orgs/{org_id}/memberships/by-email",
+        json={"email": "member@example.com", "role": "lecturer"},
     )
     assert r.status_code == 201
     membership_data = r.json()
     assert membership_data["organization_id"] == org_id
-    assert membership_data["user_id"] == user_id
+    assert membership_data["user_email"] == "member@example.com"
     assert membership_data["role"] == "lecturer"
     membership_id = membership_data["id"]
 
@@ -67,18 +55,11 @@ async def test_duplicate_membership_returns_409(client):
     r = await client.post("/api/v1/orgs", json={"name": "Test Org"})
     org_id = r.json()["id"]
 
-    r = await client.post(
-        "/api/v1/users",
-        json={"email": "member@example.com", "password": "password123"},
-    )
-    user_id = r.json()["id"]
-
-    payload = {"user_id": user_id, "role": "lecturer"}
-
-    r = await client.post(f"/api/v1/orgs/{org_id}/memberships", json=payload)
+    payload = {"email": "member@example.com", "role": "lecturer"}
+    r = await client.post(f"/api/v1/orgs/{org_id}/memberships/by-email", json=payload)
     assert r.status_code == 201
 
-    r = await client.post(f"/api/v1/orgs/{org_id}/memberships", json=payload)
+    r = await client.post(f"/api/v1/orgs/{org_id}/memberships/by-email", json=payload)
     assert r.status_code == 409
     assert "already in organization" in r.json()["detail"]
 
@@ -93,14 +74,8 @@ async def test_membership_not_found_for_different_org(client):
     org2_id = r.json()["id"]
 
     r = await client.post(
-        "/api/v1/users",
-        json={"email": "member@example.com", "password": "password123"},
-    )
-    user_id = r.json()["id"]
-
-    r = await client.post(
-        f"/api/v1/orgs/{org1_id}/memberships",
-        json={"user_id": user_id, "role": "lecturer"},
+        f"/api/v1/orgs/{org1_id}/memberships/by-email",
+        json={"email": "member@example.com", "role": "lecturer"},
     )
     membership_id = r.json()["id"]
 
@@ -123,14 +98,9 @@ async def test_list_memberships_pagination(client):
     org_id = r.json()["id"]
 
     for i in range(3):
-        r = await client.post(
-            "/api/v1/users",
-            json={"email": f"user{i}@example.com", "password": "password123"},
-        )
-        user_id = r.json()["id"]
         await client.post(
-            f"/api/v1/orgs/{org_id}/memberships",
-            json={"user_id": user_id, "role": "lecturer"},
+            f"/api/v1/orgs/{org_id}/memberships/by-email",
+            json={"email": f"user{i}@example.com", "role": "lecturer"},
         )
 
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships?offset=0&limit=2")
