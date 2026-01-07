@@ -172,6 +172,45 @@ export interface StaffSubmissionUpdate {
   feedback?: string | null;
 }
 
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export type StaffSubmissionBulkAction = "mark_pending" | "mark_grading" | "mark_graded";
+
+export interface StaffSubmissionsBulkRequest {
+  submission_ids: number[];
+  action: StaffSubmissionBulkAction;
+}
+
+export interface StaffSubmissionsBulkResult {
+  updated_ids: number[];
+  skipped_ids: number[];
+}
+
+export interface StaffNextSubmissionOut {
+  submission_id: number | null;
+}
+
+export interface MissingSubmissionsSummaryItem {
+  assignment_id: number;
+  assignment_title: string;
+  total_students: number;
+  submitted_count: number;
+  missing_count: number;
+}
+
+export interface MissingStudentOut {
+  user_id: number;
+  email: string;
+  full_name: string | null;
+  programme: string | null;
+  student_number: string | null;
+}
+
 /* ============================================
    MODULE RESOURCES TYPES
    ============================================ */
@@ -822,6 +861,21 @@ export const courseStaff = {
     return handleResponse<ImportCsvResult>(res);
   },
 
+  async missingSubmissionsSummary(courseId: number): Promise<MissingSubmissionsSummaryItem[]> {
+    const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}/missing-submissions`, {
+      credentials: "include",
+    });
+    return handleResponse<MissingSubmissionsSummaryItem[]>(res);
+  },
+
+  async missingSubmissions(courseId: number, assignmentId: number): Promise<MissingStudentOut[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/missing-submissions/${assignmentId}`,
+      { credentials: "include" }
+    );
+    return handleResponse<MissingStudentOut[]>(res);
+  },
+
   // Module resources (staff - includes unpublished)
   async listModuleResources(courseId: number, moduleId: number): Promise<ModuleResource[]> {
     const res = await fetch(
@@ -939,6 +993,50 @@ export const staffSubmissions = {
       credentials: "include",
     });
     return handleResponse<StaffSubmissionQueueItem[]>(res);
+  },
+
+  async listPage(params?: {
+    course_id?: number;
+    status?: "pending" | "grading" | "graded" | "error";
+    offset?: number;
+    limit?: number;
+  }): Promise<Paginated<StaffSubmissionQueueItem>> {
+    const query = new URLSearchParams();
+    if (params?.course_id !== undefined) query.set("course_id", String(params.course_id));
+    if (params?.status) query.set("status_filter", params.status);
+    if (params?.offset !== undefined) query.set("offset", String(params.offset));
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+
+    const qs = query.toString();
+    const res = await fetch(`${API_BASE}/api/v1/staff/submissions/page${qs ? `?${qs}` : ""}`, {
+      credentials: "include",
+    });
+    return handleResponse<Paginated<StaffSubmissionQueueItem>>(res);
+  },
+
+  async bulkUpdate(data: StaffSubmissionsBulkRequest): Promise<StaffSubmissionsBulkResult> {
+    const res = await fetch(`${API_BASE}/api/v1/staff/submissions/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<StaffSubmissionsBulkResult>(res);
+  },
+
+  async nextUngraded(params?: {
+    course_id?: number;
+    status?: "pending" | "grading" | "graded" | "error";
+  }): Promise<StaffNextSubmissionOut> {
+    const query = new URLSearchParams();
+    if (params?.course_id !== undefined) query.set("course_id", String(params.course_id));
+    if (params?.status) query.set("status_filter", params.status);
+    const qs = query.toString();
+
+    const res = await fetch(`${API_BASE}/api/v1/staff/submissions/next${qs ? `?${qs}` : ""}`, {
+      credentials: "include",
+    });
+    return handleResponse<StaffNextSubmissionOut>(res);
   },
 
   async get(submissionId: number): Promise<StaffSubmissionDetail> {
