@@ -25,6 +25,7 @@ from app.api.routes.student import router as student_router
 from app.api.routes.student_notifications import router as student_notifications_router
 from app.api.routes.student_resources import router as student_resources_router
 from app.api.routes.superadmin_organizations import router as superadmin_organizations_router
+from app.api.routes.superadmin_stats import router as superadmin_stats_router
 from app.api.routes.users import router as users_router
 
 api_router = APIRouter()
@@ -41,6 +42,7 @@ api_router.include_router(staff_course_resources_router, tags=["staff"])
 api_router.include_router(staff_missing_submissions_router, tags=["staff"])
 api_router.include_router(staff_submissions_router, tags=["staff"])
 api_router.include_router(superadmin_organizations_router, tags=["superadmin"])
+api_router.include_router(superadmin_stats_router, tags=["superadmin"])
 api_router.include_router(orgs_router, tags=["orgs"])
 api_router.include_router(users_router, tags=["users"])
 api_router.include_router(org_memberships_router, tags=["org-memberships"])
