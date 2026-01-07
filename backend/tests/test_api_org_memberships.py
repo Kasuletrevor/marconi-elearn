@@ -2,8 +2,6 @@ import pytest
 
 
 async def _login_admin(client) -> None:
-    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
-    assert r.status_code == 201
     r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
@@ -23,6 +21,11 @@ async def test_org_memberships_crud(client):
     )
     assert r.status_code == 201
     user_id = r.json()["id"]
+
+    r = await client.get(f"/api/v1/orgs/{org_id}/users/lookup?email=member@example.com")
+    assert r.status_code == 200
+    assert r.json()["id"] == user_id
+    assert r.json()["email"] == "member@example.com"
 
     r = await client.post(
         f"/api/v1/orgs/{org_id}/memberships",
