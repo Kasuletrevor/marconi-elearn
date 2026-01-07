@@ -14,6 +14,7 @@ export interface User {
   email: string;
   is_superadmin: boolean;
   org_admin_of: number[];
+  org_roles: { org_id: number; role: "admin" | "lecturer" | "ta" }[];
   course_roles: { course_id: number; role: "owner" | "co_lecturer" | "ta" | "student" }[];
 }
 
