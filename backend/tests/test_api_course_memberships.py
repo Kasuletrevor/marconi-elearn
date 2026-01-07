@@ -1,10 +1,8 @@
 import pytest
 
 
-async def _login_admin(client, email: str = "admin@example.com") -> None:
-    r = await client.post("/api/v1/users", json={"email": email, "password": "password123"})
-    assert r.status_code == 201
-    r = await client.post("/api/v1/auth/login", json={"email": email, "password": "password123"})
+async def _login_admin(client) -> None:
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
 
@@ -35,7 +33,7 @@ async def test_course_membership_enroll_and_list(client):
 
 @pytest.mark.asyncio
 async def test_org_admin_can_update_course_membership_role(client):
-    await _login_admin(client, email="admin3@example.com")
+    await _login_admin(client)
     r = await client.post("/api/v1/orgs", json={"name": "Org B"})
     assert r.status_code == 201
     org_id = r.json()["id"]
@@ -68,7 +66,7 @@ async def test_org_admin_can_update_course_membership_role(client):
 
 @pytest.mark.asyncio
 async def test_student_can_submit_but_cannot_list_submissions(client):
-    await _login_admin(client, email="admin2@example.com")
+    await _login_admin(client)
     r = await client.post("/api/v1/orgs", json={"name": "Org A"})
     org_id = r.json()["id"]
 
