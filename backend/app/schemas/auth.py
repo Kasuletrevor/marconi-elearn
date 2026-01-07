@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.course_membership import CourseRole
+from app.models.organization_membership import OrgRole
 
 
 class LoginRequest(BaseModel):
@@ -18,9 +19,15 @@ class CourseRoleItem(BaseModel):
     role: CourseRole
 
 
+class OrgRoleItem(BaseModel):
+    org_id: int
+    role: OrgRole
+
+
 class MeResponse(BaseModel):
     id: int
     email: EmailStr
     is_superadmin: bool = False
     org_admin_of: list[int] = Field(default_factory=list)
+    org_roles: list[OrgRoleItem] = Field(default_factory=list)
     course_roles: list[CourseRoleItem] = Field(default_factory=list)
