@@ -19,9 +19,9 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
 import {
+  orgUsers,
   orgs,
   staff,
-  users,
   type Course,
   type CourseMembership,
   type CourseMembershipCreate,
@@ -275,32 +275,16 @@ function CourseCard(props: {
   onEdit: () => void;
   onDeleted: () => Promise<void>;
 }) {
-  const { orgId, course, isExpanded, onToggle, onEdit, onDeleted } = props;
-  const [memberships, setMemberships] = useState<CourseMembership[]>([]);
-  const [userEmailById, setUserEmailById] = useState<Record<number, string>>({});
+  const { orgId, course, isExpanded, onToggle, onEdit, onDeleted } = props;     
+  const [memberships, setMemberships] = useState<CourseMembership[]>([]);       
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [newUserId, setNewUserId] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<StaffRole>("ta");
   const [isAdding, setIsAdding] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const staffMembers = memberships.filter((m) => m.role !== "student");
-
-  async function hydrateEmails(rows: CourseMembership[]) {
-    const ids = Array.from(new Set(rows.map((m) => m.user_id))).filter((id) => !userEmailById[id]);
-    if (ids.length === 0) return;
-    try {
-      const pairs = await Promise.all(ids.map(async (id) => [id, (await users.get(id)).email] as const));
-      setUserEmailById((prev) => {
-        const next = { ...prev };
-        for (const [id, email] of pairs) next[id] = email;
-        return next;
-      });
-    } catch {
-      // ignore email hydration failures
-    }
-  }
 
   async function loadRoster() {
     setIsLoading(true);
@@ -308,7 +292,6 @@ function CourseCard(props: {
     try {
       const rows = await staff.listMemberships(orgId, course.id, 0, 500);
       setMemberships(rows);
-      await hydrateEmails(rows);
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load course memberships");
@@ -323,17 +306,17 @@ function CourseCard(props: {
   }, [isExpanded]);
 
   async function addStaff() {
-    const id = Number(newUserId);
-    if (!id || Number.isNaN(id)) return;
+    const email = newEmail.trim();
+    if (!email) return;
     setIsAdding(true);
     setError("");
     try {
-      const payload: CourseMembershipCreate = { user_id: id, role: newRole };
+      const lookedUp = await orgUsers.lookup(orgId, email);
+      const payload: CourseMembershipCreate = { user_id: lookedUp.id, role: newRole };
       const created = await staff.enrollUser(orgId, course.id, payload);
       const next = [...memberships, created];
       setMemberships(next);
-      setNewUserId("");
-      await hydrateEmails(next);
+      setNewEmail("");
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to add member");
@@ -455,12 +438,12 @@ function CourseCard(props: {
 
               <div className="grid md:grid-cols-3 gap-3 items-end">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">User ID</label>
+                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Email</label>
                   <input
-                    value={newUserId}
-                    onChange={(e) => setNewUserId(e.target.value)}
-                    inputMode="numeric"
-                    placeholder="e.g. 42"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    inputMode="email"
+                    placeholder="e.g. ta@university.edu"
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                   <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
@@ -481,7 +464,7 @@ function CourseCard(props: {
                 </div>
                 <button
                   onClick={addStaff}
-                  disabled={isAdding || !newUserId.trim()}
+                  disabled={isAdding || !newEmail.trim()}
                   className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 >
                   {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -515,7 +498,7 @@ function CourseCard(props: {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-[var(--foreground)] truncate">
-                            {userEmailById[m.user_id] ?? `User #${m.user_id}`}
+                            {m.user_email ?? `User #${m.user_id}`}
                           </p>
                           <p className="text-xs text-[var(--muted-foreground)]">User ID: {m.user_id}</p>
                         </div>
@@ -709,4 +692,3 @@ function CourseModal(props: {
     </motion.div>
   );
 }
-
