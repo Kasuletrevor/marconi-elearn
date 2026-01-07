@@ -6,8 +6,6 @@ import pytest
 @pytest.mark.asyncio
 async def test_staff_can_publish_resource_and_student_can_view_and_get_notification(client):
     # Admin creates org/course/module and enrolls a student
-    r = await client.post("/api/v1/users", json={"email": "admin@example.com", "password": "password123"})
-    assert r.status_code == 201
     r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
@@ -121,9 +119,7 @@ async def test_staff_can_publish_resource_and_student_can_view_and_get_notificat
 
 @pytest.mark.asyncio
 async def test_student_can_list_and_download_their_submissions(client):
-    r = await client.post("/api/v1/users", json={"email": "admin2@example.com", "password": "password123"})
-    assert r.status_code == 201
-    r = await client.post("/api/v1/auth/login", json={"email": "admin2@example.com", "password": "password123"})
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
     assert r.status_code == 200
 
     r = await client.post("/api/v1/orgs", json={"name": "Org B"})
@@ -172,4 +168,3 @@ async def test_student_can_list_and_download_their_submissions(client):
     r = await client.get(f"/api/v1/student/submissions/{submission_id}/download")
     assert r.status_code == 200
     assert r.content == b"int main(){return 0;}\n"
-
