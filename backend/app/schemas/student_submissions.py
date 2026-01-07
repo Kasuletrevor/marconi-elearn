@@ -15,11 +15,16 @@ class StudentSubmissionItem(BaseModel):
     assignment_id: int
     assignment_title: str
     max_points: int
+    file_name: str | None = None
 
     submitted_at: datetime
     status: SubmissionStatus
     score: int | None
     feedback: str | None
+    due_date: datetime | None = None
+    effective_due_date: datetime | None = None
+    late_seconds: int | None = None
+    late_penalty_percent: int | None = None
 
 
 class StudentSubmissionDownloadMeta(BaseModel):

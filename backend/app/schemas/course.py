@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.late_policy import LatePolicy
 
 
 class CourseCreate(BaseModel):
@@ -10,6 +11,7 @@ class CourseCreate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     semester: str | None = Field(default=None, max_length=50)
     year: int | None = None
+    late_policy: LatePolicy | None = None
 
 
 class CourseCreateInOrg(BaseModel):
@@ -18,6 +20,7 @@ class CourseCreateInOrg(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     semester: str | None = Field(default=None, max_length=50)
     year: int | None = None
+    late_policy: LatePolicy | None = None
 
 
 class CourseUpdate(BaseModel):
@@ -26,6 +29,7 @@ class CourseUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     semester: str | None = Field(default=None, max_length=50)
     year: int | None = None
+    late_policy: LatePolicy | None = None
 
 
 class CourseOut(BaseModel):
@@ -38,5 +42,6 @@ class CourseOut(BaseModel):
     description: str | None
     semester: str | None
     year: int | None
+    late_policy: dict | None
     created_at: datetime
     updated_at: datetime

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.late_policy import LatePolicy
 
 
 class AssignmentCreate(BaseModel):
@@ -9,6 +10,7 @@ class AssignmentCreate(BaseModel):
     module_id: int | None = None
     due_date: datetime | None = None
     max_points: int = Field(default=100, ge=0, le=1_000_000)
+    late_policy: LatePolicy | None = None
 
 
 class AssignmentUpdate(BaseModel):
@@ -17,6 +19,7 @@ class AssignmentUpdate(BaseModel):
     module_id: int | None = None
     due_date: datetime | None = None
     max_points: int | None = Field(default=None, ge=0, le=1_000_000)
+    late_policy: LatePolicy | None = None
 
 
 class AssignmentOut(BaseModel):
@@ -29,3 +32,4 @@ class AssignmentOut(BaseModel):
     description: str | None
     due_date: datetime | None
     max_points: int
+    late_policy: dict | None
