@@ -48,6 +48,7 @@ async def create_assignment_in_course(
         description=payload.description,
         due_date=payload.due_date,
         max_points=payload.max_points,
+        late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
     )
 
 
@@ -98,6 +99,7 @@ async def update_assignment_in_course(
         module_id=payload.module_id,
         due_date=payload.due_date,
         max_points=payload.max_points,
+        late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
     )
 
 
