@@ -47,6 +47,14 @@ export function getRedirectPath(user: User): string {
     return "/admin";
   }
 
+  // Org staff (lecturer/ta) -> staff dashboard
+  const hasOrgStaffRole = user.org_roles?.some((or) =>
+    ["lecturer", "ta"].includes(or.role)
+  );
+  if (hasOrgStaffRole) {
+    return "/staff";
+  }
+
   // Course staff (owner, co_lecturer, ta) -> staff dashboard
   const staffRoles = ["owner", "co_lecturer", "ta"];
   const hasStaffRole = user.course_roles.some((cr) =>
@@ -66,7 +74,11 @@ export function getRedirectPath(user: User): string {
 export function isStaff(user: User | null): boolean {
   if (!user) return false;
   const staffRoles = ["owner", "co_lecturer", "ta"];
-  return user.course_roles.some((cr) => staffRoles.includes(cr.role));
+  const hasCourseStaffRole = user.course_roles.some((cr) =>
+    staffRoles.includes(cr.role)
+  );
+  const hasOrgRole = (user.org_roles?.length ?? 0) > 0;
+  return hasCourseStaffRole || hasOrgRole;
 }
 
 /**
