@@ -8,7 +8,6 @@ import {
   BookOpen,
   Plus,
   Loader2,
-  AlertCircle,
   Building2,
   Pencil,
   Users as UsersIcon,
@@ -16,7 +15,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Search,
+  AlertCircle,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
 import {
@@ -31,6 +30,9 @@ import {
   type Organization,
   ApiError,
 } from "@/lib/api";
+import { PageHeader } from "@/components/admin/PageHeader";
+import { EmptyState } from "@/components/admin/EmptyState";
+import { DataList } from "@/components/admin/DataList";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -155,108 +157,79 @@ export default function AdminCoursesPage() {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-6 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-2xl text-center"
-        >
-          <AlertCircle className="w-8 h-8 text-[var(--secondary)] mx-auto mb-3" />
-          <p className="text-[var(--secondary)]">{error}</p>
-        </motion.div>
-      </div>
+      <EmptyState
+        icon={AlertCircle}
+        title="Error"
+        description={error}
+      />
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)]">
-              Courses
-            </h1>
-            <p className="text-[var(--muted-foreground)] mt-1">
-              Create courses, set semester/year, and assign staff roles.
-            </p>
-          </div>
+    <div className="max-w-6xl mx-auto">
+      <PageHeader
+        title="Courses"
+        description="Create courses, set semester/year, and assign staff roles."
+        action={
           <button
             onClick={() => setModal({ kind: "create" })}
             disabled={!selectedOrgId}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
             New course
           </button>
-        </div>
+        }
+      />
 
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="md:col-span-1 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl">
-            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Organization
-            </label>
-            <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
-              <select
-                value={selectedOrgId ?? ""}
-                onChange={(e) => setSelectedOrgId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full pl-10 pr-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+      <DataList
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "Find by code or title…",
+        }}
+        filter={
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+            <select
+              value={selectedOrgId ?? ""}
+              onChange={(e) => setSelectedOrgId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full pl-10 pr-8 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] appearance-none"
+            >
+              {organizations.length === 0 && <option value="">No org access</option>}
+              {organizations.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] pointer-events-none" />
+          </div>
+        }
+      >
+        {selectedOrgId === null ? (
+          <EmptyState
+            icon={Building2}
+            title="No organization selected"
+            description="You don't have org admin access yet."
+          />
+        ) : filteredCourses.length === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title="No courses found"
+            description="Create the first course for this organization."
+            action={
+              <button
+                onClick={() => setModal({ kind: "create" })}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors text-sm font-medium"
               >
-                {organizations.length === 0 && <option value="">No org access</option>}
-                {organizations.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="text-xs text-[var(--muted-foreground)] mt-2">
-              Tip: You can manage org members in{" "}
-              <Link href="/admin/members" className="text-[var(--primary)] hover:underline">
-                Members
-              </Link>
-              .
-            </p>
-          </div>
-
-          <div className="md:col-span-2 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl">
-            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Search
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Find by code or title…"
-                className="w-full pl-10 pr-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              />
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {selectedOrgId === null && (
-        <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-center text-[var(--muted-foreground)]">
-          You don&apos;t have org admin access yet.
-        </div>
-      )}
-
-      {selectedOrgId !== null && filteredCourses.length === 0 && (
-        <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="p-10 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-center">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center">
-            <BookOpen className="w-8 h-8 text-[var(--muted-foreground)]" />
-          </div>
-          <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)] mb-2">
-            No courses found
-          </h2>
-          <p className="text-[var(--muted-foreground)]">Create the first course for this organization.</p>
-        </motion.div>
-      )}
-
-      {selectedOrgId !== null && filteredCourses.length > 0 && (
-        <div className="space-y-3">
-          {filteredCourses.map((course) => (
+                <Plus className="w-4 h-4" />
+                Create Course
+              </button>
+            }
+          />
+        ) : (
+          filteredCourses.map((course) => (
             <CourseCard
               key={course.id}
               orgId={selectedOrgId}
@@ -266,9 +239,9 @@ export default function AdminCoursesPage() {
               onEdit={() => setModal({ kind: "edit", course })}
               onDeleted={async () => loadCourses(selectedOrgId)}
             />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </DataList>
 
       <AnimatePresence>
         {modal && selectedOrgId !== null && (
