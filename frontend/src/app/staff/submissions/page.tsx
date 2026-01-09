@@ -49,6 +49,7 @@ export default function StaffSubmissionsQueuePage() {
   const [isBulkWorking, setIsBulkWorking] = useState(false);
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [nextId, setNextId] = useState<number | null>(null);
 
   type CourseOption = { id: number | "all"; title: string; code: string };
 
@@ -107,24 +108,9 @@ export default function StaffSubmissionsQueuePage() {
     }
   }
 
-  async function goNextUngraded() {
-    setIsNavigatingNext(true);
-    try {
-      const status = selectedStatus === "all" || selectedStatus === "graded" ? undefined : selectedStatus;
-      const res = await staffSubmissions.nextUngraded({
-        course_id: selectedCourseId === "all" ? undefined : selectedCourseId,
-        status,
-      });
-      if (res.submission_id) {
-        router.push(`/staff/submissions/${res.submission_id}`);
-      } else {
-        setError("No ungraded submissions match this filter.");
-      }
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.detail);
-      else setError("Failed to find next ungraded submission");
-    } finally {
-      setIsNavigatingNext(false);
+  function goNextUngraded() {
+    if (nextId) {
+      router.push(`/staff/submissions/${nextId}`);
     }
   }
 
@@ -133,7 +119,7 @@ export default function StaffSubmissionsQueuePage() {
       setError("");
       refresh ? setIsRefreshing(true) : setIsLoading(true);
 
-      const [coursesData, page] = await Promise.all([
+      const [coursesData, page, nextSub] = await Promise.all([
         courseStaff.listCourses(),
         staffSubmissions.listPage({
           course_id: selectedCourseId === "all" ? undefined : selectedCourseId,
@@ -141,11 +127,16 @@ export default function StaffSubmissionsQueuePage() {
           offset,
           limit,
         }),
+        staffSubmissions.nextUngraded({
+          course_id: selectedCourseId === "all" ? undefined : selectedCourseId,
+          status: selectedStatus === "all" || selectedStatus === "graded" ? undefined : selectedStatus,
+        }),
       ]);
 
       setCourses(coursesData);
       setItems(page.items);
       setTotal(page.total);
+      setNextId(nextSub.submission_id);
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load submissions");
@@ -180,10 +171,10 @@ export default function StaffSubmissionsQueuePage() {
             </button>
             <button
               onClick={goNextUngraded}
-              disabled={isNavigatingNext || selectedStatus === "graded"}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm shadow-sm"
+              disabled={!nextId}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm shadow-sm"
             >
-              {isNavigatingNext ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+              <ArrowRight className="w-4 h-4" />
               Next ungraded
             </button>
           </div>
