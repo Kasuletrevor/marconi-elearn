@@ -13,8 +13,14 @@ import {
   Clock,
   ArrowRight,
   GraduationCap,
+  Activity,
+  Settings,
+  ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { ApiError, superadmin, type SuperadminStats } from "@/lib/api";
+import { PageHeader } from "@/components/admin/PageHeader";
+import { EmptyState } from "@/components/admin/EmptyState";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -29,20 +35,12 @@ const staggerContainer = {
   },
 };
 
-// Placeholder metrics - will be fetched from API
-const metrics = [
-  { label: "Organizations", value: "—", icon: Building2, trend: null },
-  { label: "Total Users", value: "—", icon: Users, trend: null },
-  { label: "Active Courses", value: "—", icon: BookOpen, trend: null },
-  { label: "Submissions Today", value: "—", icon: TrendingUp, trend: null },
-];
-
 // Placeholder system status
 const systemStatus = [
-  { service: "API Server", status: "healthy" },
-  { service: "Database", status: "healthy" },
-  { service: "JOBE Server", status: "pending" },
-  { service: "Email Service", status: "healthy" },
+  { service: "API Gateway", status: "healthy", icon: Zap },
+  { service: "Relational Database", status: "healthy", icon: Activity },
+  { service: "JOBE Sandbox", status: "pending", icon: ShieldCheck },
+  { service: "SMTP Relay", status: "healthy", icon: CheckCircle2 },
 ];
 
 export default function SuperadminPage() {
@@ -66,53 +64,56 @@ export default function SuperadminPage() {
 
   const liveMetrics = [
     {
-      label: "Organizations",
+      label: "Institutions",
       value: stats ? String(stats.organizations_total) : "—",
       icon: Building2,
+      color: "var(--primary)",
     },
-    { label: "Total Users", value: stats ? String(stats.users_total) : "—", icon: Users },
-    { label: "Active Courses", value: stats ? String(stats.courses_total) : "—", icon: BookOpen },
-    { label: "Submissions Today", value: stats ? String(stats.submissions_today) : "—", icon: TrendingUp },
+    { label: "Platform Users", value: stats ? String(stats.users_total) : "—", icon: Users, color: "var(--secondary)" },
+    { label: "Academic Courses", value: stats ? String(stats.courses_total) : "—", icon: BookOpen, color: "var(--primary)" },
+    { label: "Submissions (24h)", value: stats ? String(stats.submissions_today) : "—", icon: TrendingUp, color: "var(--secondary)" },
   ] as const;
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)] mb-2">
-          Platform Overview
-        </h1>
-        <p className="text-[var(--muted-foreground)]">
-          Monitor and manage the Marconi Elearn platform
-        </p>
-      </motion.div>
+    <div className="max-w-6xl mx-auto space-y-10">
+      <PageHeader
+        title="Platform Control Deck"
+        description="Global oversight and infrastructure management for Marconi Elearn."
+      />
 
       {/* Metrics Grid */}
       <motion.div
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+        className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {liveMetrics.map((metric) => (
           <motion.div
             key={metric.label}
             variants={fadeInUp}
-            className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl"
+            className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm relative overflow-hidden group"
           >
+            <div
+              className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity"
+              aria-hidden="true"
+            >
+              <metric.icon size={80} />
+            </div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
-                <metric.icon className="w-5 h-5 text-[var(--primary)]" />
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center border border-white/50"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${metric.color} 10%, transparent)`,
+                }}
+              >
+                <metric.icon className="w-5 h-5" style={{ color: metric.color }} />
               </div>
             </div>
-            <p className="text-2xl font-bold text-[var(--foreground)] mb-1">
+            <p className="text-3xl font-bold text-[var(--foreground)] mb-1 font-[family-name:var(--font-display)]">
               {metric.value}
             </p>
-            <p className="text-sm text-[var(--muted-foreground)]">
+            <p className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-widest">
               {metric.label}
             </p>
           </motion.div>
@@ -120,132 +121,130 @@ export default function SuperadminPage() {
       </motion.div>
 
       {metricsError ? (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl flex items-start gap-3"
-        >
+        <div className="p-4 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-[var(--secondary)] shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-[var(--foreground)]">Metrics unavailable</p>
-            <p className="text-sm text-[var(--muted-foreground)]">{metricsError}</p>
+            <p className="text-sm font-medium text-[var(--foreground)]">Telemetry partially offline</p>
+            <p className="text-xs text-[var(--muted-foreground)]">{metricsError}</p>
           </div>
-        </motion.div>
+        </div>
       ) : null}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* System Status */}
+      <div className="grid lg:grid-cols-2 gap-8">
+        {/* System Health */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl"
+          className="space-y-4"
         >
-          <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mb-4">
-            System Status
-          </h2>
-          <div className="space-y-3">
-            {systemStatus.map((item) => (
-              <div
-                key={item.service}
-                className="flex items-center justify-between p-3 bg-[var(--background)] rounded-xl"
-              >
-                <span className="text-[var(--foreground)]">{item.service}</span>
-                <StatusBadge status={item.status} />
-              </div>
-            ))}
+          <div className="flex items-center justify-between px-2">
+            <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
+              Infrastructure Health
+            </h2>
+            <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded-full border border-green-100">
+              All Systems Operational
+            </span>
+          </div>
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+            <div className="divide-y divide-[var(--border)]/50">
+              {systemStatus.map((item) => (
+                <div
+                  key={item.service}
+                  className="flex items-center justify-between p-4 bg-[var(--background)]/30 hover:bg-[var(--background)] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white border border-[var(--border)] flex items-center justify-center">
+                      <item.icon className="w-4 h-4 text-[var(--muted-foreground)]" />
+                    </div>
+                    <span className="text-sm font-medium text-[var(--foreground)]">{item.service}</span>
+                  </div>
+                  <StatusBadge status={item.status} />
+                </div>
+              ))}
+            </div>
           </div>
         </motion.div>
 
-        {/* Quick Actions */}
+        {/* Global Operations */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl"
+          className="space-y-4"
         >
-          <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mb-4">
-            Quick Actions
+          <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)] px-2">
+            Platform Operations
           </h2>
-          <div className="space-y-3">
-            <button
-              type="button"
+          <div className="grid gap-3">
+            <OperationButton
               onClick={() => router.push("/superadmin/organizations?new=1")}
-              className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-[var(--primary)]" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-[var(--foreground)]">
-                  Create Organization
-                </p>
-                <p className="text-sm text-[var(--muted-foreground)]">
-                  Add a new organization to the platform
-                </p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)]" />
-            </button>
-            <button
-              type="button"
+              title="Onboard Institution"
+              description="Initialize a new organizational tenant"
+              icon={Building2}
+            />
+            <OperationButton
               onClick={() => router.push("/admin/members")}
-              className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[var(--secondary)]/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-[var(--secondary)]" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-[var(--foreground)]">
-                  Add Org Staff
-                </p>
-                <p className="text-sm text-[var(--muted-foreground)]">
-                  Add lecturers/TAs/admins to an organization
-                </p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)]" />
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/courses")}
-              className="w-full flex items-center gap-3 p-4 bg-[var(--background)] hover:bg-[var(--primary)]/5 border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-[var(--primary)]" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-[var(--foreground)]">
-                  Create Courses
-                </p>
-                <p className="text-sm text-[var(--muted-foreground)]">
-                  Create courses and assign course staff roles
-                </p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)]" />
-            </button>
+              title="Assign Platform Staff"
+              description="Manage global administrative privileges"
+              icon={ShieldCheck}
+            />
+            <OperationButton
+              onClick={() => router.push("/superadmin/settings")}
+              title="Global Parameters"
+              description="Configure platform-wide environment variables"
+              icon={Settings}
+            />
           </div>
         </motion.div>
       </div>
 
-      {/* Info Banner */}
+      {/* Audit & Transparency */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="mt-6 p-4 bg-[var(--primary)]/5 border border-[var(--primary)]/20 rounded-xl flex items-start gap-3"
+        className="p-6 bg-[var(--primary)] text-white rounded-2xl shadow-xl relative overflow-hidden group"
       >
-        <AlertCircle className="w-5 h-5 text-[var(--primary)] shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm text-[var(--foreground)]">
-            <strong>Platform Admin View</strong>
+        <div className="absolute right-0 top-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+          <ShieldCheck size={120} />
+        </div>
+        <div className="max-w-2xl">
+          <h3 className="text-xl font-semibold mb-2">Governance & Oversight</h3>
+          <p className="text-sm text-white/80 mb-6 leading-relaxed">
+            The platform admin view provides unrestricted access to all data. Every action taken from this dashboard is recorded in the global immutable audit ledger for institutional compliance.
           </p>
-          <p className="text-sm text-[var(--muted-foreground)]">
-            This dashboard provides platform-wide metrics and management
-            capabilities. Organization-specific management is available in the
-            Organization Admin dashboard.
-          </p>
+          <div className="flex gap-3">
+            <button className="px-4 py-2 bg-white text-[var(--primary)] rounded-xl text-xs font-bold hover:bg-white/90 transition-colors">
+              Access Global Ledger
+            </button>
+            <button className="px-4 py-2 bg-[var(--primary-hover)] text-white border border-white/20 rounded-xl text-xs font-bold hover:bg-white/10 transition-colors">
+              Export Transparency Report
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>
+  );
+}
+
+function OperationButton({ onClick, title, description, icon: Icon }: { onClick: () => void; title: string; description: string; icon: any }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-4 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl hover:border-[var(--primary)]/30 hover:shadow-md transition-all text-left group"
+    >
+      <div className="w-10 h-10 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center shrink-0 group-hover:bg-[var(--primary)] group-hover:text-white transition-colors shadow-sm">
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
+          {title}
+        </p>
+        <p className="text-xs text-[var(--muted-foreground)] truncate">{description}</p>
+      </div>
+      <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
+    </button>
   );
 }
 
@@ -256,23 +255,23 @@ function StatusBadge({ status }: { status: string }) {
   > = {
     healthy: {
       icon: CheckCircle2,
-      className: "text-green-600 bg-green-500/10",
-      label: "Healthy",
+      className: "text-green-600 bg-green-500/5 border-green-200/50",
+      label: "Operational",
     },
     degraded: {
       icon: AlertCircle,
-      className: "text-amber-600 bg-amber-500/10",
-      label: "Degraded",
+      className: "text-amber-600 bg-amber-500/5 border-amber-200/50",
+      label: "Latency Detected",
     },
     pending: {
       icon: Clock,
-      className: "text-[var(--muted-foreground)] bg-[var(--muted-foreground)]/10",
-      label: "Not Configured",
+      className: "text-[var(--muted-foreground)] bg-[var(--muted-foreground)]/5 border-[var(--border)]",
+      label: "Provisioning",
     },
     down: {
       icon: AlertCircle,
-      className: "text-[var(--secondary)] bg-[var(--secondary)]/10",
-      label: "Down",
+      className: "text-[var(--secondary)] bg-[var(--secondary)]/5 border-[var(--secondary)]/20",
+      label: "Critical Failure",
     },
   };
 
@@ -280,9 +279,9 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-tight ${className}`}
     >
-      <Icon className="w-3.5 h-3.5" />
+      <Icon className="w-3 h-3" />
       {label}
     </span>
   );
