@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
+  ArrowRight,
   Download,
   FileText,
   Loader2,
@@ -37,6 +38,7 @@ export default function StaffSubmissionDetailPage() {
   const [feedback, setFeedback] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [isNavigatingNext, setIsNavigatingNext] = useState(false);
 
   const maxPoints = data?.max_points ?? 0;
   const submittedAt = useMemo(() => (data ? new Date(data.submitted_at) : null), [data]);
@@ -80,6 +82,26 @@ export default function StaffSubmissionDetailPage() {
     } catch (err) {
       if (err instanceof ApiError) setSaveError(err.detail);
       else setSaveError("Download failed");
+    }
+  }
+
+  async function handleNext() {
+    if (!data) return;
+    setIsNavigatingNext(true);
+    try {
+      const res = await staffSubmissions.nextUngraded({
+        after_submission_id: data.id,
+      });
+      if (res.submission_id) {
+        router.push(`/staff/submissions/${res.submission_id}`);
+      } else {
+        setSaveError("No more ungraded submissions");
+      }
+    } catch (err) {
+      if (err instanceof ApiError) setSaveError(err.detail);
+      else setSaveError("Failed to find next submission");
+    } finally {
+      setIsNavigatingNext(false);
     }
   }
 
@@ -202,6 +224,18 @@ export default function StaffSubmissionDetailPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleNext}
+              disabled={isNavigatingNext}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isNavigatingNext ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRight className="w-4 h-4" />
+              )}
+              Next
+            </button>
             <button
               onClick={handleDownload}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] transition-colors"

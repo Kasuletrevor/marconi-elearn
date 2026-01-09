@@ -179,12 +179,14 @@ async def next_ungraded_submission(
     current_user: Annotated[User, Depends(get_current_user)],
     course_id: int | None = None,
     status_filter: SubmissionStatus | None = None,
+    after_submission_id: int | None = None,
 ) -> StaffNextSubmissionOut:
     row = await get_next_ungraded_staff_submission_row(
         db,
         staff_user_id=current_user.id,
         course_id=course_id,
         status=status_filter,
+        after_submission_id=after_submission_id,
     )
     return StaffNextSubmissionOut(submission_id=None if row is None else row.submission.id)
 

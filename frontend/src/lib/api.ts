@@ -1205,10 +1205,13 @@ export const staffSubmissions = {
   async nextUngraded(params?: {
     course_id?: number;
     status?: "pending" | "grading" | "graded" | "error";
+    after_submission_id?: number;
   }): Promise<StaffNextSubmissionOut> {
     const query = new URLSearchParams();
     if (params?.course_id !== undefined) query.set("course_id", String(params.course_id));
     if (params?.status) query.set("status_filter", params.status);
+    if (params?.after_submission_id !== undefined)
+      query.set("after_submission_id", String(params.after_submission_id));
     const qs = query.toString();
 
     const res = await fetch(`${API_BASE}/api/v1/staff/submissions/next${qs ? `?${qs}` : ""}`, {

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import Select, and_, case, func, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -138,6 +138,7 @@ async def get_next_ungraded_staff_submission_row(
     staff_user_id: int,
     course_id: int | None = None,
     status: SubmissionStatus | None = None,
+    after_submission_id: int | None = None,
 ) -> StaffSubmissionRow | None:
     stmt = _base_staff_submission_query(staff_user_id=staff_user_id)
     if course_id is not None:
@@ -153,6 +154,37 @@ async def get_next_ungraded_staff_submission_row(
         (Submission.status == SubmissionStatus.error, 2),
         else_=3,
     )
+
+    if after_submission_id is not None:
+        # Get the sort key values of the 'after' submission
+        after_stmt = select(Submission.status, Submission.created_at, Submission.id).where(
+            Submission.id == after_submission_id
+        )
+        after_res = await db.execute(after_stmt)
+        after_row = after_res.first()
+
+        if after_row:
+            after_status, after_created, after_id = after_row
+            after_priority = 3
+            if after_status == SubmissionStatus.pending:
+                after_priority = 0
+            elif after_status == SubmissionStatus.grading:
+                after_priority = 1
+            elif after_status == SubmissionStatus.error:
+                after_priority = 2
+
+            stmt = stmt.where(
+                or_(
+                    priority > after_priority,
+                    and_(priority == after_priority, Submission.created_at > after_created),
+                    and_(
+                        priority == after_priority,
+                        Submission.created_at == after_created,
+                        Submission.id > after_id,
+                    ),
+                )
+            )
+
     stmt = stmt.order_by(priority, Submission.created_at.asc(), Submission.id.asc())
     result = await db.execute(stmt.limit(1))
     row = result.first()
