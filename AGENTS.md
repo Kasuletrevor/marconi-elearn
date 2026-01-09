@@ -15,10 +15,27 @@ The source of truth for product scope and sequencing is `spec.md` — read that 
 - Execution: run untrusted code via **JOBE** as a separate service (not inside the API).
 - Email: **Gmail SMTP** is acceptable for development/small pilots; production should move to a transactional provider.
 
+## Project Management (Linear)
+
+Trevor tracks execution in Linear:
+- Linear project: `Marconi Elearn`
+- Linear team: `KJT tech solutions`
+- Seeded roadmap: 11 critical tasks (infra, grading, AI, operations).
+
+Agent expectations:
+- Treat Linear as the execution tracker; treat `spec.md` as the plan-of-record.
+- Before starting new work, check Linear for the next highest-priority issue and current status.
+- After finishing work, update the relevant Linear issue (status + short notes on what changed).
+- Only create new Linear issues if Trevor explicitly asks; otherwise add discoveries to `review.md` and call them out in your handoff.
+
 ## Repo Structure
 
 - `spec.md`: platform spec + roadmap/plan.
+- `review.md`: known gaps/next upgrades checklist.
+- `USER_JOURNEY.md`: role-based navigation and API map (keep in sync with reality).
+- `MILESTONES.md`: brief milestone log (high-signal progress snapshots).
 - `backend/`: FastAPI service (Python).
+- `frontend/`: Next.js app (App Router).
 
 ## Backend (Python) Practices
 
@@ -46,4 +63,4 @@ The source of truth for product scope and sequencing is `spec.md` — read that 
 
 - Plan-of-record: update and follow `spec.md`.
 - Keep changes small, reversible, and aligned to current milestone order in `spec.md`.
-
+- When behavior changes user flows or roles, update `USER_JOURNEY.md` and (if relevant) add a note to `review.md`.
