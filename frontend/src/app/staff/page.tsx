@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useAuthStore, getStaffCourseIds, getCourseRole } from "@/lib/store";
 import { student, type Course, ApiError } from "@/lib/api";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -39,9 +41,7 @@ export default function StaffDashboardPage() {
   useEffect(() => {
     async function fetchCourses() {
       try {
-        // Use student API to get courses (works for staff too since they have membership)
         const allCourses = await student.getCourses();
-        // Filter to only courses where user is staff
         const staffCourses = allCourses.filter((c) =>
           staffCourseIds.includes(c.id)
         );
@@ -64,7 +64,6 @@ export default function StaffDashboardPage() {
     }
   }, [staffCourseIds]);
 
-  // TODO: Fetch real stats from API
   const stats = [
     {
       label: "Pending Reviews",
@@ -92,110 +91,83 @@ export default function StaffDashboardPage() {
     },
   ];
 
-  const quickActions = [
-    { label: "Review Submissions", href: "/staff/submissions", icon: FileText },
-    { label: "View At-Risk", href: "/staff/at-risk", icon: AlertTriangle },
-  ];
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        title="Dashboard Error"
+        description={error}
+      />
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)] mb-2">
-          Staff Dashboard
-        </h1>
-        <p className="text-[var(--muted-foreground)]">
-          Manage submissions, assignments, and student progress
-        </p>
-      </motion.div>
+    <div className="max-w-6xl mx-auto space-y-10">
+      <PageHeader
+        title="Staff Dashboard"
+        description="Manage submissions, assignments, and student progress."
+      />
 
-      {/* Stats Grid */}
       <motion.div
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {stats.map((stat) => (
           <motion.div
             key={stat.label}
             variants={fadeInUp}
-            className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl"
+            className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm relative overflow-hidden group"
           >
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+              className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity"
+              aria-hidden="true"
+            >
+              <stat.icon size={80} />
+            </div>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 border border-white/50"
               style={{
-                backgroundColor: `color-mix(in srgb, ${stat.color} 15%, transparent)`,
+                backgroundColor: `color-mix(in srgb, ${stat.color} 10%, transparent)`,
               }}
             >
               <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
             </div>
-            <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--foreground)]">
+            <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)]">
               {stat.value}
             </p>
-            <p className="text-sm text-[var(--muted-foreground)]">{stat.label}</p>
+            <p className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider mt-1">
+              {stat.label}
+            </p>
           </motion.div>
         ))}
       </motion.div>
 
-      {/* Quick Actions */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="mb-8"
+        transition={{ delay: 0.2 }}
+        className="space-y-6"
       >
-        <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)] mb-4">
-          Quick Actions
-        </h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          {quickActions.map((action) => (
-            <Link
-              key={action.label}
-              href={action.href}
-              className="group flex items-center gap-4 p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)]/30 hover:shadow-lg transition-all"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
-                <action.icon className="w-5 h-5 text-[var(--primary)]" />
-              </div>
-              <span className="font-medium text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
-                {action.label}
-              </span>
-              <ArrowRight className="w-4 h-4 ml-auto text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
-            </Link>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* My Courses */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)] mb-4">
+        <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
           My Courses
         </h2>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
-          </div>
-        ) : error ? (
-          <div className="p-6 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-2xl text-center">
-            <p className="text-[var(--secondary)]">{error}</p>
-          </div>
-        ) : courses.length === 0 ? (
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-8 text-center">
-            <BookOpen className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-4" />
-            <p className="text-[var(--muted-foreground)]">
-              No courses assigned yet
-            </p>
-          </div>
+        {courses.length === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title="No courses assigned"
+            description="You don't have any staff roles in active courses yet."
+          />
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {courses.map((course) => (
@@ -226,39 +198,41 @@ function CourseCard({ course, user }: CourseCardProps) {
   return (
     <Link
       href={`/staff/courses/${course.id}`}
-      className="group p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl hover:border-[var(--primary)]/30 hover:shadow-lg transition-all"
+      className="group p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl hover:border-[var(--primary)]/30 hover:shadow-lg transition-all flex flex-col h-full"
     >
       <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
-          <BookOpen className="w-5 h-5 text-[var(--primary)]" />
+        <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
+          <BookOpen className="w-5 h-5" />
         </div>
-        <span className="text-xs font-medium px-2 py-1 rounded-md bg-[var(--primary)]/10 text-[var(--primary)]">
+        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-[var(--background)] border border-[var(--border)] text-[var(--muted-foreground)]">
           {role ? roleLabels[role] || role : "Staff"}
         </span>
       </div>
-      <div className="mb-3">
-        <span className="text-xs font-medium text-[var(--muted-foreground)] bg-[var(--background)] px-2 py-0.5 rounded">
-          {course.code}
-        </span>
+      <div className="flex-1">
+        <div className="mb-2">
+          <span className="text-[10px] font-mono bg-[var(--background)] border border-[var(--border)] text-[var(--muted-foreground)] px-1.5 py-0.5 rounded uppercase tracking-tighter">
+            {course.code}
+          </span>
+        </div>
+        <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors leading-tight">
+          {course.title}
+        </h3>
+        {course.description && (
+          <p className="text-sm text-[var(--muted-foreground)] mt-2 line-clamp-2">
+            {course.description}
+          </p>
+        )}
       </div>
-      <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors leading-tight">
-        {course.title}
-      </h3>
-      {course.description && (
-        <p className="text-sm text-[var(--muted-foreground)] mt-2 line-clamp-2">
-          {course.description}
-        </p>
-      )}
-      <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[var(--border)]">
-        {course.semester && course.year && (
-          <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
+      <div className="flex items-center justify-between mt-6 pt-4 border-t border-[var(--border)]/50">
+        {course.semester && course.year ? (
+          <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)] font-medium">
             <Calendar className="w-3.5 h-3.5" />
             <span>
-              {course.semester}, {course.year}
+              {course.semester} {course.year}
             </span>
           </div>
-        )}
-        <ArrowRight className="w-4 h-4 ml-auto text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
+        ) : <div />}
+        <ArrowRight className="w-4 h-4 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
       </div>
     </Link>
   );
