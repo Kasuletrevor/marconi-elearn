@@ -30,9 +30,9 @@ import {
   type Organization,
   ApiError,
 } from "@/lib/api";
-import { PageHeader } from "@/components/admin/PageHeader";
-import { EmptyState } from "@/components/admin/EmptyState";
-import { DataList } from "@/components/admin/DataList";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { DataList } from "@/components/shared/DataList";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 16 },

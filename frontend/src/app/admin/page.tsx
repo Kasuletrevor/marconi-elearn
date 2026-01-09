@@ -24,8 +24,8 @@ import {
   type Course,
   ApiError,
 } from "@/lib/api";
-import { PageHeader } from "@/components/admin/PageHeader";
-import { EmptyState } from "@/components/admin/EmptyState";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
