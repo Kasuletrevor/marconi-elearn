@@ -130,6 +130,7 @@ jobs:
           cat << ENVEOF > .env
           POSTGRES_USER=$POSTGRES_USER
           POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+          POSTGRES_DB=marconi
           DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/marconi
           SUPERADMIN_EMAILS=$SUPERADMIN_EMAILS
           SUPERADMIN_PASSWORD=$SUPERADMIN_PASSWORD
@@ -138,7 +139,6 @@ jobs:
           DOCKER_IMAGE=$DOCKER_IMAGE
           DOCKER_TAG=$DOCKER_TAG
           ENVEOF
-
 
           # Ensure remote directory exists
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ~/marconi"
@@ -151,6 +151,10 @@ jobs:
             set -e
             cd ~/marconi
 
+            echo "Internal system diagnostics before deployment:"
+            free -m
+            docker ps
+
             # Create external networks if they don't exist
             docker network inspect nginx-proxy-manager_npm-network >/dev/null 2>&1 || docker network create nginx-proxy-manager_npm-network 2>/dev/null || true
             docker network inspect proxy_hostinger-network >/dev/null 2>&1 || docker network create proxy_hostinger-network 2>/dev/null || true
@@ -162,9 +166,25 @@ jobs:
             docker-compose up -d --force-recreate backend
 
             echo "Waiting for backend to be healthy..."
-            sleep 10
+            for i in {1..30}; do
+              if curl -s http://localhost:8000/ > /dev/null; then
+                echo "Backend is healthy!"
+                break
+              fi
+              echo "Waiting... ($i/30)"
+              sleep 2
+              if [ $i -eq 30 ]; then
+                echo "Timeout waiting for backend to be healthy"
+                docker-compose logs backend
+                exit 1
+              fi
+            done
 
             docker-compose exec -T backend python -m alembic upgrade head
+
+            echo "Post-deployment diagnostics:"
+            free -m
+            docker-compose ps
 
             echo "Deployment complete!"
           ENDSSH
