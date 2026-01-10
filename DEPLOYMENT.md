@@ -7,9 +7,12 @@ This document describes the automated deployment workflow for the Marconi Elearn
 - **CI/CD Platform**: GitHub Actions
 - **Container Registry**: Docker Hub
 - **Deployment Target**: Docker Compose on your server
-- **Database**: PostgreSQL 16 (Docker container)
-- **Queue**: Redis (Docker container) - for background auto-grading
+- **Database**: PostgreSQL 16 (Docker container) - external port `16098`
+- **Queue**: Redis (Docker container) - external port `40971`
+- **API**: Backend - external port `32316` (randomized for security)
 - **External Service**: JOBE (code execution, hosted separately)
+
+**Note**: All services communicate on the internal Docker network (`marconi-network`) using standard ports (PostgreSQL 5432, Redis 6379, Backend 8000). Random ports are only for external access to reduce exposure. Nginx proxy can route traffic to any internal port.
 
 ## Prerequisites
 
@@ -83,7 +86,17 @@ Add the following secrets:
 | `JOBE_TIMEOUT_SECONDS` | `20` |
 | `JOBE_ALLOWED_LANGUAGES` | `c,cpp` |
 | `REDIS_URL` | `redis://redis:6379/0` |
-| `BACKEND_PORT` | `8000` |
+| `BACKEND_PORT` | `32316` |
+
+**External Ports** (randomized for security):
+
+| Service | External Port | Internal Port |
+|---------|----------------|---------------|
+| Backend | `32316` | `8000` |
+| PostgreSQL | `16098` | `5432` |
+| Redis | `40971` | `6379` |
+
+These can be changed in `docker-compose.yml`. Nginx on the same network can route traffic to internal ports regardless of external ports.
 
 ## Deployment Workflow
 
@@ -217,9 +230,12 @@ docker-compose logs -f backend
 
 ## Security Notes
 
+- **Random Ports**: External ports are randomized (Backend: 32316, PostgreSQL: 16098, Redis: 40971) to reduce automated scanning
+- **Internal Communication**: Services use standard ports on Docker network, Nginx proxy routes to internal ports
 - Never commit `.env` files
 - Rotate Docker Hub access tokens regularly
 - Use strong passwords for PostgreSQL
 - Keep SSH keys secure (add passphrase)
-- Enable firewall rules to restrict access to ports
+- Enable firewall rules to restrict access to random ports only
 - Consider using managed database service for production
+- Backend container runs as non-root user (`appuser`)
