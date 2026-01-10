@@ -15,6 +15,7 @@ from app.crud.submissions import create_submission, list_submissions
 from app.db.deps import get_db
 from app.models.user import User
 from app.schemas.submission import SubmissionOut
+from app.worker.enqueue import enqueue_grading
 
 router = APIRouter(prefix="/orgs/{org_id}/courses/{course_id}/assignments/{assignment_id}/submissions")
 
@@ -73,6 +74,10 @@ async def upload_submission(
         size_bytes=len(data),
         storage_path=str(dest),
     )
+    try:
+        await enqueue_grading(submission_id=submission.id)
+    except Exception:
+        pass
     return submission
 
 
