@@ -1,0 +1,2 @@
+"""Taskiq worker package."""
+
