@@ -80,6 +80,24 @@ export interface InvitePreview {
   course_title: string | null;
 }
 
+export interface PlaygroundLanguage {
+  id: string;
+  version: string;
+}
+
+export interface PlaygroundRunRequest {
+  language_id: string;
+  source_code: string;
+  stdin?: string;
+}
+
+export interface PlaygroundRunResponse {
+  outcome: number;
+  compile_output: string;
+  stdout: string;
+  stderr: string;
+}
+
 export interface Organization {
   id: number;
   name: string;
@@ -1262,9 +1280,32 @@ export const staffSubmissions = {
 export const invites = {
   async preview(token: string): Promise<InvitePreview> {
     const res = await fetch(
-      `${API_BASE}/api/v1/invites/preview?token=${encodeURIComponent(token)}`,
+      `${API_BASE}/api/v1/invites/preview?token=${encodeURIComponent(token)}`,  
       { credentials: "include" }
     );
     return handleResponse<InvitePreview>(res);
+  },
+};
+
+/* ============================================
+   PLAYGROUND (authenticated)
+   ============================================ */
+
+export const playground = {
+  async listLanguages(): Promise<PlaygroundLanguage[]> {
+    const res = await fetch(`${API_BASE}/api/v1/playground/languages`, {
+      credentials: "include",
+    });
+    return handleResponse<PlaygroundLanguage[]>(res);
+  },
+
+  async run(data: PlaygroundRunRequest): Promise<PlaygroundRunResponse> {
+    const res = await fetch(`${API_BASE}/api/v1/playground/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<PlaygroundRunResponse>(res);
   },
 };
