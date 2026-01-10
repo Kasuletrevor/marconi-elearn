@@ -232,8 +232,8 @@ docker-compose logs -f backend
 
 The backend connects to two external Docker networks for reverse proxy access:
 
-- `npm-network` - Nginx Proxy Manager network
-- `hostinger-network` - Hostinger proxy network
+- `nginx-proxy-manager_npm-network` - Nginx Proxy Manager network
+- `proxy_hostinger-network` - Hostinger proxy network
 
 These networks are automatically created during deployment if they don't exist.
 
@@ -317,7 +317,7 @@ These networks are automatically created during deployment if they don't exist.
 
 ### Hostinger Proxy Configuration
 
-For the `hostinger-network`, configure similarly in your Hostinger dashboard:
+For the `proxy_hostinger-network`, configure similarly in your Hostinger dashboard:
 
 1. Add domain `api.yourdomain.com`
 2. Set proxy target to container name: `marconi-backend`
@@ -331,7 +331,7 @@ Verify containers are connected to external networks:
 ```bash
 ssh deploy@your-server
 cd ~/marconi
-docker network inspect npm-network --format '{{range .Containers}}{{.Name}} {{end}}'
+docker network inspect nginx-proxy-manager_npm-network --format '{{range .Containers}}{{.Name}} {{end}}'
 # Should list: marconi-backend marconi-postgres marconi-redis
 ```
 
