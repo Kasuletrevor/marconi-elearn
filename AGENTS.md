@@ -13,6 +13,7 @@ The source of truth for product scope and sequencing is `spec.md` — read that 
 - Auth: **Email + password** with **server-side sessions stored in Postgres** and an **HTTP-only cookie** (session-only cookie lifetime).
 - Tenancy: keep a tenant boundary (called **Organization/Workspace**) and scope everything under it.
 - Execution: run untrusted code via **JOBE** as a separate service (not inside the API).
+- JOBE config: set `JOBE_BASE_URL` (must include `/restapi`), optionally restrict with `JOBE_ALLOWED_LANGUAGES`, and tune `JOBE_TIMEOUT_SECONDS`.
 - Email: **Gmail SMTP** is acceptable for development/small pilots; production should move to a transactional provider.
 
 ## Project Management (Linear)
