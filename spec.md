@@ -190,6 +190,22 @@ Main Web App (Vercel) -> Job Queue (Redis/DB) -> JOBE Server (Render)
     - Response: `{ outcome, compile_output, stdout, stderr }` (direct mapping from JOBE `cmpinfo/stdout/stderr/outcome`)
 - This synchronous path is for interactive use only; grading remains a queued worker concern.
 
+**Auto-Grading (Queue + Worker)**:
+- Queue: Redis + Taskiq worker (Postgres remains the source of truth).
+- When a submission is uploaded:
+  - API creates the `submissions` row (status `pending`)
+  - API enqueues `grade_submission(submission_id)` (if `REDIS_URL` is configured)
+  - Worker transitions `pending -> grading -> graded/error` and writes:
+    - `submissions.score`, `submissions.feedback`
+    - `submission_test_results` rows (per test case stdout/stderr/compile output)
+- UI updates use polling + backoff (Vercel-friendly); SSE can be added later.
+
+**Local Dev (Auto-Grading)**:
+1. Start Redis (any local install or Docker).
+2. Ensure `.env` has `REDIS_URL=redis://localhost:6379/0` and `JOBE_BASE_URL=.../restapi`.
+3. Run API: `cd backend; .\\.venv\\Scripts\\python -m uvicorn app.main:app --reload`
+4. Run worker (separate terminal): `cd backend; .\\.venv\\Scripts\\taskiq worker app.worker.broker:broker app.worker.tasks`
+
 **Safety Measures**:
 
 | Measure | Implementation |
@@ -507,7 +523,7 @@ JOBE_ALLOWED_LANGUAGES=c,cpp
 JOBE_TIMEOUT_SECONDS=20
 
 # Job Queue
-REDIS_URL=redis://...
+REDIS_URL=redis://localhost:6379/0
 
 # AI
 OPENAI_API_KEY=sk-...
