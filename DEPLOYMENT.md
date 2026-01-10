@@ -67,18 +67,23 @@ Add the following secrets:
 | `SSH_USER` | SSH username on server | `deploy` |
 | `POSTGRES_USER` | PostgreSQL username | `marconi_user` |
 | `POSTGRES_PASSWORD` | PostgreSQL password (strong random) | `xK9#mP2$vL5@nQ8` |
-| `POSTGRES_DB` | PostgreSQL database name | `marconi` |
-| `SESSION_COOKIE_NAME` | Session cookie name | `marconi_session` |
-| `SESSION_COOKIE_SECURE` | True for production | `true` |
-| `SESSION_COOKIE_SAMESITE` | Cookie same-site policy | `lax` |
 | `SUPERADMIN_EMAILS` | Comma-separated admin emails | `admin@school.edu` |
 | `SUPERADMIN_PASSWORD` | Bootstrap password | `temp_password_change_me` |
 | `CORS_ALLOW_ORIGINS` | Frontend URLs | `https://your-frontend.com` |
 | `JOBE_BASE_URL` | JOBE service URL | `https://jobe.example.com/restapi` |
-| `JOBE_TIMEOUT_SECONDS` | JOBE timeout | `20` |
-| `JOBE_ALLOWED_LANGUAGES` | Allowed languages | `c,cpp` |
-| `REDIS_URL` | Redis connection URL | `redis://redis:6379/0` |
-| `BACKEND_PORT` | Backend port | `8000` |
+
+**Optional Secrets** (have sensible defaults):
+
+| Secret | Default |
+|--------|---------|
+| `POSTGRES_DB` | `marconi` |
+| `SESSION_COOKIE_NAME` | `marconi_session` |
+| `SESSION_COOKIE_SECURE` | `true` |
+| `SESSION_COOKIE_SAMESITE` | `lax` |
+| `JOBE_TIMEOUT_SECONDS` | `20` |
+| `JOBE_ALLOWED_LANGUAGES` | `c,cpp` |
+| `REDIS_URL` | `redis://redis:6379/0` |
+| `BACKEND_PORT` | `8000` |
 
 ## Deployment Workflow
 
