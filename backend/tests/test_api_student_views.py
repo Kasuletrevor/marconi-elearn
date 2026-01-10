@@ -47,7 +47,11 @@ async def test_student_can_list_their_courses_modules_assignments(client):
     assert len(r.json()) == 1
     assert r.json()[0]["id"] == course_id
 
-    r = await client.get(f"/api/v1/student/courses/{course_id}/modules")
+    r = await client.get(f"/api/v1/student/courses/{course_id}")
+    assert r.status_code == 200
+    assert r.json()["id"] == course_id
+
+    r = await client.get(f"/api/v1/student/courses/{course_id}/modules")        
     assert r.status_code == 200
     assert len(r.json()) == 1
 
