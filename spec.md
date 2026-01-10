@@ -181,6 +181,15 @@ Main Web App (Vercel) -> Job Queue (Redis/DB) -> JOBE Server (Render)
   - Results are persisted (DB) and shown in the UI (status, stdout/stderr, pass/fail)
 ```
 
+**MVP (Playground) Integration**:
+- The Next.js playground calls FastAPI (cookie-authenticated), which proxies to JOBE.
+- Backend endpoints:
+  - `GET /api/v1/playground/languages` -> language allowlist (from JOBE, filtered by `JOBE_ALLOWED_LANGUAGES`)
+  - `POST /api/v1/playground/run` -> compile/run a single file
+    - Body: `{ language_id, source_code, stdin }`
+    - Response: `{ outcome, compile_output, stdout, stderr }` (direct mapping from JOBE `cmpinfo/stdout/stderr/outcome`)
+- This synchronous path is for interactive use only; grading remains a queued worker concern.
+
 **Safety Measures**:
 
 | Measure | Implementation |
@@ -490,8 +499,12 @@ NEXTAUTH_URL=https://marconi-elearn.vercel.app
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 # Code Execution (JOBE)
-JOBE_SERVER_URL=https://your-jobe-instance.render.com
-JOBE_API_KEY=optional-key
+# Base URL including `/restapi` suffix, e.g.:
+# `http://208.109.228.76:4000/jobe/index.php/restapi`
+JOBE_BASE_URL=http://...
+# Comma-separated allowlist (empty = no filtering, not recommended)
+JOBE_ALLOWED_LANGUAGES=c,cpp
+JOBE_TIMEOUT_SECONDS=20
 
 # Job Queue
 REDIS_URL=redis://...
