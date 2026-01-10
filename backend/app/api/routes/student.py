@@ -30,6 +30,7 @@ from app.schemas.course import CourseOut
 from app.schemas.module import ModuleOut
 from app.schemas.student_submissions import StudentSubmissionItem
 from app.schemas.submission import SubmissionOut, SubmissionStudentOut
+from app.worker.enqueue import enqueue_grading
 
 router = APIRouter(prefix="/student", dependencies=[Depends(get_current_user)])
 
@@ -182,6 +183,11 @@ async def submit_assignment(
         size_bytes=len(data),
         storage_path=str(dest),
     )
+    # Fire-and-forget: enqueue background grading if Redis is configured.
+    try:
+        await enqueue_grading(submission_id=submission.id)
+    except Exception:
+        pass
     return submission
 
 
