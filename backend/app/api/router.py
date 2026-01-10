@@ -20,6 +20,7 @@ from app.api.routes.staff_course_assignment_extensions import (
 from app.api.routes.staff_course_invites import router as staff_course_invites_router
 from app.api.routes.staff_course_memberships import router as staff_course_memberships_router
 from app.api.routes.staff_course_modules import router as staff_course_modules_router
+from app.api.routes.staff_course_org_members import router as staff_course_org_members_router
 from app.api.routes.staff_course_resources import router as staff_course_resources_router
 from app.api.routes.staff_course_submissions import router as staff_course_submissions_router
 from app.api.routes.staff_course_test_cases import router as staff_course_test_cases_router
@@ -45,6 +46,7 @@ api_router.include_router(staff_course_assignment_extensions_router, tags=["staf
 api_router.include_router(staff_course_submissions_router, tags=["staff"])
 api_router.include_router(staff_course_memberships_router, tags=["staff"])
 api_router.include_router(staff_course_invites_router, tags=["staff"])
+api_router.include_router(staff_course_org_members_router, tags=["staff"])
 api_router.include_router(staff_course_resources_router, tags=["staff"])
 api_router.include_router(staff_course_test_cases_router, tags=["staff"])
 api_router.include_router(staff_missing_submissions_router, tags=["staff"])
