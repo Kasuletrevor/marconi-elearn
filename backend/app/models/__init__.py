@@ -10,8 +10,10 @@ from app.models.module import Module
 from app.models.module_resource import ModuleResource
 from app.models.notification import Notification
 from app.models.submission import Submission
+from app.models.submission_test_result import SubmissionTestResult
 from app.models.student_profile import StudentProfile
 from app.models.session import Session
+from app.models.test_case import TestCase
 from app.models.user import User
 
 __all__ = [
@@ -29,5 +31,7 @@ __all__ = [
     "Session",
     "StudentProfile",
     "Submission",
+    "SubmissionTestResult",
+    "TestCase",
     "User",
 ]
