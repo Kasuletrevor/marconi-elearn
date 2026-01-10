@@ -193,15 +193,17 @@ jobs:
             # Ensure the configured database exists (handles renamed DBs with a persisted volume).
             docker compose -p marconi -f docker-compose.yml exec -T postgres sh -lc '
               set -e
-              case "$POSTGRES_DB" in
+              DB="${POSTGRES_DB:-}"
+
+              case "$DB" in
                 (""|*[!a-zA-Z0-9_]*)
-                  echo "Invalid POSTGRES_DB: $POSTGRES_DB"
+                  echo "Invalid POSTGRES_DB: $DB"
                   exit 1
                   ;;
               esac
 
-              psql -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$POSTGRES_DB'" | grep -q 1 \
-                || psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE $POSTGRES_DB"
+              psql -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB'" | grep -q 1 \
+                || psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE $DB"
             '
 
             docker compose -p marconi -f docker-compose.yml up -d --force-recreate backend
