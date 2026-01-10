@@ -28,9 +28,9 @@ services:
       - uploads:/app/backend/var/uploads
     networks:
       - marconi-network
-      - npm-network:
+      - nginx-proxy-manager_npm-network:
           external: true
-      - hostinger-network:
+      - proxy_hostinger-network:
           external: true
 
   postgres:
@@ -68,9 +68,9 @@ services:
       - redis_data:/data
     networks:
       - marconi-network
-      - npm-network:
+      - nginx-proxy-manager_npm-network:
           external: true
-      - hostinger-network:
+      - proxy_hostinger-network:
           external: true
 
 volumes:
@@ -81,7 +81,7 @@ volumes:
 networks:
   marconi-network:
     driver: bridge
-  npm-network:
+  nginx-proxy-manager_npm-network:
     external: true
-  hostinger-network:
+  proxy_hostinger-network:
     external: true
