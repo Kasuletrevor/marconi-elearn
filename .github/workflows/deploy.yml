@@ -146,7 +146,7 @@ jobs:
           lines = [
               f"POSTGRES_USER={get('POSTGRES_USER')}",
               f"POSTGRES_PASSWORD={get('POSTGRES_PASSWORD')}",
-              f"POSTGRES_DB={get('POSTGRES_DB','marconi')}",
+              f"POSTGRES_DB={get('POSTGRES_DB','marconi_elearn')}",
               f"SUPERADMIN_EMAILS={get('SUPERADMIN_EMAILS')}",
               f"SUPERADMIN_PASSWORD={get('SUPERADMIN_PASSWORD')}",
               f"CORS_ALLOW_ORIGINS={get('CORS_ALLOW_ORIGINS')}",
@@ -186,7 +186,18 @@ jobs:
             docker rm -f marconi-backend marconi-postgres marconi-redis >/dev/null 2>&1 || true
 
             docker compose -p marconi -f docker-compose.yml pull
-            docker compose -p marconi -f docker-compose.yml up -d --force-recreate
+
+            # Bring up dependencies first so we can ensure the DB exists.
+            docker compose -p marconi -f docker-compose.yml up -d --force-recreate postgres redis
+
+            # Ensure the configured database exists (handles renamed DBs with a persisted volume).
+            docker compose -p marconi -f docker-compose.yml exec -T postgres sh -lc '
+              set -e
+              psql -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '\''$POSTGRES_DB'\''" | grep -q 1 \
+                || psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE \\\"$POSTGRES_DB\\\""
+            '
+
+            docker compose -p marconi -f docker-compose.yml up -d --force-recreate backend
 
             echo "Waiting for backend health..."
             for i in {1..30}; do
