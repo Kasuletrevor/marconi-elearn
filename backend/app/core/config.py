@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     # If empty, superadmins must be created via DB or an admin-only endpoint.
     superadmin_password: str = ""
     cors_allow_origins: str = "http://localhost:3000"
+    jobe_base_url: str = ""
+    jobe_timeout_seconds: float = 20.0
+    # Comma-separated list. If empty, no filtering is applied.
+    jobe_allowed_languages: str = "c,cpp"
+    # Queue/worker
+    redis_url: str = ""
+    taskiq_queue_name: str = "marconi"
 
     model_config = SettingsConfigDict(
         env_file=str((Path(__file__).resolve().parents[3] / ".env")),
