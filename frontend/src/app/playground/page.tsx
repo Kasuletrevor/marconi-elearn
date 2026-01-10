@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Play, Terminal, Trash2, Code2 } from "lucide-react";
 import Link from "next/link";
 import { CodeEditor } from "@/components/ui/CodeEditor";
+import { ApiError, PlaygroundLanguage, playground } from "@/lib/api";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 14 },
@@ -23,17 +24,68 @@ export default function PlaygroundPage() {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  const [languages, setLanguages] = useState<PlaygroundLanguage[] | null>(null);
+  const [languageId, setLanguageId] = useState("c");
+
+  useEffect(() => {
+    let cancelled = false;
+    playground
+      .listLanguages()
+      .then((langs) => {
+        if (cancelled) return;
+        setLanguages(langs);
+        setLanguageId((prev) => {
+          if (langs.some((l) => l.id === prev)) return prev;
+          return langs.length > 0 ? langs[0].id : prev;
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLanguages([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const languageLabel = useMemo(() => {
+    const match = languages?.find((l) => l.id === languageId);
+    if (!match) return languageId.toUpperCase();
+    return `${match.id.toUpperCase()} (${match.version})`;
+  }, [languages, languageId]);
 
   const handleRun = async () => {
     setIsRunning(true);
     setOutput(""); // Clear previous output
-    
-    // Simulate execution delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    // Mock output for now
-    setOutput("Compiling...\nRunning...\n\nHello, Marconi!\n\nProcess exited with code 0.");
-    setIsRunning(false);
+
+    try {
+      const res = await playground.run({
+        language_id: languageId,
+        source_code: code,
+        stdin: "",
+      });
+
+      const parts: string[] = [];
+      parts.push("Compiling...");
+      if (res.compile_output.trim()) {
+        parts.push(res.compile_output.trimEnd());
+      }
+      parts.push("Running...");
+      if (res.stdout.trim()) parts.push(res.stdout.trimEnd());
+      if (res.stderr.trim()) parts.push(res.stderr.trimEnd());
+      parts.push(`\nOutcome: ${res.outcome}`);
+      setOutput(parts.join("\n\n"));
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setOutput(`Error (${err.status}): ${err.message}`);
+      } else if (err instanceof Error) {
+        setOutput(`Error: ${err.message}`);
+      } else {
+        setOutput("Error: Failed to run code.");
+      }
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   const handleClear = () => {
@@ -104,7 +156,20 @@ export default function PlaygroundPage() {
         <div className="flex flex-col h-full bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
           <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between">
             <span className="text-xs font-medium text-[var(--muted-foreground)] font-mono">main.c</span>
-            <span className="text-xs text-[var(--muted-foreground)]">C (GCC 9.3.0)</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[var(--muted-foreground)]">{languageLabel}</span>
+              <select
+                value={languageId}
+                onChange={(e) => setLanguageId(e.target.value)}
+                className="text-xs bg-[var(--background)] border border-[var(--border)] rounded-lg px-2 py-1 text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+              >
+                {(languages ?? []).map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.id.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex-1">
             <CodeEditor
