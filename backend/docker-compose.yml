@@ -23,7 +23,7 @@ services:
       JOBE_TIMEOUT_SECONDS: ${JOBE_TIMEOUT_SECONDS:-20}
       JOBE_ALLOWED_LANGUAGES: ${JOBE_ALLOWED_LANGUAGES:-c,cpp}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${BACKEND_PORT:-32316}:8000"
     volumes:
       - uploads:/app/backend/var/uploads
     networks:
@@ -44,6 +44,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    ports:
+      - "16098:5432"
     networks:
       - marconi-network
 
@@ -57,7 +59,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "6379:6379"
+      - "40971:6379"
     volumes:
       - redis_data:/data
     networks:
