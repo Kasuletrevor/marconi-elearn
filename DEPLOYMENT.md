@@ -228,6 +228,120 @@ View logs in real-time:
 docker-compose logs -f backend
 ```
 
+## Nginx Proxy Manager Integration
+
+The backend connects to two external Docker networks for reverse proxy access:
+
+- `npm-network` - Nginx Proxy Manager network
+- `hostinger-network` - Hostinger proxy network
+
+These networks are automatically created during deployment if they don't exist.
+
+### Nginx Proxy Manager Configuration
+
+1. **Access NPM Dashboard**
+   - Go to `http://your-server:81` (or your NPM port)
+   - Login with admin credentials
+
+2. **Create Proxy Host**
+
+   Click "Hosts" → "Proxy Hosts" → "Create Proxy Host":
+
+   | Field | Value |
+   |-------|-------|
+   | **Domain Names** | `api.yourdomain.com` |
+   | **Scheme** | `http` |
+   | **Forward Hostname / IP** | `marconi-backend` |
+   | **Forward Port** | `8000` |
+   | **Block Common Exploits** | ☑ Enabled |
+
+3. **SSL Configuration**
+
+   In the same form, click "SSL" tab:
+   - Select "Request a new SSL Certificate"
+   - Enable "Force SSL"
+   - Enable "HTTP/2"
+   - Click "Save"
+
+4. **Advanced Options** (optional)
+
+   Click "Advanced" tab for custom Nginx config:
+
+   ```nginx
+   # Enable WebSocket support for future features
+   proxy_http_version 1.1;
+   proxy_set_header Upgrade $http_upgrade;
+   proxy_set_header Connection "upgrade";
+
+   # Proper headers
+   proxy_set_header Host $host;
+   proxy_set_header X-Real-IP $remote_addr;
+   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+   proxy_set_header X-Forwarded-Proto $scheme;
+
+   # Timeouts for long-running operations
+   proxy_connect_timeout 60s;
+   proxy_send_timeout 60s;
+   proxy_read_timeout 60s;
+   ```
+
+5. **CORS Headers** (if needed)
+
+   Add to advanced config if experiencing CORS issues:
+
+   ```nginx
+   add_header Access-Control-Allow-Origin $http_origin always;
+   add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+   add_header Access-Control-Allow-Headers "Authorization, Content-Type, Accept" always;
+   add_header Access-Control-Allow-Credentials "true" always;
+
+   if ($request_method = 'OPTIONS') {
+       add_header Access-Control-Allow-Origin $http_origin;
+       add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS";
+       add_header Access-Control-Allow-Headers "Authorization, Content-Type, Accept";
+       add_header Access-Control-Allow-Credentials "true";
+       add_header Content-Length 0;
+       add_header Content-Type text/plain;
+       return 204;
+   }
+   ```
+
+6. **Test Configuration**
+
+   After creating the proxy host:
+   ```bash
+   curl -I https://api.yourdomain.com/
+   ```
+
+   Should return `200 OK` with proper headers.
+
+### Hostinger Proxy Configuration
+
+For the `hostinger-network`, configure similarly in your Hostinger dashboard:
+
+1. Add domain `api.yourdomain.com`
+2. Set proxy target to container name: `marconi-backend`
+3. Set port to: `8000` (internal Docker port)
+4. Enable SSL certificate
+
+### Network Connectivity Verification
+
+Verify containers are connected to external networks:
+
+```bash
+ssh deploy@your-server
+cd ~/marconi
+docker network inspect npm-network --format '{{range .Containers}}{{.Name}} {{end}}'
+# Should list: marconi-backend marconi-postgres marconi-redis
+```
+
+If containers are not connected, restart them:
+
+```bash
+docker-compose down
+docker-compose up -d
+```
+
 ## Security Notes
 
 - **Random Ports**: External ports are randomized (Backend: 32316, PostgreSQL: 16098, Redis: 40971) to reduce automated scanning
