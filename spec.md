@@ -90,6 +90,8 @@ Organization (tenant)
 | Submit Assignments | No | No | No | Yes |
 | View Own Grades | No | No | No | Yes |
 
+**Note (Org admin vs Course owner)**: Being an organization admin does not automatically make you staff/owner of every course. When an org admin creates a course, the creator is automatically added as the course `Owner` so they can manage it via staff-scoped APIs.
+
 ### 2.2 Authentication & User Management
 
 > [!CAUTION]
@@ -481,6 +483,7 @@ Key relationships:
 - [x] Submission history + results UI (student + staff views)
 - [x] Submission system with queue (MVP: Redis + Taskiq worker)
 - [ ] Offline download feature (PDF + starter ZIP packaging)
+- [ ] Assignments/submissions production hardening + UX polish (tracked in `review.md`)
 
 ### Phase 4: Code Execution (Week 4-5)
 - [ ] JOBE server deployment on Render (currently using external JOBE box)
