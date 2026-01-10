@@ -28,6 +28,10 @@ services:
       - uploads:/app/backend/var/uploads
     networks:
       - marconi-network
+      - npm-network:
+          external: true
+      - hostinger-network:
+          external: true
 
   postgres:
     image: postgres:16-alpine
@@ -64,6 +68,10 @@ services:
       - redis_data:/data
     networks:
       - marconi-network
+      - npm-network:
+          external: true
+      - hostinger-network:
+          external: true
 
 volumes:
   postgres_data:
@@ -73,3 +81,7 @@ volumes:
 networks:
   marconi-network:
     driver: bridge
+  npm-network:
+    external: true
+  hostinger-network:
+    external: true
