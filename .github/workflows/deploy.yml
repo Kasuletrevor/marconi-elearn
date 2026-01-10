@@ -2,8 +2,7 @@ name: Deploy Backend
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -33,7 +32,10 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://postgres:password@localhost:5432/marconi_test
       SUPERADMIN_EMAILS: admin@example.com
       SUPERADMIN_PASSWORD: password123
+      # Avoid external services during CI.
+      REDIS_URL: ""
       JOBE_BASE_URL: http://localhost:4000
+      JOBE_ALLOWED_LANGUAGES: c,cpp
 
     steps:
       - name: Checkout code
@@ -45,17 +47,15 @@ jobs:
           python-version: "3.11"
 
       - name: Install uv
-        run: pip install uv
+        run: python -m pip install --upgrade pip uv
 
       - name: Install dependencies
         working-directory: backend
-        run: |
-          uv pip install --system -e .
-          uv pip install --system pytest pytest-asyncio
+        run: uv pip install --system -e ".[dev]"
 
       - name: Run tests
         working-directory: backend
-        run: uv run pytest
+        run: uv run pytest -q
 
   build:
     name: Build and Push Docker Image
@@ -119,58 +119,78 @@ jobs:
         env:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
           SUPERADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD }}
           CORS_ALLOW_ORIGINS: ${{ secrets.CORS_ALLOW_ORIGINS }}
           JOBE_BASE_URL: ${{ secrets.JOBE_BASE_URL }}
-          DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/marconi-backend
+          JOBE_TIMEOUT_SECONDS: ${{ secrets.JOBE_TIMEOUT_SECONDS }}
+          JOBE_ALLOWED_LANGUAGES: ${{ secrets.JOBE_ALLOWED_LANGUAGES }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
           DOCKER_TAG: main-${{ github.sha }}
+          SESSION_COOKIE_SECURE: "true"
+          SESSION_COOKIE_SAMESITE: "lax"
         run: |
-          # Create .env locally on runner
-          cat << ENVEOF > .env
-          POSTGRES_USER=$POSTGRES_USER
-          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-          POSTGRES_DB=marconi
-          DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/marconi
-          SUPERADMIN_EMAILS=$SUPERADMIN_EMAILS
-          SUPERADMIN_PASSWORD=$SUPERADMIN_PASSWORD
-          CORS_ALLOW_ORIGINS=$CORS_ALLOW_ORIGINS
-          JOBE_BASE_URL=$JOBE_BASE_URL
-          DOCKER_IMAGE=$DOCKER_IMAGE
-          DOCKER_TAG=$DOCKER_TAG
-          ENVEOF
+          set -euo pipefail
+
+          # Create .env locally on the runner without printing secrets.
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          def get(name: str, default: str = "") -> str:
+              value = os.environ.get(name)
+              return value if value else default
+
+          lines = [
+              f"POSTGRES_USER={get('POSTGRES_USER')}",
+              f"POSTGRES_PASSWORD={get('POSTGRES_PASSWORD')}",
+              f"POSTGRES_DB={get('POSTGRES_DB','marconi')}",
+              f"SUPERADMIN_EMAILS={get('SUPERADMIN_EMAILS')}",
+              f"SUPERADMIN_PASSWORD={get('SUPERADMIN_PASSWORD')}",
+              f"CORS_ALLOW_ORIGINS={get('CORS_ALLOW_ORIGINS')}",
+              f"JOBE_BASE_URL={get('JOBE_BASE_URL')}",
+              f"JOBE_TIMEOUT_SECONDS={get('JOBE_TIMEOUT_SECONDS','20')}",
+              f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp')}",
+              f"REDIS_URL={get('REDIS_URL','')}",
+              f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
+              f"SESSION_COOKIE_SAMESITE={get('SESSION_COOKIE_SAMESITE','lax')}",
+              f"DOCKER_IMAGE={get('DOCKER_IMAGE')}",
+              f"DOCKER_TAG={get('DOCKER_TAG')}",
+          ]
+
+          Path(".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
 
           # Ensure remote directory exists
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ~/marconi"
 
-          # Transfer .env to server
+          # Transfer files to server
           scp .env ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/marconi/.env
+          scp backend/docker-compose.yml ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/marconi/docker-compose.yml
 
           # Execute remote deployment commands
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
-            set -e
+            set -euo pipefail
             cd ~/marconi
-
-            echo "Internal system diagnostics before deployment:"
-            free -m
-            docker ps
 
             # Create external networks if they don't exist
             docker network inspect nginx-proxy-manager_npm-network >/dev/null 2>&1 || docker network create nginx-proxy-manager_npm-network 2>/dev/null || true
             docker network inspect proxy_hostinger-network >/dev/null 2>&1 || docker network create proxy_hostinger-network 2>/dev/null || true
 
-            # Download docker-compose.yml (using the current hash for consistency)
-            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/backend/docker-compose.yml -o docker-compose.yml
+            # Always stop the stack and remove orphans (best-effort).
+            docker compose -p marconi -f docker-compose.yml down --remove-orphans || true
 
-            # Clear any conflicting state from previous failed deployments
-            docker compose -p marconi down --remove-orphans || true
+            # If older runs created fixed-name containers outside this compose project, remove them too.
+            docker rm -f marconi-backend marconi-postgres marconi-redis >/dev/null 2>&1 || true
 
-            docker compose -p marconi pull
-            docker compose -p marconi up -d --force-recreate backend
+            docker compose -p marconi -f docker-compose.yml pull
+            docker compose -p marconi -f docker-compose.yml up -d --force-recreate
 
-            echo "Waiting for backend to be healthy..."
+            echo "Waiting for backend health..."
             for i in {1..30}; do
-              if curl -s http://localhost:8000/ > /dev/null; then
+              if docker compose -p marconi -f docker-compose.yml exec -T backend curl -fsS http://localhost:8000/api/v1/health >/dev/null; then
                 echo "Backend is healthy!"
                 break
               fi
@@ -178,16 +198,16 @@ jobs:
               sleep 2
               if [ $i -eq 30 ]; then
                 echo "Timeout waiting for backend to be healthy"
-                docker compose -p marconi logs backend
+                docker compose -p marconi -f docker-compose.yml logs backend
                 exit 1
               fi
             done
 
-            docker compose -p marconi exec -T backend python -m alembic upgrade head
+            docker compose -p marconi -f docker-compose.yml exec -T backend python -m alembic upgrade head
 
-            echo "Post-deployment diagnostics:"
-            free -m
-            docker compose -p marconi ps
+            # Cleanup dangling images to prevent disk bloat.
+            docker image prune -f --filter dangling=true >/dev/null 2>&1 || true
 
+            docker compose -p marconi -f docker-compose.yml ps
             echo "Deployment complete!"
           ENDSSH
