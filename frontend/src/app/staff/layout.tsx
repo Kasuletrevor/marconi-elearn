@@ -19,8 +19,8 @@ import {
   ChevronDown,
   User,
 } from "lucide-react";
-import { auth, ApiError, type User as UserType } from "@/lib/api";
-import { useAuthStore, getRedirectPath, isStaff, getStaffCourseIds } from "@/lib/store";
+import { auth, ApiError, type User as UserType, type Course, courseStaff } from "@/lib/api";
+import { useAuthStore, getRedirectPath, isStaff } from "@/lib/store";
 
 interface StaffLayoutProps {
   children: React.ReactNode;
@@ -172,7 +172,25 @@ function SidebarContent({
   const router = useRouter();
   const { enterStudentView } = useAuthStore();
   const [coursesExpanded, setCoursesExpanded] = useState(true);
-  const staffCourseIds = getStaffCourseIds(user);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+
+  useEffect(() => {
+    async function fetchCourses() {
+      setIsLoadingCourses(true);
+      try {
+        const data = await courseStaff.listCourses();
+        setCourses(data);
+      } catch (err) {
+        console.error("Failed to fetch staff courses", err);
+      } finally {
+        setIsLoadingCourses(false);
+      }
+    }
+    if (user) {
+      fetchCourses();
+    }
+  }, [user]);
 
   // Main navigation items (course-agnostic)
   const mainLinks = [
@@ -220,11 +238,10 @@ function SidebarContent({
               key={link.href}
               href={link.href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                isActive
-                  ? "bg-[var(--primary)] text-white"
-                  : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
+                ? "bg-[var(--primary)] text-white"
+                : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                }`}
             >
               <link.icon className="w-5 h-5" />
               <span className="font-medium">{link.label}</span>
@@ -242,9 +259,8 @@ function SidebarContent({
             <FolderOpen className="w-4 h-4" />
             <span className="text-sm font-medium">My Courses</span>
             <ChevronDown
-              className={`w-4 h-4 ml-auto transition-transform ${
-                coursesExpanded ? "rotate-180" : ""
-              }`}
+              className={`w-4 h-4 ml-auto transition-transform ${coursesExpanded ? "rotate-180" : ""
+                }`}
             />
           </button>
 
@@ -257,26 +273,30 @@ function SidebarContent({
                 className="overflow-hidden"
               >
                 <div className="mt-2 space-y-1 pl-4">
-                  {staffCourseIds.length === 0 ? (
+                  {courses.length === 0 ? (
                     <p className="px-4 py-2 text-sm text-[var(--muted-foreground)]">
-                      No courses assigned
+                      {isLoadingCourses ? "Loading courses..." : "No courses assigned"}
                     </p>
                   ) : (
-                    staffCourseIds.map((courseId) => {
-                      const isActive = pathname.includes(`/staff/courses/${courseId}`);
+                    courses.map((course) => {
+                      const isActive = pathname.includes(`/staff/courses/${course.id}`);
                       return (
                         <Link
-                          key={courseId}
-                          href={`/staff/courses/${courseId}`}
+                          key={course.id}
+                          href={`/staff/courses/${course.id}`}
                           onClick={onClose}
-                          className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-all ${
-                            isActive
-                              ? "bg-[var(--primary)]/10 text-[var(--primary)]"
-                              : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                          }`}
+                          className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-all ${isActive
+                            ? "bg-[var(--primary)]/10 text-[var(--primary)]"
+                            : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                            }`}
                         >
-                          <BookOpen className="w-4 h-4" />
-                          <span>Course #{courseId}</span>
+                          <BookOpen className="w-4 h-4 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="block font-medium truncate">{course.code}</span>
+                            <span className="block text-xs opacity-80 truncate">
+                              {course.title}
+                            </span>
+                          </div>
                         </Link>
                       );
                     })
