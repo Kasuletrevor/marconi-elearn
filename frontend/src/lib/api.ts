@@ -949,6 +949,14 @@ export const courseStaff = {
     return handleResponse<Module[]>(res);
   },
 
+  async listOrgMembers(courseId: number, offset = 0, limit = 200): Promise<OrgMembership[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/org-members?offset=${offset}&limit=${limit}`,
+      { credentials: "include" }
+    );
+    return handleResponse<OrgMembership[]>(res);
+  },
+
   async createModule(courseId: number, data: ModuleCreate): Promise<Module> {
     const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}/modules`, {
       method: "POST",
