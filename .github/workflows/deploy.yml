@@ -123,33 +123,40 @@ jobs:
           SUPERADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD }}
           CORS_ALLOW_ORIGINS: ${{ secrets.CORS_ALLOW_ORIGINS }}
           JOBE_BASE_URL: ${{ secrets.JOBE_BASE_URL }}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/marconi-backend
           DOCKER_TAG: main-${{ github.sha }}
         run: |
+          # Create .env locally on runner
+          cat << ENVEOF > .env
+          POSTGRES_USER=$POSTGRES_USER
+          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+          DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/marconi
+          SUPERADMIN_EMAILS=$SUPERADMIN_EMAILS
+          SUPERADMIN_PASSWORD=$SUPERADMIN_PASSWORD
+          CORS_ALLOW_ORIGINS=$CORS_ALLOW_ORIGINS
+          JOBE_BASE_URL=$JOBE_BASE_URL
+          DOCKER_IMAGE=$DOCKER_IMAGE
+          DOCKER_TAG=$DOCKER_TAG
+          ENVEOF
+
+
+          # Ensure remote directory exists
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ~/marconi"
+
+          # Transfer .env to server
+          scp .env ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/marconi/.env
+
+          # Execute remote deployment commands
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
             set -e
-
-            cd ~/marconi || mkdir -p ~/marconi && cd ~/marconi
+            cd ~/marconi
 
             # Create external networks if they don't exist
             docker network inspect nginx-proxy-manager_npm-network >/dev/null 2>&1 || docker network create nginx-proxy-manager_npm-network 2>/dev/null || true
             docker network inspect proxy_hostinger-network >/dev/null 2>&1 || docker network create proxy_hostinger-network 2>/dev/null || true
 
-            cat > .env << ENVEOF
-            POSTGRES_USER=$POSTGRES_USER
-            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-            DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/marconi
-            SUPERADMIN_EMAILS=$SUPERADMIN_EMAILS
-            SUPERADMIN_PASSWORD=$SUPERADMIN_PASSWORD
-            CORS_ALLOW_ORIGINS=$CORS_ALLOW_ORIGINS
-            JOBE_BASE_URL=$JOBE_BASE_URL
-            DOCKER_IMAGE=$DOCKER_USERNAME/marconi-backend
-            DOCKER_TAG=$DOCKER_TAG
-            ENVEOF
-
-            if [ ! -f docker-compose.yml ]; then
-              curl -o docker-compose.yml https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/backend/docker-compose.yml
-            fi
+            # Download docker-compose.yml (using the current hash for consistency)
+            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/backend/docker-compose.yml -o docker-compose.yml
 
             docker-compose pull
             docker-compose up -d --force-recreate backend
