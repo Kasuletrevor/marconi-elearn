@@ -54,6 +54,19 @@ async def my_courses(
     return await list_my_courses(db, user_id=current_user.id, offset=offset, limit=limit)
 
 
+@router.get("/courses/{course_id}", response_model=CourseOut)
+async def get_my_course(
+    course_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> CourseOut:
+    await require_course_student_or_staff(course_id, current_user, db)
+    course = await db.get(Course, course_id)
+    if course is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return course
+
+
 @router.get("/courses/{course_id}/modules", response_model=list[ModuleOut])
 async def course_modules(
     course_id: int,
