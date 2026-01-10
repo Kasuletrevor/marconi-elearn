@@ -14,6 +14,27 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: marconi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@localhost:5432/marconi_test
+      SUPERADMIN_EMAILS: admin@example.com
+      SUPERADMIN_PASSWORD: password123
+      JOBE_BASE_URL: http://localhost:4000
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
