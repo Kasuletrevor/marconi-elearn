@@ -8,8 +8,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-marconi_session}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:-lax}
@@ -44,8 +47,25 @@ services:
     networks:
       - marconi-network
 
+  redis:
+    image: redis:alpine
+    restart: always
+    container_name: marconi-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - marconi-network
+
 volumes:
   postgres_data:
+  redis_data:
   uploads:
 
 networks:
