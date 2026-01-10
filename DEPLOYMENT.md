@@ -8,6 +8,7 @@ This document describes the automated deployment workflow for the Marconi Elearn
 - **Container Registry**: Docker Hub
 - **Deployment Target**: Docker Compose on your server
 - **Database**: PostgreSQL 16 (Docker container)
+- **Queue**: Redis (Docker container) - for background auto-grading
 - **External Service**: JOBE (code execution, hosted separately)
 
 ## Prerequisites
@@ -76,11 +77,12 @@ Add the following secrets:
 | `JOBE_BASE_URL` | JOBE service URL | `https://jobe.example.com/restapi` |
 | `JOBE_TIMEOUT_SECONDS` | JOBE timeout | `20` |
 | `JOBE_ALLOWED_LANGUAGES` | Allowed languages | `c,cpp` |
+| `REDIS_URL` | Redis connection URL | `redis://redis:6379/0` |
 | `BACKEND_PORT` | Backend port | `8000` |
 
 ## Deployment Workflow
 
-When you push to the `main` branch, the following happens automatically:
+When you push to the `main` branch, following happens automatically:
 
 1. **Test**: Runs pytest on the backend
 2. **Build**: Builds Docker image and pushes to Docker Hub
@@ -89,6 +91,40 @@ When you push to the `main` branch, the following happens automatically:
    - Pulls latest Docker image
    - Restarts containers
    - Runs Alembic migrations
+
+## Background Worker (Auto-grading)
+
+The backend includes a Taskiq worker for background auto-grading of C/C++ submissions against test cases.
+
+### Starting the Worker
+
+On your server, start the worker in a separate terminal:
+
+```bash
+ssh deploy@your-server
+cd ~/marconi
+docker-compose exec -d backend python -m taskiq worker app.worker.broker:broker app.worker.tasks
+```
+
+Or run it on the host with docker-compose exec in the foreground:
+
+```bash
+docker-compose exec backend python -m taskiq worker app.worker.broker:broker app.worker.tasks
+```
+
+### Worker Requirements
+
+- **REDIS_URL** must be configured for grading tasks to enqueue
+- When `REDIS_URL` is empty, submissions are stored but not auto-graded
+- Staff can manually regrade submissions via the API even without the worker
+
+### Monitoring the Worker
+
+```bash
+ssh deploy@your-server
+cd ~/marconi
+docker-compose logs -f backend | grep taskiq
+```
 
 ### Manual Trigger
 
@@ -114,6 +150,7 @@ ssh deploy@your-server
 cd ~/marconi
 docker-compose logs backend
 docker-compose logs postgres
+docker-compose logs redis
 ```
 
 ### Migrations failed
