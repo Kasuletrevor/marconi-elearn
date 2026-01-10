@@ -87,6 +87,7 @@ Add the following secrets:
 | `JOBE_ALLOWED_LANGUAGES` | `c,cpp` |
 | `REDIS_URL` | `redis://redis:6379/0` |
 | `BACKEND_PORT` | `32316` |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` |
 
 **External Ports** (randomized for security):
 
