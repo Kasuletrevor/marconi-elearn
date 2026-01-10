@@ -456,37 +456,39 @@ Key relationships:
 
 ## 6. Development Phases
 
+> Status note (2026-01-10): The checklist below is kept up to date, but some items are “MVP complete” (working end-to-end) rather than “production hardened” (throttling, observability, retries, etc.). Those remaining hardening tasks live in `review.md` and the Linear project.
+
 ### Phase 1: Foundation (Week 1-2)
 - [x] Backend scaffold (FastAPI, SQLAlchemy, Alembic)
 - [x] Organization/User/Course membership models (initial)
 - [x] Alembic migrations (initial)
 - [x] API + CRUD test harness (pytest + async)
 - [x] DB-backed cookie sessions (login/logout/me)
-- [ ] Organization/tenant model
-- [ ] Role-based access control
-- [ ] Invite system with single-use tokens
+- [x] Organization/tenant model
+- [x] Role-based access control (superadmin/org-admin/course roles)
+- [x] Invite system with single-use tokens (+ invite preview endpoint)
 
 ### Phase 2: Course Management (Week 2-3)
-- [ ] Course CRUD with role scoping
-- [ ] Module management
-- [ ] Resource uploads
-- [ ] Student enrollment (CSV upload)
-- [ ] Late policy configuration
+- [x] Course CRUD with role scoping
+- [x] Module management
+- [x] Resource uploads
+- [x] Student enrollment (CSV roster import + invites + auto-enroll)
+- [x] Late policy configuration (course/assignment + per-student extensions)
 
 ### Phase 3: Assignments & Submissions (Week 3-4)
-- [ ] Assignment creation
-- [ ] Submission upload (file validation + storage + metadata)
-- [ ] Submission history + results UI
-- [ ] Submission system with queue
-- [ ] Offline download feature
+- [x] Assignment creation
+- [x] Submission upload (file validation + storage + metadata)
+- [x] Submission history + results UI (student + staff views)
+- [x] Submission system with queue (MVP: Redis + Taskiq worker)
+- [ ] Offline download feature (PDF + starter ZIP packaging)
 
 ### Phase 4: Code Execution (Week 4-5)
-- [ ] JOBE server deployment on Render
-- [ ] Job queue implementation
-- [ ] Rate limiting and resource caps
-- [ ] Test case execution
-- [ ] Auto-grading logic
-- [ ] Execution observability
+- [ ] JOBE server deployment on Render (currently using external JOBE box)
+- [x] Job queue implementation (MVP: Redis + Taskiq worker)
+- [ ] Rate limiting and resource caps (API + worker throttles, time/memory/output caps)
+- [x] Test case execution (MVP: staff-managed test cases + worker runs via JOBE)
+- [x] Auto-grading logic (MVP: points-by-test, compile failure handling)
+- [ ] Execution observability (metrics + alerts)
 
 ### Phase 5: AI Integration (Week 5-6)
 - [ ] OpenAI integration with async queue
@@ -495,11 +497,11 @@ Key relationships:
 - [ ] Feedback approval workflow
 
 ### Phase 6: Operations & Polish (Week 6-7)
-- [ ] Audit logging
-- [ ] CSV exports
-- [ ] Email notifications
+- [x] Audit logging (MVP: org-scoped audit events + `/admin/audit`)
+- [ ] CSV exports (gradebook/roster, etc.)
+- [ ] Email notifications (invite + password reset + ops)
 - [ ] UI/UX refinement
-- [ ] Deploy to Vercel + Render
+- [ ] Deploy to Vercel + Render (end-to-end production deploy checklist)
 
 ---
 
@@ -510,9 +512,8 @@ Key relationships:
 DATABASE_URL=postgresql://...
 
 # Frontend
-NEXTAUTH_SECRET=your-secret-key
-NEXTAUTH_URL=https://marconi-elearn.vercel.app
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+# FastAPI base URL for the Next.js app to call (cookie-auth, CORS must allow frontend origin)
+NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # Code Execution (JOBE)
 # Base URL including `/restapi` suffix, e.g.:
