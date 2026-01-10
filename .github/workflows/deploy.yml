@@ -98,18 +98,10 @@ jobs:
         env:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          SESSION_COOKIE_NAME: ${{ secrets.SESSION_COOKIE_NAME }}
-          SESSION_COOKIE_SECURE: ${{ secrets.SESSION_COOKIE_SECURE }}
-          SESSION_COOKIE_SAMESITE: ${{ secrets.SESSION_COOKIE_SAMESITE }}
           SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
           SUPERADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD }}
           CORS_ALLOW_ORIGINS: ${{ secrets.CORS_ALLOW_ORIGINS }}
           JOBE_BASE_URL: ${{ secrets.JOBE_BASE_URL }}
-          JOBE_TIMEOUT_SECONDS: ${{ secrets.JOBE_TIMEOUT_SECONDS }}
-          JOBE_ALLOWED_LANGUAGES: ${{ secrets.JOBE_ALLOWED_LANGUAGES }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
-          BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_TAG: main-${{ github.sha }}
         run: |
@@ -121,21 +113,13 @@ jobs:
             cat > .env << ENVEOF
             POSTGRES_USER=$POSTGRES_USER
             POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-            POSTGRES_DB=$POSTGRES_DB
-            DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB
-            SESSION_COOKIE_NAME=$SESSION_COOKIE_NAME
-            SESSION_COOKIE_SECURE=$SESSION_COOKIE_SECURE
-            SESSION_COOKIE_SAMESITE=$SESSION_COOKIE_SAMESITE
+            DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/marconi
             SUPERADMIN_EMAILS=$SUPERADMIN_EMAILS
             SUPERADMIN_PASSWORD=$SUPERADMIN_PASSWORD
             CORS_ALLOW_ORIGINS=$CORS_ALLOW_ORIGINS
             JOBE_BASE_URL=$JOBE_BASE_URL
-            JOBE_TIMEOUT_SECONDS=$JOBE_TIMEOUT_SECONDS
-            JOBE_ALLOWED_LANGUAGES=$JOBE_ALLOWED_LANGUAGES
-            REDIS_URL=$REDIS_URL
             DOCKER_IMAGE=$DOCKER_USERNAME/marconi-backend
             DOCKER_TAG=$DOCKER_TAG
-            BACKEND_PORT=$BACKEND_PORT
             ENVEOF
 
             if [ ! -f docker-compose.yml ]; then
