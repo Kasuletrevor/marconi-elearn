@@ -111,8 +111,8 @@ jobs:
             cd ~/marconi || mkdir -p ~/marconi && cd ~/marconi
 
             # Create external networks if they don't exist
-            docker network inspect npm-network >/dev/null 2>&1 || docker network create npm-network 2>/dev/null || true
-            docker network inspect hostinger-network >/dev/null 2>&1 || docker network create hostinger-network 2>/dev/null || true
+            docker network inspect nginx-proxy-manager_npm-network >/dev/null 2>&1 || docker network create nginx-proxy-manager_npm-network 2>/dev/null || true
+            docker network inspect proxy_hostinger-network >/dev/null 2>&1 || docker network create proxy_hostinger-network 2>/dev/null || true
 
             cat > .env << ENVEOF
             POSTGRES_USER=$POSTGRES_USER
