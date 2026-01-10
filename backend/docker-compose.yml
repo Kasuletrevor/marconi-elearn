@@ -28,10 +28,8 @@ services:
       - uploads:/app/backend/var/uploads
     networks:
       - marconi-network
-      - nginx-proxy-manager_npm-network:
-          external: true
-      - proxy_hostinger-network:
-          external: true
+      - nginx-proxy-manager_npm-network
+      - proxy_hostinger-network
 
   postgres:
     image: postgres:16-alpine
@@ -68,10 +66,8 @@ services:
       - redis_data:/data
     networks:
       - marconi-network
-      - nginx-proxy-manager_npm-network:
-          external: true
-      - proxy_hostinger-network:
-          external: true
+      - nginx-proxy-manager_npm-network
+      - proxy_hostinger-network
 
 volumes:
   postgres_data:
