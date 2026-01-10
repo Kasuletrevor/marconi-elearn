@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,6 +49,10 @@ import {
   type Assignment,
   type CourseMembership,
   type ModuleResource,
+  type OrgMembership,
+  type CourseMembershipCreate,
+  type CourseMembershipUpdate,
+  staff,
   ApiError,
 } from "@/lib/api";
 import { useAuthStore, getCourseRole } from "@/lib/store";
@@ -196,8 +200,8 @@ export default function StaffCoursePage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id
-                  ? "border-[var(--primary)] text-[var(--primary)]"
-                  : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                ? "border-[var(--primary)] text-[var(--primary)]"
+                : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -243,7 +247,14 @@ export default function StaffCoursePage() {
           />
         )}
         {activeTab === "modules" && (
-          <ModulesTab course={course} modules={modules} />
+          <ModulesTab
+            course={course}
+            modules={modules}
+            onRefreshModules={async () => {
+              const data = await student.getModules(courseId);
+              setModules(data);
+            }}
+          />
         )}
       </motion.div>
     </div>
@@ -799,8 +810,112 @@ interface RosterTabProps {
 }
 
 function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
+  const [orgMembers, setOrgMembers] = useState<OrgMembership[]>([]);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [newRole, setNewRole] = useState<"owner" | "co_lecturer" | "ta" | "student">("student");
+  const [isAdding, setIsAdding] = useState(false);
+  const [isLoadingOrg, setIsLoadingOrg] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadOrgMembers() {
+      setIsLoadingOrg(true);
+      try {
+        const data = await staff.listOrgMemberships(course.organization_id);
+        setOrgMembers(data);
+      } catch (err) {
+        console.error("Failed to load org members", err);
+      } finally {
+        setIsLoadingOrg(false);
+      }
+    }
+    loadOrgMembers();
+  }, [course.organization_id]);
+
   const students = memberships.filter((m) => m.role === "student");
   const staffMembers = memberships.filter((m) => m.role !== "student");
+
+  const availableOrgMembers = useMemo(() => {
+    const assigned = new Set(memberships.map((m) => m.user_id));
+    const q = memberSearch.trim().toLowerCase();
+    const filtered = orgMembers.filter((m) => {
+      if (assigned.has(m.user_id)) return false;
+      if (!q) return true;
+      return (m.user_email ?? "").toLowerCase().includes(q);
+    });
+    return filtered.sort((a, b) => (a.user_email ?? "").localeCompare(b.user_email ?? ""));
+  }, [orgMembers, memberships, memberSearch]);
+
+  async function addMember() {
+    if (selectedUserId === null) return;
+    setIsAdding(true);
+    setError("");
+    try {
+      const payload: CourseMembershipCreate = { user_id: selectedUserId, role: newRole };
+      await courseStaff.enrollUser(course.id, payload);
+      await onRefresh();
+      setSelectedUserId(null);
+      setMemberSearch("");
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to add member");
+    } finally {
+      setIsAdding(false);
+    }
+  }
+
+  async function updateRole(membershipId: number, role: CourseMembership["role"]) {
+    setError("");
+    try {
+      const payload: CourseMembershipUpdate = { role };
+      await staff.updateMembership(course.organization_id, course.id, membershipId, payload);
+      await onRefresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to update role");
+    }
+  }
+
+  async function removeMember(membershipId: number) {
+    if (!confirm("Remove this member from the course?")) return;
+    setError("");
+    try {
+      await courseStaff.removeMembership(course.id, membershipId);
+      await onRefresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to remove member");
+    }
+  }
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAdding(true);
+    setError("");
+    try {
+      const res = await courseStaff.importRosterCsv(course.id, file);
+      const msg = `Imported: ${res.created_invites} invites created, ${res.auto_enrolled} auto-enrolled.`;
+      if (res.issues.length > 0) {
+        setError(`${msg} Some rows had issues.`);
+      } else {
+        // Use a simple alert for now, or just clear error
+        // alert(msg); 
+      }
+      await onRefresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to import CSV");
+    } finally {
+      setIsAdding(false);
+      // Reset input
+      e.target.value = "";
+    }
+  }
 
   const roleLabels: Record<string, string> = {
     owner: "Owner",
@@ -810,101 +925,187 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Actions */}
-      <div className="flex items-center justify-between">
-        <p className="text-[var(--muted-foreground)]">
-          {memberships.length} members in this course
-        </p>
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[var(--foreground)] hover:bg-[var(--background)] transition-colors">
-            <Upload className="w-4 h-4" />
-            <span>Import CSV</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary)]/90 transition-colors">
-            <Plus className="w-4 h-4" />
-            <span>Add Member</span>
-          </button>
+    <div className="space-y-8">
+      {/* Add Member Section */}
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+        <h3 className="font-medium text-[var(--foreground)] mb-4">Add Member</h3>
+        {error && (
+          <div className="mb-4 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
+            {error}
+          </div>
+        )}
+        <div className="grid md:grid-cols-12 gap-3 items-end">
+          <div className="md:col-span-5">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Select User
+            </label>
+            <select
+              value={selectedUserId ?? ""}
+              onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              disabled={isLoadingOrg}
+            >
+              <option value="">
+                {isLoadingOrg
+                  ? "Loading users..."
+                  : availableOrgMembers.length === 0
+                    ? "No eligible users found"
+                    : "Select a user..."}
+              </option>
+              {availableOrgMembers.map((m) => (
+                <option key={m.id} value={m.user_id}>
+                  {(m.user_email ?? `User #${m.user_id}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-3">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Role
+            </label>
+            <select
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value as any)}
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            >
+              <option value="student">Student</option>
+              <option value="ta">TA</option>
+              <option value="co_lecturer">Co-Lecturer</option>
+              <option value="owner">Owner</option>
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <button
+              onClick={addMember}
+              disabled={isAdding || selectedUserId === null}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Add
+            </button>
+          </div>
+          <div className="md:col-span-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".csv"
+              onChange={handleCsvUpload}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isAdding}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] hover:bg-[var(--card)] transition-colors disabled:opacity-60"
+            >
+              <Upload className="w-4 h-4" />
+              CSV
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Staff Section */}
-      {staffMembers.length > 0 && (
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
-          <div className="p-4 bg-[var(--background)] border-b border-[var(--border)]">
-            <h3 className="font-medium text-[var(--foreground)]">
-              Staff ({staffMembers.length})
-            </h3>
-          </div>
-          <div className="divide-y divide-[var(--border)]">
-            {staffMembers.map((member) => (
+      {/* Staff List */}
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <div className="p-4 bg-[var(--background)] border-b border-[var(--border)] flex justify-between items-center">
+          <h3 className="font-medium text-[var(--foreground)]">
+            Staff ({staffMembers.length})
+          </h3>
+        </div>
+        <div className="divide-y divide-[var(--border)]">
+          {staffMembers.length === 0 ? (
+            <div className="p-8 text-center text-[var(--muted-foreground)]">No staff members</div>
+          ) : (
+            staffMembers.map((member) => (
               <div
                 key={member.id}
-                className="flex items-center gap-4 p-4 hover:bg-[var(--background)] transition-colors"
+                className="flex items-center justify-between p-4 hover:bg-[var(--background)] transition-colors group"
               >
-                <div className="w-10 h-10 rounded-full bg-[var(--primary)]/10 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-[var(--primary)]" />
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-[var(--primary)]/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-[var(--primary)]" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-[var(--foreground)]">
+                      {member.user_email || `User #${member.user_id}`}
+                    </p>
+                    <p className="text-sm text-[var(--muted-foreground)]">
+                      {roleLabels[member.role]}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[var(--foreground)]">
-                    User #{member.user_id}
-                  </p>
-                  <p className="text-sm text-[var(--muted-foreground)]">
-                    {roleLabels[member.role]}
-                  </p>
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <select
+                    value={member.role}
+                    onChange={(e) => updateRole(member.id, e.target.value as any)}
+                    className="text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] px-2 py-1"
+                  >
+                    <option value="owner">Owner</option>
+                    <option value="co_lecturer">Co-Lecturer</option>
+                    <option value="ta">TA</option>
+                  </select>
+                  <button
+                    onClick={() => removeMember(member.id)}
+                    className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
+                    title="Remove member"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            ))
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Students Section */}
+      {/* Student List */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <div className="p-4 bg-[var(--background)] border-b border-[var(--border)]">
           <h3 className="font-medium text-[var(--foreground)]">
             Students ({students.length})
           </h3>
         </div>
-        {students.length === 0 ? (
-          <div className="p-8 text-center">
-            <Users className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
-            <p className="text-[var(--muted-foreground)]">
-              No students enrolled yet
-            </p>
-            <p className="text-sm text-[var(--muted-foreground)] mt-1">
-              Import a CSV roster or add students manually
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-[var(--border)]">
-            {students.map((member) => (
+        <div className="divide-y divide-[var(--border)]">
+          {students.length === 0 ? (
+            <div className="p-8 text-center">
+              <Users className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
+              <p className="text-[var(--muted-foreground)]">No students enrolled yet</p>
+            </div>
+          ) : (
+            students.map((member) => (
               <div
                 key={member.id}
-                className="flex items-center gap-4 p-4 hover:bg-[var(--background)] transition-colors"
+                className="flex items-center justify-between p-4 hover:bg-[var(--background)] transition-colors group"
               >
-                <div className="w-10 h-10 rounded-full bg-[var(--card)] border border-[var(--border)] flex items-center justify-center">
-                  <Users className="w-5 h-5 text-[var(--muted-foreground)]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[var(--foreground)]">
-                    User #{member.user_id}
-                  </p>
-                  {member.student_number && (
-                    <p className="text-sm text-[var(--muted-foreground)]">
-                      {member.student_number}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-[var(--background)] border border-[var(--border)] flex items-center justify-center">
+                    <Users className="w-5 h-5 text-[var(--muted-foreground)]" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-[var(--foreground)]">
+                      {member.user_email || `User #${member.user_id}`}
                     </p>
-                  )}
+                    {member.student_number && (
+                      <p className="text-sm text-[var(--muted-foreground)]">
+                        {member.student_number}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <button className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors">
-                  <MoreVertical className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => removeMember(member.id)}
+                    className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
+                    title="Remove student"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </div >
   );
 }
 
@@ -976,8 +1177,8 @@ function AssignmentsTab({ course, assignments, modules }: AssignmentsTabProps) {
                     {dueDate && (
                       <span
                         className={`text-xs ${isPastDue
-                            ? "text-[var(--muted-foreground)]"
-                            : "text-[var(--muted-foreground)]"
+                          ? "text-[var(--muted-foreground)]"
+                          : "text-[var(--muted-foreground)]"
                           }`}
                       >
                         {isPastDue ? "Closed " : "Due "}
@@ -1013,11 +1214,46 @@ function AssignmentsTab({ course, assignments, modules }: AssignmentsTabProps) {
 interface ModulesTabProps {
   course: Course;
   modules: Module[];
+  onRefreshModules: () => Promise<void>;
 }
 
-function ModulesTab({ course, modules }: ModulesTabProps) {
+function ModulesTab({ course, modules, onRefreshModules }: ModulesTabProps) {
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newPosition, setNewPosition] = useState<number>(1);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
+  const nextPosition = useMemo(() => {
+    if (modules.length === 0) return 1;
+    return Math.max(...modules.map((m) => m.position)) + 1;
+  }, [modules]);
+
+  useEffect(() => {
+    if (!showCreateModal) return;
+    setNewTitle("");
+    setNewPosition(nextPosition);
+    setCreateError("");
+  }, [showCreateModal, nextPosition]);
+
+  async function createModule() {
+    const title = newTitle.trim();
+    if (!title) return;
+    setIsCreating(true);
+    setCreateError("");
+    try {
+      await courseStaff.createModule(course.id, { title, position: newPosition });
+      await onRefreshModules();
+      setShowCreateModal(false);
+    } catch (err) {
+      if (err instanceof ApiError) setCreateError(err.detail);
+      else setCreateError("Failed to create module");
+    } finally {
+      setIsCreating(false);
+    }
+  }
+ 
   const toggleModule = (moduleId: number) => {
     setExpandedModules((prev) => {
       const next = new Set(prev);
@@ -1035,11 +1271,95 @@ function ModulesTab({ course, modules }: ModulesTabProps) {
       {/* Actions */}
       <div className="flex items-center justify-between">
         <p className="text-[var(--muted-foreground)]">{modules.length} modules</p>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary)]/90 transition-colors">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary)]/90 transition-colors"
+        >
           <Plus className="w-4 h-4" />
           <span>Add Module</span>
         </button>
       </div>
+
+      <AnimatePresence>
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+            onClick={() => setShowCreateModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-md bg-[var(--background)] border border-[var(--border)] rounded-2xl shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">New module</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">{course.code}</p>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-2 rounded-xl hover:bg-[var(--card)] transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {createError && (
+                  <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 text-sm text-[var(--secondary)]">
+                    {createError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Title</label>
+                  <input
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. Week 1: Basics"
+                    className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Position</label>
+                  <input
+                    type="number"
+                    value={newPosition}
+                    onChange={(e) => setNewPosition(Number(e.target.value))}
+                    className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                  <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">Suggested next position: {nextPosition}</p>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-[var(--border)] flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createModule}
+                  disabled={isCreating || !newTitle.trim()}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Create
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modules List */}
       {modules.length === 0 ? (
@@ -1262,8 +1582,8 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
                   <div
                     key={resource.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${resource.is_published
-                        ? "bg-[var(--card)] border-[var(--border)]"
-                        : "bg-[var(--muted-foreground)]/5 border-dashed border-[var(--muted-foreground)]/30"
+                      ? "bg-[var(--card)] border-[var(--border)]"
+                      : "bg-[var(--muted-foreground)]/5 border-dashed border-[var(--muted-foreground)]/30"
                       }`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
@@ -1299,8 +1619,8 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
                       <button
                         onClick={() => handleTogglePublish(resource)}
                         className={`p-1.5 rounded-lg transition-colors ${resource.is_published
-                            ? "text-emerald-600 hover:bg-emerald-500/10"
-                            : "text-[var(--muted-foreground)] hover:bg-[var(--background)]"
+                          ? "text-emerald-600 hover:bg-emerald-500/10"
+                          : "text-[var(--muted-foreground)] hover:bg-[var(--background)]"
                           }`}
                         title={resource.is_published ? "Unpublish" : "Publish"}
                       >
@@ -1604,8 +1924,8 @@ function AddFileModal({ courseId, moduleId, onClose, onSuccess }: AddFileModalPr
           <div
             onClick={() => fileInputRef.current?.click()}
             className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file
-                ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                : "border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--background)]"
+              ? "border-[var(--primary)] bg-[var(--primary)]/5"
+              : "border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--background)]"
               }`}
           >
             <input
@@ -1700,4 +2020,3 @@ function AddFileModal({ courseId, moduleId, onClose, onSuccess }: AddFileModalPr
     </div>
   );
 }
-
