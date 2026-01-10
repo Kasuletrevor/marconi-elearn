@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ${DOCKER_IMAGE:-marconi-backend}:${DOCKER_TAG:-latest}
+    restart: always
+    container_name: marconi-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-marconi_session}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:-lax}
+      SUPERADMIN_EMAILS: ${SUPERADMIN_EMAILS}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      JOBE_BASE_URL: ${JOBE_BASE_URL}
+      JOBE_TIMEOUT_SECONDS: ${JOBE_TIMEOUT_SECONDS:-20}
+      JOBE_ALLOWED_LANGUAGES: ${JOBE_ALLOWED_LANGUAGES:-c,cpp}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - uploads:/app/backend/var/uploads
+    networks:
+      - marconi-network
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    container_name: marconi-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - marconi-network
+
+volumes:
+  postgres_data:
+  uploads:
+
+networks:
+  marconi-network:
+    driver: bridge
