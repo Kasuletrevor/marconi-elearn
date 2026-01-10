@@ -24,6 +24,9 @@ else:
 # Deterministic superadmin credentials for tests.
 os.environ["SUPERADMIN_EMAILS"] = "admin@example.com"
 os.environ["SUPERADMIN_PASSWORD"] = "password123"
+os.environ["JOBE_ALLOWED_LANGUAGES"] = "c,cpp"
+# Avoid external services during tests.
+os.environ["REDIS_URL"] = ""
 
 from app.main import app  # noqa: E402
 
