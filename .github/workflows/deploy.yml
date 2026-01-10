@@ -162,8 +162,8 @@ jobs:
             # Download docker-compose.yml (using the current hash for consistency)
             curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/backend/docker-compose.yml -o docker-compose.yml
 
-            docker-compose pull
-            docker-compose up -d --force-recreate backend
+            docker compose pull
+            docker compose up -d --force-recreate backend
 
             echo "Waiting for backend to be healthy..."
             for i in {1..30}; do
@@ -175,16 +175,16 @@ jobs:
               sleep 2
               if [ $i -eq 30 ]; then
                 echo "Timeout waiting for backend to be healthy"
-                docker-compose logs backend
+                docker compose logs backend
                 exit 1
               fi
             done
 
-            docker-compose exec -T backend python -m alembic upgrade head
+            docker compose exec -T backend python -m alembic upgrade head
 
             echo "Post-deployment diagnostics:"
             free -m
-            docker-compose ps
+            docker compose ps
 
             echo "Deployment complete!"
           ENDSSH
