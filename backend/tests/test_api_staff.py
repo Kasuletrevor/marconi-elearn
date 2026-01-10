@@ -21,6 +21,12 @@ async def test_staff_endpoints_allow_course_staff(client):
     ta_id = r.json()["id"]
 
     r = await client.post(
+        f"/api/v1/orgs/{org_id}/memberships",
+        json={"user_id": ta_id, "role": "ta"},
+    )
+    assert r.status_code == 201
+
+    r = await client.post(
         f"/api/v1/orgs/{org_id}/courses/{course_id}/memberships",
         json={"user_id": ta_id, "role": "ta"},
     )
@@ -59,9 +65,17 @@ async def test_staff_endpoints_allow_course_staff(client):
     assert any(a["id"] == assignment_id for a in r.json())
 
     # Staff can view roster
-    r = await client.get(f"/api/v1/staff/courses/{course_id}/memberships")
+    r = await client.get(f"/api/v1/staff/courses/{course_id}/memberships")      
     assert r.status_code == 200
-    assert any(m["user_id"] == ta_id and m["role"] == "ta" for m in r.json())
+    assert any(m["user_id"] == ta_id and m["role"] == "ta" for m in r.json())   
+
+    # Staff can list org members for dropdowns (without org-admin access)
+    r = await client.get(f"/api/v1/orgs/{org_id}/memberships")
+    assert r.status_code == 403
+
+    r = await client.get(f"/api/v1/staff/courses/{course_id}/org-members")
+    assert r.status_code == 200
+    assert any(m["user_id"] == ta_id for m in r.json())
 
 
 @pytest.mark.asyncio
