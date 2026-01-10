@@ -5,6 +5,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 
 from app.db.base import Base
 from app.models import *  # noqa: F403
@@ -18,14 +19,18 @@ target_metadata = Base.metadata
 
 
 def _sync_db_url() -> str:
-    url = os.environ.get("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL is required for Alembic migrations")
-    if url.startswith("postgresql+asyncpg://"):
-        return url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return url
+    # Prefer the app settings, which can build a safe URL from POSTGRES_* parts
+    # (important when passwords contain '@', ':', etc.).
+    from app.core.config import settings
+
+    raw = settings.database_url or os.environ.get("DATABASE_URL")
+    if not raw:
+        raise RuntimeError("DATABASE_URL or POSTGRES_* is required for Alembic migrations")
+
+    url = make_url(raw)
+    if url.drivername in {"postgresql", "postgresql+asyncpg"}:
+        url = url.set(drivername="postgresql+psycopg")
+    return str(url)
 
 
 def run_migrations_offline() -> None:
@@ -61,4 +66,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
