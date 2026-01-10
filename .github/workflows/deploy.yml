@@ -119,14 +119,14 @@ jobs:
         env:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: "marconi"
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB != '' && secrets.POSTGRES_DB || 'marconi_elearn' }}
           SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
           SUPERADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD }}
           CORS_ALLOW_ORIGINS: ${{ secrets.CORS_ALLOW_ORIGINS }}
           JOBE_BASE_URL: ${{ secrets.JOBE_BASE_URL }}
-          JOBE_TIMEOUT_SECONDS: ${{ secrets.JOBE_TIMEOUT_SECONDS }}
-          JOBE_ALLOWED_LANGUAGES: ${{ secrets.JOBE_ALLOWED_LANGUAGES }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
+          JOBE_TIMEOUT_SECONDS: ${{ secrets.JOBE_TIMEOUT_SECONDS != '' && secrets.JOBE_TIMEOUT_SECONDS || '20' }}
+          JOBE_ALLOWED_LANGUAGES: ${{ secrets.JOBE_ALLOWED_LANGUAGES != '' && secrets.JOBE_ALLOWED_LANGUAGES || 'c,cpp,python3,java' }}
+          REDIS_URL: ${{ secrets.REDIS_URL != '' && secrets.REDIS_URL || 'redis://redis:6379/0' }}
           DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
           DOCKER_TAG: main-${{ github.sha }}
           SESSION_COOKIE_SECURE: "true"
@@ -152,8 +152,8 @@ jobs:
               f"CORS_ALLOW_ORIGINS={get('CORS_ALLOW_ORIGINS')}",
               f"JOBE_BASE_URL={get('JOBE_BASE_URL')}",
               f"JOBE_TIMEOUT_SECONDS={get('JOBE_TIMEOUT_SECONDS','20')}",
-              f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp')}",
-              f"REDIS_URL={get('REDIS_URL','')}",
+              f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp,python3,java')}",
+              f"REDIS_URL={get('REDIS_URL','redis://redis:6379/0')}",
               f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
               f"SESSION_COOKIE_SAMESITE={get('SESSION_COOKIE_SAMESITE','lax')}",
               f"DOCKER_IMAGE={get('DOCKER_IMAGE')}",
@@ -191,20 +191,39 @@ jobs:
             docker compose -p marconi -f docker-compose.yml up -d --force-recreate postgres redis
 
             # Ensure the configured database exists (handles renamed DBs with a persisted volume).
-            docker compose -p marconi -f docker-compose.yml exec -T postgres sh -lc '
-              set -e
-              DB="${POSTGRES_DB:-}"
+            POSTGRES_USER="$(grep -E '^POSTGRES_USER=' .env | head -n1 | cut -d= -f2- || true)"
+            POSTGRES_DB="$(grep -E '^POSTGRES_DB=' .env | head -n1 | cut -d= -f2- || true)"
+            POSTGRES_USER="${POSTGRES_USER:-postgres}"
+            POSTGRES_DB="${POSTGRES_DB:-marconi_elearn}"
 
-              case "$DB" in
-                (""|*[!a-zA-Z0-9_]*)
-                  echo "Invalid POSTGRES_DB: $DB"
-                  exit 1
-                  ;;
-              esac
+            if ! [[ "$POSTGRES_USER" =~ ^[A-Za-z0-9_]+$ ]]; then
+              echo "Invalid POSTGRES_USER in .env: $POSTGRES_USER"
+              exit 1
+            fi
+            if ! [[ "$POSTGRES_DB" =~ ^[A-Za-z0-9_]+$ ]]; then
+              echo "Invalid POSTGRES_DB in .env: $POSTGRES_DB"
+              exit 1
+            fi
 
-              psql -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB'" | grep -q 1 \
-                || psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE $DB"
-            '
+            echo "Ensuring database exists: $POSTGRES_DB"
+            for i in {1..30}; do
+              if docker compose -p marconi -f docker-compose.yml exec -T postgres pg_isready -U "$POSTGRES_USER" >/dev/null 2>&1; then
+                break
+              fi
+              sleep 2
+              if [ "$i" -eq 30 ]; then
+                echo "Postgres did not become ready in time"
+                docker compose -p marconi -f docker-compose.yml logs postgres
+                exit 1
+              fi
+            done
+
+            if docker compose -p marconi -f docker-compose.yml exec -T postgres psql -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'" | grep -q 1; then
+              echo "Database already exists: $POSTGRES_DB"
+            else
+              docker compose -p marconi -f docker-compose.yml exec -T postgres createdb -U "$POSTGRES_USER" "$POSTGRES_DB"
+              echo "Database created: $POSTGRES_DB"
+            fi
 
             docker compose -p marconi -f docker-compose.yml up -d --force-recreate backend
 
