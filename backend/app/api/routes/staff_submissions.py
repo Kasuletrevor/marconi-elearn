@@ -17,10 +17,12 @@ from app.crud.staff_submissions import (
     list_staff_submission_rows,
     list_staff_submission_rows_by_ids,
 )
+from app.crud.submission_test_results import delete_submission_test_results, list_submission_test_results
 from app.db.deps import get_db
 from app.models.submission import SubmissionStatus
 from app.models.user import User
 from app.models.notification import NotificationKind
+from app.schemas.submission_test_result import SubmissionTestResultOut
 from app.schemas.staff_submissions import (
     StaffNextSubmissionOut,
     StaffSubmissionBulkAction,
@@ -32,6 +34,7 @@ from app.schemas.staff_submissions import (
     StaffSubmissionsPage,
 )
 from app.schemas.submission import SubmissionOut
+from app.worker.enqueue import enqueue_grading
 
 router = APIRouter(prefix="/staff/submissions", dependencies=[Depends(get_current_user)])
 
@@ -284,3 +287,41 @@ async def download_submission(
         filename=row.submission.file_name,
         media_type=row.submission.content_type or "application/octet-stream",
     )
+
+
+@router.get("/{submission_id}/tests", response_model=list[SubmissionTestResultOut])
+async def list_submission_tests(
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[SubmissionTestResultOut]:
+    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    return await list_submission_test_results(db, submission_id=submission_id)
+
+
+@router.post("/{submission_id}/regrade", response_model=SubmissionOut)
+async def regrade_submission(
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> SubmissionOut:
+    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+
+    submission = row.submission
+    submission.status = SubmissionStatus.pending
+    submission.score = None
+    submission.feedback = None
+    await db.commit()
+    await delete_submission_test_results(db, submission_id=submission_id)
+
+    try:
+        await enqueue_grading(submission_id=submission_id)
+    except Exception:
+        pass
+
+    await db.refresh(submission)
+    return submission
