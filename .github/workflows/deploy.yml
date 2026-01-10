@@ -108,6 +108,7 @@ jobs:
           JOBE_BASE_URL: ${{ secrets.JOBE_BASE_URL }}
           JOBE_TIMEOUT_SECONDS: ${{ secrets.JOBE_TIMEOUT_SECONDS }}
           JOBE_ALLOWED_LANGUAGES: ${{ secrets.JOBE_ALLOWED_LANGUAGES }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
           BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_TAG: main-${{ github.sha }}
@@ -131,6 +132,7 @@ jobs:
             JOBE_BASE_URL=$JOBE_BASE_URL
             JOBE_TIMEOUT_SECONDS=$JOBE_TIMEOUT_SECONDS
             JOBE_ALLOWED_LANGUAGES=$JOBE_ALLOWED_LANGUAGES
+            REDIS_URL=$REDIS_URL
             DOCKER_IMAGE=$DOCKER_USERNAME/marconi-backend
             DOCKER_TAG=$DOCKER_TAG
             BACKEND_PORT=$BACKEND_PORT
