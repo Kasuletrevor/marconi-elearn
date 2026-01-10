@@ -822,7 +822,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     async function loadOrgMembers() {
       setIsLoadingOrg(true);
       try {
-        const data = await staff.listOrgMemberships(course.organization_id);
+        const data = await courseStaff.listOrgMembers(course.id);
         setOrgMembers(data);
       } catch (err) {
         console.error("Failed to load org members", err);
