@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
 import {
-  orgUsers,
   orgs,
   superadmin,
   staff,
@@ -27,6 +26,7 @@ import {
   type CourseMembership,
   type CourseMembershipCreate,
   type CourseMembershipUpdate,
+  type OrgMembership,
   type Organization,
   ApiError,
 } from "@/lib/api";
@@ -54,6 +54,17 @@ function roleLabel(role: CourseMembership["role"]): string {
   }
 }
 
+function orgRoleLabel(role: OrgMembership["role"]): string {
+  switch (role) {
+    case "admin":
+      return "Org admin";
+    case "lecturer":
+      return "Lecturer";
+    case "ta":
+      return "TA";
+  }
+}
+
 function formatCourseMeta(course: Course): string {
   const parts: string[] = [];
   if (course.semester) parts.push(course.semester);
@@ -67,6 +78,8 @@ export default function AdminCoursesPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [orgMembers, setOrgMembers] = useState<OrgMembership[]>([]);
+  const [orgMembersError, setOrgMembersError] = useState("");
   const [expandedCourseIds, setExpandedCourseIds] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -122,14 +135,32 @@ export default function AdminCoursesPage() {
     }
   }
 
+  async function loadOrgMembers(orgId: number) {
+    setOrgMembersError("");
+    try {
+      const rows = await staff.listOrgMemberships(orgId, 0, 500);
+      setOrgMembers(rows);
+    } catch (err) {
+      if (err instanceof ApiError) setOrgMembersError(err.detail);
+      else setOrgMembersError("Failed to load organization members");
+      setOrgMembers([]);
+    }
+  }
+
   useEffect(() => {
     loadOrganizations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   useEffect(() => {
-    if (selectedOrgId) loadCourses(selectedOrgId);
-    else setCourses([]);
+    if (selectedOrgId) {
+      loadCourses(selectedOrgId);
+      loadOrgMembers(selectedOrgId);
+    } else {
+      setCourses([]);
+      setOrgMembers([]);
+      setOrgMembersError("");
+    }
   }, [selectedOrgId]);
 
   useEffect(() => {
@@ -233,6 +264,8 @@ export default function AdminCoursesPage() {
             <CourseCard
               key={course.id}
               orgId={selectedOrgId}
+              orgMembers={orgMembers}
+              orgMembersError={orgMembersError}
               course={course}
               isExpanded={expandedCourseIds.has(course.id)}
               onToggle={() => toggleExpanded(course.id)}
@@ -264,22 +297,35 @@ export default function AdminCoursesPage() {
 
 function CourseCard(props: {
   orgId: number;
+  orgMembers: OrgMembership[];
+  orgMembersError: string;
   course: Course;
   isExpanded: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDeleted: () => Promise<void>;
 }) {
-  const { orgId, course, isExpanded, onToggle, onEdit, onDeleted } = props;     
-  const [memberships, setMemberships] = useState<CourseMembership[]>([]);       
+  const { orgId, orgMembers, orgMembersError, course, isExpanded, onToggle, onEdit, onDeleted } = props;
+  const [memberships, setMemberships] = useState<CourseMembership[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [newEmail, setNewEmail] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [newRole, setNewRole] = useState<StaffRole>("ta");
   const [isAdding, setIsAdding] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const staffMembers = memberships.filter((m) => m.role !== "student");
+  const availableOrgMembers = useMemo(() => {
+    const assigned = new Set(memberships.map((m) => m.user_id));
+    const q = memberSearch.trim().toLowerCase();
+    const filtered = orgMembers.filter((m) => {
+      if (assigned.has(m.user_id)) return false;
+      if (!q) return true;
+      return (m.user_email ?? "").toLowerCase().includes(q);
+    });
+    return filtered.sort((a, b) => (a.user_email ?? "").localeCompare(b.user_email ?? ""));
+  }, [orgMembers, memberships, memberSearch]);
 
   async function loadRoster() {
     setIsLoading(true);
@@ -296,22 +342,22 @@ function CourseCard(props: {
   }
 
   useEffect(() => {
-    if (isExpanded) loadRoster();
+    if (!isExpanded) return;
+    loadRoster();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpanded]);
 
   async function addStaff() {
-    const email = newEmail.trim();
-    if (!email) return;
+    if (selectedUserId === null) return;
     setIsAdding(true);
     setError("");
     try {
-      const lookedUp = await orgUsers.lookup(orgId, email);
-      const payload: CourseMembershipCreate = { user_id: lookedUp.id, role: newRole };
+      const payload: CourseMembershipCreate = { user_id: selectedUserId, role: newRole };
       const created = await staff.enrollUser(orgId, course.id, payload);
       const next = [...memberships, created];
       setMemberships(next);
-      setNewEmail("");
+      setSelectedUserId(null);
+      setMemberSearch("");
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to add member");
@@ -431,40 +477,76 @@ function CourseCard(props: {
                 </div>
               )}
 
-              <div className="grid md:grid-cols-3 gap-3 items-end">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Email</label>
+                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                    Staff member
+                  </label>
                   <input
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    inputMode="email"
-                    placeholder="e.g. ta@university.edu"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    placeholder="Search org staff by email..."
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
-                  <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
-                    Use `Users` API to look up IDs (temporary).
-                  </p>
                 </div>
+
+                <div className="grid md:grid-cols-12 gap-3 items-end">
+                  <div className="md:col-span-6">
+                    <select
+                      value={selectedUserId ?? ""}
+                      onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    >
+                      <option value="">
+                        {availableOrgMembers.length === 0
+                          ? "No eligible org members"
+                          : `Select from ${availableOrgMembers.length}...`}
+                      </option>
+                      {availableOrgMembers.map((m) => (
+                        <option key={m.id} value={m.user_id}>
+                          {(m.user_email ?? `User #${m.user_id}`) + ` - ${orgRoleLabel(m.role)}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-4">
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Role</label>
+                    <select
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value as StaffRole)}
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    >
+                      <option value="owner">Owner</option>
+                      <option value="co_lecturer">Co‑lecturer</option>
+                      <option value="ta">TA</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <button
+                      onClick={addStaff}
+                      disabled={isAdding || selectedUserId === null}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      Add
+                    </button>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Role</label>
-                  <select
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value as StaffRole)}
-                    className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  >
-                    <option value="owner">Owner</option>
-                    <option value="co_lecturer">Co‑lecturer</option>
-                    <option value="ta">TA</option>
-                  </select>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">
+                    Only existing org staff appear here. Invite/add staff via{" "}
+                    <Link href={`/admin/members?org=${orgId}`} className="underline underline-offset-2">
+                      Members
+                    </Link>
+                    .
+                  </p>
+                  {orgMembersError && (
+                    <p className="mt-2 text-[10px] text-[var(--secondary)]">
+                      {orgMembersError}
+                    </p>
+                  )}
                 </div>
-                <button
-                  onClick={addStaff}
-                  disabled={isAdding || !newEmail.trim()}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Add
-                </button>
               </div>
 
               <div className="mt-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
