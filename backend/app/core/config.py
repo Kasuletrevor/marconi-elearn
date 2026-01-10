@@ -54,7 +54,7 @@ class Settings(BaseSettings):
                 port=self.postgres_port or 5432,
                 database=self.postgres_db,
             )
-            self.database_url = str(url)
+            self.database_url = url.render_as_string(hide_password=False)
 
         if not self.database_url:
             raise ValueError("DATABASE_URL or POSTGRES_* must be configured")
