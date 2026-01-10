@@ -44,6 +44,9 @@ Agent expectations:
   - Use `uv` for environments and installs (preferred over raw `pip`).
   - Use `uv pip ...` (pip-compatible) and `uv run ...` for commands when convenient.
   - Keep a local `.venv` under `backend/.venv`.
+- Queue/worker:
+  - Auto-grading runs via Redis + Taskiq; start a worker with `cd backend; .\\.venv\\Scripts\\taskiq worker app.worker.broker:broker app.worker.tasks`.
+  - Postgres is the source of truth for grading status/results; Redis is just the queue.
 - Code organization:
   - Put DB/business operations in `backend/app/crud/` (testable units).
   - Keep route handlers thin in `backend/app/api/routes/` (request/response + auth + calling CRUD).
