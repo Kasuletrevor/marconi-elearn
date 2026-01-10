@@ -110,6 +110,10 @@ jobs:
 
             cd ~/marconi || mkdir -p ~/marconi && cd ~/marconi
 
+            # Create external networks if they don't exist
+            docker network inspect npm-network >/dev/null 2>&1 || docker network create npm-network 2>/dev/null || true
+            docker network inspect hostinger-network >/dev/null 2>&1 || docker network create hostinger-network 2>/dev/null || true
+
             cat > .env << ENVEOF
             POSTGRES_USER=$POSTGRES_USER
             POSTGRES_PASSWORD=$POSTGRES_PASSWORD
