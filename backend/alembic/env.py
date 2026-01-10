@@ -30,7 +30,7 @@ def _sync_db_url() -> str:
     url = make_url(raw)
     if url.drivername in {"postgresql", "postgresql+asyncpg"}:
         url = url.set(drivername="postgresql+psycopg")
-    return str(url)
+    return url.render_as_string(hide_password=False)
 
 
 def run_migrations_offline() -> None:
