@@ -34,6 +34,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY backend /app/backend
 
+RUN chmod +x /app/backend/start.sh
 RUN mkdir -p /app/backend/var/uploads && chown -R appuser:appuser /app/backend/var
 
 USER appuser
@@ -43,5 +44,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/v1/health >/dev/null || exit 1
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/backend/start.sh"]
 

@@ -231,40 +231,22 @@ jobs:
               echo "Database created: $POSTGRES_DB"
             fi
 
-            # Wait for backend to be running (depends_on ensures deps are healthy first)
-            echo "Waiting for backend container to start..."
-            for i in {1..30}; do
-              if docker inspect marconi-backend >/dev/null 2>&1; then
-                echo "Backend container exists"
-                break
-              fi
-              sleep 2
-              if [ "$i" -eq 30 ]; then
-                echo "Backend container did not start"
-                docker compose -p marconi -f docker-compose.yml logs
-                exit 1
-              fi
-            done
-
-            echo "Running database migrations..."
-            timeout 300 docker compose -p marconi -f docker-compose.yml exec -T backend python -m alembic upgrade head
-
+            # Wait for backend health (migrations run automatically via start.sh)
             echo "Waiting for backend health..."
-            for i in {1..30}; do
+            for i in {1..60}; do
               if docker compose -p marconi -f docker-compose.yml exec -T backend curl -fsS http://localhost:8000/ >/dev/null 2>&1; then
                 echo "Backend is healthy!"
                 BACKEND_HOST=$(hostname -I | awk '{print $1}')
                 echo "Backend reachable on http://${BACKEND_HOST}:${BACKEND_PORT:-32316}"
                 break
               fi
-              echo "Waiting... ($i/30)"
-              sleep 10
-              if [ $i -eq 30 ]; then
+              echo "Waiting... ($i/60)"
+              sleep 5
+              if [ $i -eq 60 ]; then
                 echo "Timeout waiting for backend to be healthy"
                 docker compose -p marconi -f docker-compose.yml logs backend
                 exit 1
               fi
-            done
             done
 
             # Cleanup dangling images to prevent disk bloat.
