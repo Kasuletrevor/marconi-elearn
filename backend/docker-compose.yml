@@ -6,11 +6,11 @@ services:
     networks:
       - marconi-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || curl -fsS http://localhost/ >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/80'"]
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 30s
+      start_period: 60s
 
   backend:
     image: ${DOCKER_IMAGE:-marconi-backend}:${DOCKER_TAG:-latest}
