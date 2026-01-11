@@ -6,6 +6,8 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
   BookOpen,
   Users,
   FileText,
@@ -24,6 +26,7 @@ import {
   RefreshCw,
   MoreVertical,
   Pencil,
+  Save,
   Trash2,
   Copy,
   UserX,
@@ -52,6 +55,8 @@ import {
   type OrgMembership,
   type CourseMembershipCreate,
   type CourseMembershipUpdate,
+  type CourseUpdate,
+  type LatePolicy,
   staff,
   ApiError,
 } from "@/lib/api";
@@ -88,8 +93,10 @@ export default function StaffCoursePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const role = getCourseRole(user, courseId);
+  const canEditCourseSettings = role === "owner" || role === "co_lecturer";
 
   useEffect(() => {
     async function fetchCourseData() {
@@ -184,7 +191,20 @@ export default function StaffCoursePage() {
           title={course.title}
           description={`${course.code} • ${course.semester && course.year ? `${course.semester}, ${course.year}` : "No term set"}`}
           action={
-            <button className="flex items-center gap-2 px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] transition-colors">
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              disabled={!canEditCourseSettings}
+              title={
+                canEditCourseSettings
+                  ? "Course settings"
+                  : "Only instructors (owner/co-lecturer) can edit settings"
+              }
+              className={`flex items-center gap-2 px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-medium text-[var(--foreground)] transition-colors ${
+                canEditCourseSettings
+                  ? "hover:bg-[var(--card)]/60"
+                  : "opacity-60 cursor-not-allowed"
+              }`}
+            >
               <Settings className="w-4 h-4" />
               <span>Settings</span>
             </button>
@@ -261,7 +281,270 @@ export default function StaffCoursePage() {
           />
         )}
       </motion.div>
+
+      <AnimatePresence>
+        {showSettingsModal && (
+          <CourseSettingsModal
+            course={course}
+            onClose={() => setShowSettingsModal(false)}
+            onSaved={(updated) => {
+              setCourse(updated);
+              setShowSettingsModal(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function normalizeLatePolicy(policy: Course["late_policy"]): LatePolicy {
+  const p = policy ?? null;
+  return {
+    enabled: p?.enabled ?? true,
+    type: "percent_per_day",
+    grace_minutes: Number(p?.grace_minutes ?? 0) || 0,
+    percent_per_day: Number(p?.percent_per_day ?? 0) || 0,
+    max_percent: Number(p?.max_percent ?? 100) || 100,
+  };
+}
+
+function CourseSettingsModal({
+  course,
+  onClose,
+  onSaved,
+}: {
+  course: Course;
+  onClose: () => void;
+  onSaved: (course: Course) => void;
+}) {
+  const [code, setCode] = useState(course.code);
+  const [title, setTitle] = useState(course.title);
+  const [description, setDescription] = useState(course.description ?? "");
+  const [semester, setSemester] = useState(course.semester ?? "");
+  const [year, setYear] = useState(course.year?.toString() ?? "");
+
+  const initialLate = normalizeLatePolicy(course.late_policy);
+  const [latePolicyEnabled, setLatePolicyEnabled] = useState(
+    course.late_policy?.enabled ?? false
+  );
+  const [graceMinutes, setGraceMinutes] = useState(initialLate.grace_minutes);
+  const [percentPerDay, setPercentPerDay] = useState(initialLate.percent_per_day);
+  const [maxPercent, setMaxPercent] = useState(initialLate.max_percent);
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  async function save() {
+    setIsSaving(true);
+    setSaveError("");
+
+    const parsedYear = year.trim() ? Number(year) : null;
+    const payload: CourseUpdate = {
+      code: code.trim(),
+      title: title.trim(),
+      description: description.trim() ? description.trim() : null,
+      semester: semester.trim() ? semester.trim() : null,
+      year: parsedYear !== null && Number.isFinite(parsedYear) ? parsedYear : null,
+      late_policy: latePolicyEnabled
+        ? {
+            enabled: true,
+            type: "percent_per_day",
+            grace_minutes: Number(graceMinutes) || 0,
+            percent_per_day: Number(percentPerDay) || 0,
+            max_percent: Number(maxPercent) || 0,
+          }
+        : null,
+    };
+
+    try {
+      const updated = await courseStaff.updateCourse(course.id, payload);
+      onSaved(updated);
+    } catch (err) {
+      if (err instanceof ApiError) setSaveError(err.detail);
+      else setSaveError("Failed to save settings");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 12, scale: 0.98 }}
+        transition={{ duration: 0.15 }}
+        className="w-full max-w-xl bg-[var(--background)] border border-[var(--border)] rounded-2xl shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[var(--foreground)]">Course settings</p>
+            <p className="text-xs text-[var(--muted-foreground)]">{course.code}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-[var(--card)] transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {saveError && (
+            <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 text-sm text-[var(--secondary)]">
+              {saveError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                Code
+              </label>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                Term
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={semester}
+                  onChange={(e) => setSemester(e.target.value)}
+                  placeholder="Semester"
+                  className="flex-1 px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+                <input
+                  value={year}
+                  onChange={(e) => setYear(e.target.value.replace(/[^\\d]/g, ""))}
+                  inputMode="numeric"
+                  placeholder="Year"
+                  className="w-28 px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Title
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+          </div>
+
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-[var(--foreground)]">Late policy</p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Applies to assignments unless overridden.
+                </p>
+              </div>
+              <button
+                onClick={() => setLatePolicyEnabled((v) => !v)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                  latePolicyEnabled
+                    ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                    : "bg-[var(--background)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--background)]/60"
+                }`}
+                type="button"
+              >
+                {latePolicyEnabled ? "Enabled" : "Disabled"}
+              </button>
+            </div>
+
+            {latePolicyEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--muted-foreground)] mb-2">
+                    Grace (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={graceMinutes}
+                    onChange={(e) => setGraceMinutes(Number(e.target.value))}
+                    min={0}
+                    className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--muted-foreground)] mb-2">
+                    % per day
+                  </label>
+                  <input
+                    type="number"
+                    value={percentPerDay}
+                    onChange={(e) => setPercentPerDay(Number(e.target.value))}
+                    min={0}
+                    max={100}
+                    className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--muted-foreground)] mb-2">
+                    Max %
+                  </label>
+                  <input
+                    type="number"
+                    value={maxPercent}
+                    onChange={(e) => setMaxPercent(Number(e.target.value))}
+                    min={0}
+                    max={100}
+                    className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-5 border-t border-[var(--border)] flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={isSaving || !code.trim() || !title.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -1128,6 +1411,7 @@ function AssignmentsTab({
   onRefreshAssignments,
 }: AssignmentsTabProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newModuleId, setNewModuleId] = useState<number | null>(null);
@@ -1136,15 +1420,44 @@ function AssignmentsTab({
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
-  useEffect(() => {
-    if (!showCreateModal) return;
+  function toDateTimeLocalValue(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    const mm = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const min = pad(date.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  }
+
+  function openCreate() {
+    setEditingAssignmentId(null);
     setNewTitle("");
     setNewDescription("");
     setNewModuleId(modules[0]?.id ?? null);
     setNewMaxPoints(100);
     setNewDueDateLocal("");
     setCreateError("");
-  }, [showCreateModal, modules]);
+    setShowCreateModal(true);
+  }
+
+  function openEdit(assignment: Assignment) {
+    setEditingAssignmentId(assignment.id);
+    setNewTitle(assignment.title);
+    setNewDescription(assignment.description ?? "");
+    setNewModuleId(assignment.module_id ?? null);
+    setNewMaxPoints(assignment.max_points ?? 100);
+    setNewDueDateLocal(
+      assignment.due_date ? toDateTimeLocalValue(new Date(assignment.due_date)) : ""
+    );
+    setCreateError("");
+    setShowCreateModal(true);
+  }
+
+  function closeModal() {
+    setShowCreateModal(false);
+    setEditingAssignmentId(null);
+  }
 
   const getModuleName = (moduleId: number | null) => {
     if (moduleId === null) return "Unassigned";
@@ -1158,15 +1471,20 @@ function AssignmentsTab({
     setIsCreating(true);
     setCreateError("");
     try {
-      await courseStaff.createAssignment(course.id, {
+      const payload = {
         title,
         description: newDescription.trim() ? newDescription.trim() : null,
         module_id: newModuleId,
         due_date: newDueDateLocal ? new Date(newDueDateLocal).toISOString() : null,
         max_points: newMaxPoints,
-      });
+      };
+      if (editingAssignmentId !== null) {
+        await courseStaff.updateAssignment(course.id, editingAssignmentId, payload);
+      } else {
+        await courseStaff.createAssignment(course.id, payload);
+      }
       await onRefreshAssignments();
-      setShowCreateModal(false);
+      closeModal();
     } catch (err) {
       if (err instanceof ApiError) setCreateError(err.detail);
       else setCreateError("Failed to create assignment");
@@ -1183,7 +1501,7 @@ function AssignmentsTab({
           {assignments.length} assignments
         </p>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary)]/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -1198,7 +1516,7 @@ function AssignmentsTab({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
-            onClick={() => setShowCreateModal(false)}
+            onClick={closeModal}
           >
             <motion.div
               initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -1210,11 +1528,13 @@ function AssignmentsTab({
             >
               <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">New assignment</p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                    {editingAssignmentId === null ? "New assignment" : "Edit assignment"}
+                  </p>
                   <p className="text-xs text-[var(--muted-foreground)]">{course.code}</p>
                 </div>
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeModal}
                   className="p-2 rounded-xl hover:bg-[var(--card)] transition-colors"
                   aria-label="Close"
                 >
@@ -1305,7 +1625,7 @@ function AssignmentsTab({
 
               <div className="p-5 border-t border-[var(--border)] flex items-center justify-end gap-2">
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeModal}
                   className="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors text-sm"
                 >
                   Cancel
@@ -1316,7 +1636,7 @@ function AssignmentsTab({
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Create
+                  {editingAssignmentId === null ? "Create" : "Save"}
                 </button>
               </div>
             </motion.div>
@@ -1383,10 +1703,28 @@ function AssignmentsTab({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors">
+                  <button
+                    onClick={() => openEdit(assignment)}
+                    className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
+                    aria-label="Edit assignment"
+                    title="Edit assignment"
+                  >
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors">
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Delete \"${assignment.title}\"?`)) return;
+                      try {
+                        await courseStaff.deleteAssignment(course.id, assignment.id);
+                        await onRefreshAssignments();
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
+                    aria-label="Delete assignment"
+                    title="Delete assignment"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -1413,6 +1751,11 @@ function ModulesTab({ course, modules, onRefreshModules }: ModulesTabProps) {
   const [newPosition, setNewPosition] = useState<number>(1);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+
+  const orderedModules = useMemo(
+    () => [...modules].sort((a, b) => a.position - b.position),
+    [modules]
+  );
 
   const nextPosition = useMemo(() => {
     if (modules.length === 0) return 1;
@@ -1561,17 +1904,36 @@ function ModulesTab({ course, modules, onRefreshModules }: ModulesTabProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {modules
-            .sort((a, b) => a.position - b.position)
-            .map((module) => (
-              <ModuleCard
-                key={module.id}
-                courseId={course.id}
-                module={module}
-                isExpanded={expandedModules.has(module.id)}
-                onToggle={() => toggleModule(module.id)}
-              />
-            ))}
+          {orderedModules.map((module, idx) => (
+            <ModuleCard
+              key={module.id}
+              courseId={course.id}
+              module={module}
+              isExpanded={expandedModules.has(module.id)}
+              onToggle={() => toggleModule(module.id)}
+              onChanged={onRefreshModules}
+              canMoveUp={idx > 0}
+              canMoveDown={idx < orderedModules.length - 1}
+              onMoveUp={async () => {
+                if (idx <= 0) return;
+                const other = orderedModules[idx - 1];
+                await Promise.all([
+                  courseStaff.updateModule(course.id, module.id, { position: other.position }),
+                  courseStaff.updateModule(course.id, other.id, { position: module.position }),
+                ]);
+                await onRefreshModules();
+              }}
+              onMoveDown={async () => {
+                if (idx >= orderedModules.length - 1) return;
+                const other = orderedModules[idx + 1];
+                await Promise.all([
+                  courseStaff.updateModule(course.id, module.id, { position: other.position }),
+                  courseStaff.updateModule(course.id, other.id, { position: module.position }),
+                ]);
+                await onRefreshModules();
+              }}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -1584,13 +1946,32 @@ interface ModuleCardProps {
   module: Module;
   isExpanded: boolean;
   onToggle: () => void;
+  onChanged: () => Promise<void>;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => Promise<void>;
+  onMoveDown: () => Promise<void>;
 }
 
-function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps) {
+function ModuleCard(
+  { courseId, module, isExpanded, onToggle, onChanged, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: ModuleCardProps
+) {
   const [resources, setResources] = useState<ModuleResource[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showAddModal, setShowAddModal] = useState<"link" | "file" | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState(module.title);
+  const [editPosition, setEditPosition] = useState<number>(module.position);    
+  const [isSavingModule, setIsSavingModule] = useState(false);
+  const [moduleEditError, setModuleEditError] = useState("");
+  const [isMovingModule, setIsMovingModule] = useState(false);
+  const [movingResourceId, setMovingResourceId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setEditTitle(module.title);
+    setEditPosition(module.position);
+  }, [module.id, module.title, module.position]);
 
   // Fetch resources when expanded
   useEffect(() => {
@@ -1616,6 +1997,37 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
     }
   }
 
+  async function saveModule() {
+    const title = editTitle.trim();
+    if (!title) return;
+    setIsSavingModule(true);
+    setModuleEditError("");
+    try {
+      await courseStaff.updateModule(courseId, module.id, { title, position: editPosition });
+      await onChanged();
+      setShowEditModal(false);
+    } catch (err) {
+      if (err instanceof ApiError) setModuleEditError(err.detail);
+      else setModuleEditError("Failed to update module");
+    } finally {
+      setIsSavingModule(false);
+    }
+  }
+
+  async function deleteModule() {
+    if (!confirm(`Delete \"${module.title}\"? This removes module content ordering (resources and assignments remain).`)) {
+      return;
+    }
+    setModuleEditError("");
+    try {
+      await courseStaff.deleteModule(courseId, module.id);
+      await onChanged();
+    } catch (err) {
+      if (err instanceof ApiError) setModuleEditError(err.detail);
+      else setModuleEditError("Failed to delete module");
+    }
+  }
+
   async function handleTogglePublish(resource: ModuleResource) {
     try {
       const updated = await courseStaff.updateModuleResource(
@@ -1632,10 +2044,38 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
     }
   }
 
-  async function handleDeleteResource(resourceId: number) {
-    if (!confirm("Are you sure you want to delete this resource?")) return;
+  async function moveResource(resourceId: number, direction: "up" | "down") {
+    if (movingResourceId !== null) return;
+    const idx = resources.findIndex((r) => r.id === resourceId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= resources.length) return;
+
+    const a = resources[idx];
+    const b = resources[swapIdx];
+
+    setMovingResourceId(resourceId);
     try {
-      await courseStaff.deleteModuleResource(courseId, module.id, resourceId);
+      const [updatedA, updatedB] = await Promise.all([
+        courseStaff.updateModuleResource(courseId, module.id, a.id, { position: b.position }),
+        courseStaff.updateModuleResource(courseId, module.id, b.id, { position: a.position }),
+      ]);
+      setResources((prev) =>
+        prev
+          .map((r) => (r.id === updatedA.id ? updatedA : r.id === updatedB.id ? updatedB : r))
+          .sort((x, y) => x.position - y.position)
+      );
+    } catch (err) {
+      console.error("Failed to reorder resource:", err);
+    } finally {
+      setMovingResourceId(null);
+    }
+  }
+
+  async function handleDeleteResource(resourceId: number) {
+    if (!confirm("Are you sure you want to delete this resource?")) return;     
+    try {
+      await courseStaff.deleteModuleResource(courseId, module.id, resourceId);  
       setResources((prev) => prev.filter((r) => r.id !== resourceId));
     } catch (err) {
       console.error("Failed to delete resource:", err);
@@ -1691,8 +2131,46 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (!canMoveUp || isMovingModule) return;
+              setIsMovingModule(true);
+              try {
+                await onMoveUp();
+              } finally {
+                setIsMovingModule(false);
+              }
+            }}
+            disabled={!canMoveUp || isMovingModule}
+            className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Move module up"
+            aria-label="Move module up"
+          >
+            <ArrowUp className="w-4 h-4" />
+          </button>
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (!canMoveDown || isMovingModule) return;
+              setIsMovingModule(true);
+              try {
+                await onMoveDown();
+              } finally {
+                setIsMovingModule(false);
+              }
+            }}
+            disabled={!canMoveDown || isMovingModule}
+            className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Move module down"
+            aria-label="Move module down"
+          >
+            <ArrowDown className="w-4 h-4" />
+          </button>
+          <button
             onClick={(e) => {
               e.stopPropagation();
+              setModuleEditError("");
+              setShowEditModal(true);
             }}
             className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
           >
@@ -1701,6 +2179,7 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
           <button
             onClick={(e) => {
               e.stopPropagation();
+              deleteModule();
             }}
             className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
           >
@@ -1713,6 +2192,85 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {showEditModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+            onClick={() => setShowEditModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-md bg-[var(--background)] border border-[var(--border)] rounded-2xl shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">Edit module</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">{module.title}</p>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="p-2 rounded-xl hover:bg-[var(--card)] transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {moduleEditError && (
+                  <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 text-sm text-[var(--secondary)]">
+                    {moduleEditError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Title</label>
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Position</label>
+                  <input
+                    type="number"
+                    value={editPosition}
+                    onChange={(e) => setEditPosition(Number(e.target.value))}
+                    className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-[var(--border)] flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveModule}
+                  disabled={isSavingModule || !editTitle.trim()}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  {isSavingModule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Expanded Resources Section */}
       {isExpanded && (
@@ -1767,7 +2325,7 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
 
             {!isLoading && !error && resources.length > 0 && (
               <div className="space-y-2">
-                {resources.map((resource) => (
+                {resources.map((resource, idx) => (
                   <div
                     key={resource.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${resource.is_published
@@ -1804,6 +2362,25 @@ function ModuleCard({ courseId, module, isExpanded, onToggle }: ModuleCardProps)
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      {/* Reorder */}
+                      <button
+                        onClick={() => moveResource(resource.id, "up")}
+                        disabled={idx === 0 || movingResourceId !== null}
+                        className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Move up"
+                        aria-label="Move resource up"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveResource(resource.id, "down")}
+                        disabled={idx === resources.length - 1 || movingResourceId !== null}
+                        className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Move down"
+                        aria-label="Move resource down"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
                       {/* Publish/Unpublish */}
                       <button
                         onClick={() => handleTogglePublish(resource)}
