@@ -3,6 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.course import Course
 
+UNSET: object = object()
+
 
 async def create_course(
     db: AsyncSession,
@@ -55,24 +57,26 @@ async def update_course(
     db: AsyncSession,
     *,
     course: Course,
-    code: str | None,
-    title: str | None,
-    description: str | None,
-    semester: str | None,
-    year: int | None,
-    late_policy: dict | None,
+    code: str | None | object = UNSET,
+    title: str | None | object = UNSET,
+    description: str | None | object = UNSET,
+    semester: str | None | object = UNSET,
+    year: int | None | object = UNSET,
+    late_policy: dict | None | object = UNSET,
 ) -> Course:
-    if code is not None:
-        course.code = code.strip()
-    if title is not None:
-        course.title = title.strip()
-    if description is not None:
-        course.description = description.strip() if description else None
-    if semester is not None:
-        course.semester = semester.strip() if semester else None
-    if year is not None:
-        course.year = year
-    if late_policy is not None:
+    if code is not UNSET:
+        if code is not None:
+            course.code = str(code).strip()
+    if title is not UNSET:
+        if title is not None:
+            course.title = str(title).strip()
+    if description is not UNSET:
+        course.description = None if description is None else (str(description).strip() or None)
+    if semester is not UNSET:
+        course.semester = None if semester is None else (str(semester).strip() or None)
+    if year is not UNSET:
+        course.year = None if year is None else int(year)
+    if late_policy is not UNSET:
         course.late_policy = late_policy
     await db.commit()
     await db.refresh(course)
