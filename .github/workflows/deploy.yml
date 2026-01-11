@@ -143,24 +143,24 @@ jobs:
               value = os.environ.get(name)
               return value if value else default
 
-           lines = [
-               f"POSTGRES_USER={get('POSTGRES_USER')}",
-               f"POSTGRES_PASSWORD={get('POSTGRES_PASSWORD')}",
-               f"POSTGRES_DB={get('POSTGRES_DB','marconi_elearn')}",
-               f"SUPERADMIN_EMAILS={get('SUPERADMIN_EMAILS')}",
-               f"SUPERADMIN_PASSWORD={get('SUPERADMIN_PASSWORD')}",
-               f"CORS_ALLOW_ORIGINS={get('CORS_ALLOW_ORIGINS')}",
-               f"JOBE_BASE_URL={get('JOBE_BASE_URL')}",
-               f"JOBE_TIMEOUT_SECONDS={get('JOBE_TIMEOUT_SECONDS','20')}",
-               f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp,python3,java')}",
-               f"REDIS_URL={get('REDIS_URL','redis://redis:6379/0')}",
-               f"SESSION_COOKIE_NAME={get('SESSION_COOKIE_NAME','marconi_session')}",
-               f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
-               f"SESSION_COOKIE_SAMESITE={get('SESSION_COOKIE_SAMESITE','lax')}",
-               f"DOCKER_IMAGE={get('DOCKER_IMAGE')}",
-               f"DOCKER_TAG={get('DOCKER_TAG')}",
-               f"BACKEND_PORT={get('BACKEND_PORT','32316')}",
-           ]
+          lines = [
+              f"POSTGRES_USER={get('POSTGRES_USER')}",
+              f"POSTGRES_PASSWORD={get('POSTGRES_PASSWORD')}",
+              f"POSTGRES_DB={get('POSTGRES_DB','marconi_elearn')}",
+              f"SUPERADMIN_EMAILS={get('SUPERADMIN_EMAILS')}",
+              f"SUPERADMIN_PASSWORD={get('SUPERADMIN_PASSWORD')}",
+              f"CORS_ALLOW_ORIGINS={get('CORS_ALLOW_ORIGINS')}",
+              f"JOBE_BASE_URL={get('JOBE_BASE_URL')}",
+              f"JOBE_TIMEOUT_SECONDS={get('JOBE_TIMEOUT_SECONDS','20')}",
+              f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp,python3,java')}",
+              f"REDIS_URL={get('REDIS_URL','redis://redis:6379/0')}",
+              f"SESSION_COOKIE_NAME={get('SESSION_COOKIE_NAME','marconi_session')}",
+              f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
+              f"SESSION_COOKIE_SAMESITE={get('SESSION_COOKIE_SAMESITE','lax')}",
+              f"DOCKER_IMAGE={get('DOCKER_IMAGE')}",
+              f"DOCKER_TAG={get('DOCKER_TAG')}",
+              f"BACKEND_PORT={get('BACKEND_PORT','32316')}",
+          ]
 
           Path(".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
