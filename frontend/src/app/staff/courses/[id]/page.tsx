@@ -41,7 +41,6 @@ import {
   ChevronUp,
 } from "lucide-react";
 import {
-  student,
   courseStaff,
   staffSubmissions,
   type StaffSubmissionQueueItem,
@@ -95,7 +94,7 @@ export default function StaffCoursePage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const role = getCourseRole(user, courseId);
-  const canEditCourseSettings = role === "owner" || role === "co_lecturer";
+  const canEditCourseSettings = role === "owner" || role === "co_lecturer";     
 
   useEffect(() => {
     async function fetchCourseData() {
@@ -106,12 +105,12 @@ export default function StaffCoursePage() {
       }
 
       try {
-        const courseData = await student.getCourse(courseId);
+        const courseData = await courseStaff.getCourse(courseId);
         setCourse(courseData);
 
         const [modulesData, assignmentsData] = await Promise.all([
-          student.getModules(courseId),
-          student.getAssignments(courseId),
+          courseStaff.listModules(courseId),
+          courseStaff.listAssignments(courseId),
         ]);
         setModules(modulesData);
         setAssignments(assignmentsData);
@@ -274,7 +273,7 @@ export default function StaffCoursePage() {
             course={course}
             modules={modules}
             onRefreshModules={async () => {
-              const data = await student.getModules(courseId);
+              const data = await courseStaff.listModules(courseId);
               setModules(data);
             }}
           />
