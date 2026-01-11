@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
 from app.crud.audit import create_audit_event
-from app.crud.courses import create_course, delete_course, get_course, list_courses, update_course
+from app.crud.courses import UNSET, create_course, delete_course, get_course, list_courses, update_course
 from app.crud.course_memberships import add_course_membership
 from app.db.deps import get_db
 from app.models.course_membership import CourseRole
@@ -85,15 +85,20 @@ async def update_course_in_org(
     course = await get_course(db, course_id=course_id)
     if course is None or course.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    fields = payload.model_fields_set
     updated = await update_course(
         db,
         course=course,
-        code=payload.code,
-        title=payload.title,
-        description=payload.description,
-        semester=payload.semester,
-        year=payload.year,
-        late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
+        code=payload.code if "code" in fields else UNSET,
+        title=payload.title if "title" in fields else UNSET,
+        description=payload.description if "description" in fields else UNSET,
+        semester=payload.semester if "semester" in fields else UNSET,
+        year=payload.year if "year" in fields else UNSET,
+        late_policy=(
+            payload.late_policy.model_dump() if payload.late_policy is not None else None
+        )
+        if "late_policy" in fields
+        else UNSET,
     )
     try:
         await create_audit_event(
