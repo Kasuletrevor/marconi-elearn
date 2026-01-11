@@ -13,8 +13,8 @@ import {
   Loader2,
   Calendar,
 } from "lucide-react";
-import { useAuthStore, getStaffCourseIds, getCourseRole } from "@/lib/store";
-import { student, type Course, ApiError } from "@/lib/api";
+import { useAuthStore, getCourseRole } from "@/lib/store";
+import { courseStaff, type Course, ApiError } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 
@@ -33,7 +33,6 @@ const staggerContainer = {
 
 export default function StaffDashboardPage() {
   const { user } = useAuthStore();
-  const staffCourseIds = getStaffCourseIds(user);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -41,10 +40,8 @@ export default function StaffDashboardPage() {
   useEffect(() => {
     async function fetchCourses() {
       try {
-        const allCourses = await student.getCourses();
-        const staffCourses = allCourses.filter((c) =>
-          staffCourseIds.includes(c.id)
-        );
+        if (!user) return;
+        const staffCourses = await courseStaff.listCourses();
         setCourses(staffCourses);
       } catch (err) {
         if (err instanceof ApiError) {
@@ -57,12 +54,8 @@ export default function StaffDashboardPage() {
       }
     }
 
-    if (staffCourseIds.length > 0) {
-      fetchCourses();
-    } else {
-      setIsLoading(false);
-    }
-  }, [staffCourseIds]);
+    fetchCourses();
+  }, [user]);
 
   const stats = [
     {
@@ -85,7 +78,7 @@ export default function StaffDashboardPage() {
     },
     {
       label: "Active Courses",
-      value: String(staffCourseIds.length),
+      value: String(courses.length),
       icon: BookOpen,
       color: "var(--primary)",
     },
