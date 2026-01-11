@@ -190,30 +190,32 @@ jobs:
             # Bring up dependencies first so we can ensure the DB exists.
             docker compose -p marconi -f docker-compose.yml up -d --force-recreate postgres redis
 
-            # Ensure the configured database exists (handles renamed DBs with a persisted volume).
-            POSTGRES_USER="$(grep -E '^POSTGRES_USER=' .env | head -n1 | cut -d= -f2- || true)"
-            POSTGRES_DB="$(grep -E '^POSTGRES_DB=' .env | head -n1 | cut -d= -f2- || true)"
-            POSTGRES_USER="${POSTGRES_USER:-postgres}"
-            POSTGRES_DB="${POSTGRES_DB:-marconi_elearn}"
-
-            if ! [[ "$POSTGRES_USER" =~ ^[A-Za-z0-9_]+$ ]]; then
-              echo "Invalid POSTGRES_USER in .env: $POSTGRES_USER"
-              exit 1
-            fi
-            if ! [[ "$POSTGRES_DB" =~ ^[A-Za-z0-9_]+$ ]]; then
-              echo "Invalid POSTGRES_DB in .env: $POSTGRES_DB"
-              exit 1
-            fi
-
-            echo "Ensuring database exists: $POSTGRES_DB"
+            # Wait for PostgreSQL to be ready.
+            echo "Waiting for PostgreSQL..."
             for i in {1..30}; do
               if docker compose -p marconi -f docker-compose.yml exec -T postgres pg_isready -U "$POSTGRES_USER" >/dev/null 2>&1; then
+                echo "PostgreSQL is ready!"
                 break
               fi
               sleep 2
               if [ "$i" -eq 30 ]; then
                 echo "Postgres did not become ready in time"
                 docker compose -p marconi -f docker-compose.yml logs postgres
+                exit 1
+              fi
+            done
+
+            # Wait for Redis to be ready.
+            echo "Waiting for Redis..."
+            for i in {1..15}; do
+              if docker compose -p marconi -f docker-compose.yml exec -T redis redis-cli ping | grep -q PONG; then
+                echo "Redis is ready!"
+                break
+              fi
+              sleep 2
+              if [ "$i" -eq 15 ]; then
+                echo "Redis did not become ready in time"
+                docker compose -p marconi -f docker-compose.yml logs redis
                 exit 1
               fi
             done
@@ -229,7 +231,7 @@ jobs:
 
             echo "Waiting for backend health..."
             for i in {1..30}; do
-              if docker compose -p marconi -f docker-compose.yml exec -T backend curl -fsS http://localhost:8000/api/v1/health >/dev/null; then
+              if docker compose -p marconi -f docker-compose.yml exec -T backend curl -fsS http://localhost:8000/ | grep -q '"status":"healthy"'; then
                 echo "Backend is healthy!"
                 break
               fi
