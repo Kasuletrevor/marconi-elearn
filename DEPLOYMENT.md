@@ -10,7 +10,7 @@ This document describes the automated deployment workflow for the Marconi Elearn
 - **Database**: PostgreSQL 16 (Docker container) - external port `16098`
 - **Queue**: Redis (Docker container) - external port `40971`
 - **API**: Backend - external port `32316` (randomized for security)
-- **External Service**: JOBE (code execution, hosted separately)
+- **Code Execution**: JOBE (recommended: run as a Docker service on the same internal network; do not expose publicly)
 
 **Note**: All services communicate on the internal Docker network (`marconi-network`) using standard ports (PostgreSQL 5432, Redis 6379, Backend 8000). Random ports are only for external access to reduce exposure. Nginx proxy can route traffic to any internal port.
 
@@ -73,7 +73,7 @@ Add the following secrets:
 | `SUPERADMIN_EMAILS` | Comma-separated admin emails | `admin@school.edu` |
 | `SUPERADMIN_PASSWORD` | Bootstrap password | `temp_password_change_me` |
 | `CORS_ALLOW_ORIGINS` | Frontend URLs | `https://your-frontend.com` |
-| `JOBE_BASE_URL` | JOBE service URL | `https://jobe.example.com/restapi` |
+| `JOBE_BASE_URL` | JOBE service URL | `http://jobe/jobe/index.php/restapi` |
 
 **Optional Secrets** (have sensible defaults):
 
