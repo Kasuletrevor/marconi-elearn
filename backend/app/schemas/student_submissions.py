@@ -21,6 +21,7 @@ class StudentSubmissionItem(BaseModel):
     status: SubmissionStatus
     score: int | None
     feedback: str | None
+    error_kind: str | None = None
     due_date: datetime | None = None
     effective_due_date: datetime | None = None
     late_seconds: int | None = None
