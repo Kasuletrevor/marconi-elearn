@@ -35,6 +35,7 @@ class SubmissionStudentOut(BaseModel):
     status: SubmissionStatus
     score: int | None
     feedback: str | None
+    error_kind: str | None = None
 
     effective_due_date: datetime | None
     late_seconds: int | None
