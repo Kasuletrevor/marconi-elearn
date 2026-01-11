@@ -5,10 +5,6 @@ services:
     image: trampgeek/jobeinabox:latest
     restart: always
     container_name: marconi-jobe
-    environment:
-      # JOBE uses default config - exposed ports configured below
-    ports:
-      - "4000:80"
     networks:
       - marconi-network
     healthcheck:
