@@ -1,6 +1,13 @@
 version: '3.8'
 
 services:
+  jobe:
+    image: trampgeek/jobeinabox:latest
+    restart: always
+    container_name: marconi-jobe
+    networks:
+      - marconi-network
+
   backend:
     image: ${DOCKER_IMAGE:-marconi-backend}:${DOCKER_TAG:-latest}
     restart: always
@@ -23,7 +30,7 @@ services:
       SUPERADMIN_EMAILS: ${SUPERADMIN_EMAILS}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
-      JOBE_BASE_URL: ${JOBE_BASE_URL}
+      JOBE_BASE_URL: ${JOBE_BASE_URL:-http://jobe/jobe/index.php/restapi}
       JOBE_TIMEOUT_SECONDS: ${JOBE_TIMEOUT_SECONDS:-20}
       JOBE_ALLOWED_LANGUAGES: ${JOBE_ALLOWED_LANGUAGES:-c,cpp}
     ports:
