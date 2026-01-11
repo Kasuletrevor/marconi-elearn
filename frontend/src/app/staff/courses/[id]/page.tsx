@@ -1201,9 +1201,11 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [isAddingStaff, setIsAddingStaff] = useState(false);
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isLoadingOrg, setIsLoadingOrg] = useState(false);
+  const [noticeArea, setNoticeArea] = useState<"student" | "staff" | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<string>("");
   const [showStaffSection, setShowStaffSection] = useState(false);
+  const [inviteLinks, setInviteLinks] = useState<string[]>([]);
 
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
@@ -1241,11 +1243,23 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     return filtered.sort((a, b) => (a.user_email ?? "").localeCompare(b.user_email ?? ""));
   }, [orgMembers, memberships, memberSearch]);
 
+  const resolvedInviteLinks = useMemo(() => {
+    if (typeof window === "undefined") return inviteLinks;
+    const origin = window.location.origin;
+    return inviteLinks.map((link) => {
+      if (link.startsWith("http://") || link.startsWith("https://")) return link;
+      if (link.startsWith("/")) return `${origin}${link}`;
+      return `${origin}/${link}`;
+    });
+  }, [inviteLinks]);
+
   async function addStaffMember() {
     if (selectedUserId === null) return;
     setIsAddingStaff(true);
+    setNoticeArea("staff");
     setError("");
     setSuccess("");
+    setInviteLinks([]);
     try {
       const payload: CourseMembershipCreate = { user_id: selectedUserId, role: newRole };
       await courseStaff.enrollUser(course.id, payload);
@@ -1262,6 +1276,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   }
 
   async function updateRole(membershipId: number, role: CourseMembership["role"]) {
+    setNoticeArea("staff");
     setError("");
     try {
       const payload: CourseMembershipUpdate = { role };
@@ -1275,9 +1290,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
 
   async function removeMember(membershipId: number) {
     if (!confirm("Remove this member from the course?")) return;
+    setNoticeArea("staff");
     setError("");
     try {
-      await courseStaff.removeMembership(course.id, membershipId);        
+      await courseStaff.removeMembership(course.id, membershipId);
       await onRefresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
@@ -1295,8 +1311,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     if (!email || !full_name || !student_number || !programme) return;
 
     setIsAddingStudent(true);
+    setNoticeArea("student");
     setError("");
     setSuccess("");
+    setInviteLinks([]);
     try {
       const res = await courseStaff.inviteStudentByEmail(course.id, {
         email,
@@ -1310,7 +1328,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       if (res.auto_enrolled > 0) {
         setSuccess("Student enrolled (existing account).");
       } else if (res.created_invites > 0) {
-        setSuccess("Invite created. Student will enroll after accepting the invite.");
+        setSuccess(
+          "Invite created (no email yet). Copy the invite link below and share it manually."
+        );
+        setInviteLinks(res.invite_links ?? []);
       } else {
         setSuccess("No invite created.");
       }
@@ -1332,8 +1353,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     if (!file) return;
 
     setIsAddingStudent(true);
+    setNoticeArea("student");
     setError("");
     setSuccess("");
+    setInviteLinks([]);
     try {
       const res = await courseStaff.importRosterCsv(course.id, file);     
       const msg = `Imported: ${res.created_invites} invites created, ${res.auto_enrolled} auto-enrolled.`;
@@ -1342,6 +1365,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       } else {
         setSuccess(msg);
       }
+      if ((res.invite_links ?? []).length > 0) setInviteLinks(res.invite_links);
       await onRefresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
@@ -1350,6 +1374,26 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       setIsAddingStudent(false);
       // Reset input
       e.target.value = "";
+    }
+  }
+
+  async function copyInviteLinksAll() {
+    setNoticeArea("student");
+    try {
+      await navigator.clipboard.writeText(resolvedInviteLinks.join("\n"));
+      setSuccess("Invite links copied to clipboard.");
+    } catch {
+      setError("Failed to copy invite links.");
+    }
+  }
+
+  async function copyInviteLink(link: string) {
+    setNoticeArea("student");
+    try {
+      await navigator.clipboard.writeText(link);
+      setSuccess("Invite link copied.");
+    } catch {
+      setError("Failed to copy invite link.");
     }
   }
 
@@ -1390,12 +1434,12 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
         <p className="text-xs text-[var(--muted-foreground)] mb-4">
           Staff are selected from organization members. Students are enrolled via invites (above).
         </p>
-        {error && (
+        {noticeArea === "staff" && error && (
           <div className="mb-4 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
             {error}
           </div>
         )}
-        {success && (
+        {noticeArea === "staff" && success && (
           <div className="mb-4 p-3 bg-[var(--success)]/10 border border-[var(--success)]/20 rounded-xl text-sm text-[var(--success)]">
             {success}
           </div>
@@ -1533,6 +1577,53 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             Import CSV
           </button>
         </div>
+
+        {noticeArea === "student" && error && (
+          <div className="mb-4 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
+            {error}
+          </div>
+        )}
+        {noticeArea === "student" && success && (
+          <div className="mb-4 p-3 bg-[var(--success)]/10 border border-[var(--success)]/20 rounded-xl text-sm text-[var(--success)]">
+            {success}
+          </div>
+        )}
+        {resolvedInviteLinks.length > 0 && (
+          <div className="mb-4 p-4 bg-[var(--background)] border border-[var(--border)] rounded-2xl">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <p className="text-sm font-medium text-[var(--foreground)]">Invite links</p>
+                <p className="text-[11px] text-[var(--muted-foreground)]">
+                  No emails yet — share these manually with the student(s).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={copyInviteLinksAll}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--card)]/70 transition-colors text-xs"
+              >
+                Copy all
+              </button>
+            </div>
+            <div className="space-y-2">
+              {resolvedInviteLinks.map((link) => (
+                <div
+                  key={link}
+                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)]"
+                >
+                  <code className="text-xs text-[var(--foreground)] break-all">{link}</code>
+                  <button
+                    type="button"
+                    onClick={() => copyInviteLink(link)}
+                    className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 transition-colors text-xs"
+                  >
+                    Copy
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-12 gap-3 items-end">
           <div className="md:col-span-4">
