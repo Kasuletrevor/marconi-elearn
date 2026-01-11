@@ -172,9 +172,8 @@ function NotificationBell() {
                       onClick={() => handleNotificationClick(notification)}
                       disabled={isLoading}
                       whileHover={{ backgroundColor: "var(--background)" }}
-                      className={`w-full px-4 py-3 text-left transition-colors ${
-                        notification.read_at === null ? "bg-[var(--primary)]/5" : ""
-                      } disabled:opacity-50`}
+                      className={`w-full px-4 py-3 text-left transition-colors ${notification.read_at === null ? "bg-[var(--primary)]/5" : ""
+                        } disabled:opacity-50`}
                     >
                       <div className="flex gap-3">
                         <div className="flex-shrink-0 mt-0.5">
@@ -183,11 +182,10 @@ function NotificationBell() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <p
-                              className={`text-sm truncate ${
-                                notification.read_at === null
-                                  ? "font-semibold text-[var(--foreground)]"
-                                  : "font-medium text-[var(--foreground)]"
-                              }`}
+                              className={`text-sm truncate ${notification.read_at === null
+                                ? "font-semibold text-[var(--foreground)]"
+                                : "font-medium text-[var(--foreground)]"
+                                }`}
                             >
                               {notification.title}
                             </p>
@@ -423,17 +421,21 @@ function SidebarContent({
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
         {sidebarLinks.map((link) => {
-          const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+          const isActive =
+            link.href === "/dashboard"
+              ? pathname === "/dashboard" ||
+              pathname.startsWith("/dashboard/courses") ||
+              pathname.startsWith("/dashboard/join")
+              : pathname === link.href || pathname.startsWith(link.href + "/");
           return (
             <Link
               key={link.href}
               href={link.href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                isActive
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
                   ? "bg-[var(--primary)] text-white"
                   : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-              }`}
+                }`}
             >
               <link.icon className="w-5 h-5" />
               <span className="font-medium">{link.label}</span>
