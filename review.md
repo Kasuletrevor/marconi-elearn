@@ -10,3 +10,4 @@
   - Data model completeness: assignment “published” state, late policy, multiple attempts policy, submission versioning
   - want “next ungraded” to mean “next after this submission” (instead of “next in the queue”), we should add an      
   after_submission_id (or after_created_at) parameter to the backend and wire it into the detail page. 
+  - Testing without email: surface invite links in the roster UI for manual sharing (token is only returned at invite creation time).
