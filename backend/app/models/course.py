@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,6 +18,8 @@ class Course(Base):
     semester: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
     year: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     late_policy: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    self_enroll_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    self_enroll_code: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
