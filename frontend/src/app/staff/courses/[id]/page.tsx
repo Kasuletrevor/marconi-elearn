@@ -1094,11 +1094,11 @@ interface RosterTabProps {
   onRefresh: () => Promise<void>;
 }
 
-function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
+function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {        
   const [orgMembers, setOrgMembers] = useState<OrgMembership[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [newRole, setNewRole] = useState<"owner" | "co_lecturer" | "ta">("ta");
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);    
+  const [newRole, setNewRole] = useState<"co_lecturer" | "ta">("ta");
   const [isAddingStaff, setIsAddingStaff] = useState(false);
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isLoadingOrg, setIsLoadingOrg] = useState(false);
@@ -1312,7 +1312,6 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             >
               <option value="ta">TA</option>
               <option value="co_lecturer">Co-Lecturer</option>
-              <option value="owner">Owner</option>
             </select>
           </div>
           <div className="md:col-span-2">
