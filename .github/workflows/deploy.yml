@@ -195,14 +195,15 @@ jobs:
             # Wait for PostgreSQL to be ready.
             echo "Waiting for PostgreSQL..."
             for i in {1..30}; do
-              if docker compose -p marconi -f docker-compose.yml exec -T postgres pg_isready >/dev/null 2>&1; then
+              status=$(docker inspect --format='{{.State.Health.Status}}' marconi-postgres 2>/dev/null || echo "starting")
+              if [ "$status" = "healthy" ]; then
                 echo "PostgreSQL is ready!"
                 break
               fi
               sleep 2
               if [ "$i" -eq 30 ]; then
-                echo "Postgres did not become ready in time"
-                docker compose -p marconi -f docker-compose.yml logs postgres
+                echo "Postgres did not become healthy in time"
+                docker logs marconi-postgres
                 exit 1
               fi
             done
@@ -210,14 +211,15 @@ jobs:
             # Wait for Redis to be ready.
             echo "Waiting for Redis..."
             for i in {1..15}; do
-              if docker compose -p marconi -f docker-compose.yml exec -T redis redis-cli ping | grep -q PONG; then
+              status=$(docker inspect --format='{{.State.Health.Status}}' marconi-redis 2>/dev/null || echo "starting")
+              if [ "$status" = "healthy" ]; then
                 echo "Redis is ready!"
                 break
               fi
               sleep 2
               if [ "$i" -eq 15 ]; then
-                echo "Redis did not become ready in time"
-                docker compose -p marconi -f docker-compose.yml logs redis
+                echo "Redis did not become healthy in time"
+                docker logs marconi-redis
                 exit 1
               fi
             done
@@ -225,14 +227,15 @@ jobs:
             # Wait for JOBE to be ready.
             echo "Waiting for JOBE..."
             for i in {1..30}; do
-              if docker compose -p marconi -f docker-compose.yml exec -T jobe curl -f http://localhost:80/ >/dev/null 2>&1; then
+              status=$(docker inspect --format='{{.State.Health.Status}}' marconi-jobe 2>/dev/null || echo "starting")
+              if [ "$status" = "healthy" ]; then
                 echo "JOBE is ready!"
                 break
               fi
               sleep 2
               if [ "$i" -eq 30 ]; then
-                echo "JOBE did not become ready in time"
-                docker compose -p marconi -f docker-compose.yml logs jobe
+                echo "JOBE did not become healthy in time"
+                docker logs marconi-jobe
                 exit 1
               fi
             done
@@ -262,12 +265,15 @@ jobs:
 
             docker compose -p marconi -f docker-compose.yml up -d --force-recreate backend
 
-            timeout 120 docker compose -p marconi -f docker-compose.yml exec -T backend python -m alembic upgrade head
+            echo "Running database migrations..."
+            timeout 300 docker compose -p marconi -f docker-compose.yml exec -T backend python -m alembic upgrade head
 
             echo "Waiting for backend health..."
             for i in {1..30}; do
               if docker compose -p marconi -f docker-compose.yml exec -T backend curl -fsS http://localhost:8000/ >/dev/null 2>&1; then
                 echo "Backend is healthy!"
+                BACKEND_HOST=$(hostname -I | awk '{print $1}')
+                echo "Backend reachable on http://${BACKEND_HOST}:${BACKEND_PORT:-32316}"
                 break
               fi
               echo "Waiting... ($i/30)"
