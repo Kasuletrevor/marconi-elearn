@@ -6,7 +6,7 @@ services:
     networks:
       - marconi-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost/jobe/index.php/restapi >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || curl -fsS http://localhost/ >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -20,9 +20,9 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       jobe:
-        condition: service_started
+        condition: service_healthy
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
