@@ -1207,7 +1207,9 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
   const [studentNumber, setStudentNumber] = useState("");
-  const [studentProgramme, setStudentProgramme] = useState("");
+  const [studentProgramme, setStudentProgramme] = useState<
+    "BELE" | "BSCE" | "BBIO" | "BSTE" | ""
+  >("");
 
   useEffect(() => {
     async function loadOrgMembers() {
@@ -1536,7 +1538,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             <input
               value={studentNumber}
               onChange={(e) => setStudentNumber(e.target.value)}
-              placeholder="2024-001"
+              placeholder="2100714449"
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
             />
           </div>
@@ -1544,12 +1546,17 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
               Programme
             </label>
-            <input
+            <select
               value={studentProgramme}
-              onChange={(e) => setStudentProgramme(e.target.value)}
-              placeholder="BSc CS"
+              onChange={(e) => setStudentProgramme(e.target.value as any)}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-            />
+            >
+              <option value="">Select programme...</option>
+              <option value="BELE">BELE</option>
+              <option value="BSCE">BSCE</option>
+              <option value="BBIO">BBIO</option>
+              <option value="BSTE">BSTE</option>
+            </select>
           </div>
           <div className="md:col-span-12">
             <button
@@ -1560,7 +1567,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
                 !studentEmail.trim() ||
                 !studentName.trim() ||
                 !studentNumber.trim() ||
-                !studentProgramme.trim()
+                !studentProgramme
               }
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
