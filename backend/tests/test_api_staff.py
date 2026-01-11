@@ -43,6 +43,10 @@ async def test_staff_endpoints_allow_course_staff(client):
     course_ids = [c["id"] for c in r.json()]
     assert course_id in course_ids
 
+    # Course settings require instructor role (TA should be forbidden)
+    r = await client.patch(f"/api/v1/staff/courses/{course_id}", json={"title": "New Title"})
+    assert r.status_code == 403
+
     # Staff can manage modules
     r = await client.post(f"/api/v1/staff/courses/{course_id}/modules", json={"title": "Intro", "position": 1})
     assert r.status_code == 201
@@ -73,9 +77,31 @@ async def test_staff_endpoints_allow_course_staff(client):
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships")
     assert r.status_code == 403
 
-    r = await client.get(f"/api/v1/staff/courses/{course_id}/org-members")
+    r = await client.get(f"/api/v1/staff/courses/{course_id}/org-members")      
     assert r.status_code == 200
     assert any(m["user_id"] == ta_id for m in r.json())
+
+    # Instructor can update course settings (admin is course owner)
+    await client.post("/api/v1/auth/logout")
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
+    assert r.status_code == 200
+
+    r = await client.patch(
+        f"/api/v1/staff/courses/{course_id}",
+        json={
+            "semester": "Fall",
+            "late_policy": {"enabled": True, "type": "percent_per_day", "grace_minutes": 30, "percent_per_day": 10, "max_percent": 100},
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["semester"] == "Fall"
+    assert r.json()["late_policy"]["enabled"] is True
+
+    # PATCH should allow clearing optional fields
+    r = await client.patch(f"/api/v1/staff/courses/{course_id}", json={"semester": None, "late_policy": None})
+    assert r.status_code == 200
+    assert r.json()["semester"] is None
+    assert r.json()["late_policy"] is None
 
 
 @pytest.mark.asyncio
