@@ -40,6 +40,43 @@ const statusBadge: Record<
   },
 };
 
+const errorKindBadge: Record<
+  NonNullable<StudentSubmission["error_kind"]>,
+  { label: string; className: string }
+> = {
+  compile_error: {
+    label: "Compile",
+    className:
+      "bg-[var(--destructive)]/10 text-[var(--destructive)] border-[var(--destructive)]/20",
+  },
+  runtime_error: {
+    label: "Runtime",
+    className:
+      "bg-[var(--destructive)]/10 text-[var(--destructive)] border-[var(--destructive)]/20",
+  },
+  infra_error: {
+    label: "Infra",
+    className: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+  },
+  internal_error: {
+    label: "Error",
+    className:
+      "bg-[var(--secondary)]/10 text-[var(--secondary)] border-[var(--secondary)]/20",
+  },
+};
+
+function formatDuration(seconds?: number | null): string {
+  if (!seconds || seconds <= 0) return "0m";
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return `${hours}h ${remMins}m`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `${days}d ${remHours}h`;
+}
+
 export default function StudentSubmissionsPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [items, setItems] = useState<StudentSubmission[]>([]);
@@ -298,6 +335,15 @@ export default function StudentSubmissionsPage() {
                     {statusBadge[s.status].label}
                   </span>
 
+                  {s.error_kind ? (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-medium ${errorKindBadge[s.error_kind].className}`}
+                      title={s.feedback || undefined}
+                    >
+                      {errorKindBadge[s.error_kind].label}
+                    </span>
+                  ) : null}
+
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -316,6 +362,14 @@ export default function StudentSubmissionsPage() {
                     </Link>
                   </div>
                 </div>
+
+                {s.late_penalty_percent !== null &&
+                  s.late_penalty_percent !== undefined &&
+                  s.late_penalty_percent > 0 && (
+                    <div className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                      Late penalty: {s.late_penalty_percent}% (late by {formatDuration(s.late_seconds)}).
+                    </div>
+                  )}
               </div>
             ))}
           </div>
@@ -324,4 +378,3 @@ export default function StudentSubmissionsPage() {
     </div>
   );
 }
-
