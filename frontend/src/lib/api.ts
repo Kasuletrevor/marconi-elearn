@@ -36,6 +36,8 @@ export interface Course {
   semester: string | null;
   year: number | null;
   late_policy?: LatePolicy | null;
+  self_enroll_enabled: boolean;
+  self_enroll_code?: string | null;
   organization_id: number;
   created_at: string;
   updated_at: string;
@@ -158,6 +160,8 @@ export interface CourseUpdate {
   semester?: string | null;
   year?: number | null;
   late_policy?: LatePolicy | null;
+  self_enroll_enabled?: boolean | null;
+  regenerate_self_enroll_code?: boolean | null;
 }
 
 export interface ModuleCreate {
