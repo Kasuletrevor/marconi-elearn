@@ -226,15 +226,25 @@ jobs:
 
             # Wait for JOBE to be ready.
             echo "Waiting for JOBE..."
-            for i in {1..30}; do
-              status=$(docker inspect --format='{{.State.Health.Status}}' marconi-jobe 2>/dev/null || echo "starting")
+            for i in {1..60}; do
+              status=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' marconi-jobe 2>/dev/null || echo "starting")
+
               if [ "$status" = "healthy" ]; then
                 echo "JOBE is ready!"
                 break
               fi
+
+              # Fallback if no healthcheck is configured
+              if [ "$status" = "no-healthcheck" ]; then
+                if docker exec marconi-jobe curl -fsS http://localhost/jobe/index.php/restapi >/dev/null 2>&1; then
+                  echo "JOBE is ready! (curl fallback)"
+                  break
+                fi
+              fi
+
               sleep 2
-              if [ "$i" -eq 30 ]; then
-                echo "JOBE did not become healthy in time"
+              if [ "$i" -eq 60 ]; then
+                echo "JOBE did not become ready in time"
                 docker logs marconi-jobe
                 exit 1
               fi
