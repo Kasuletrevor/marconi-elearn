@@ -35,9 +35,20 @@ export interface Course {
   description: string | null;
   semester: string | null;
   year: number | null;
+  late_policy?: LatePolicy | null;
   organization_id: number;
   created_at: string;
   updated_at: string;
+}
+
+export type LatePolicyType = "percent_per_day";
+
+export interface LatePolicy {
+  enabled: boolean;
+  type: LatePolicyType;
+  grace_minutes: number;
+  percent_per_day: number;
+  max_percent: number;
 }
 
 export interface Module {
@@ -135,6 +146,7 @@ export interface CourseCreateInOrg {
   description?: string | null;
   semester?: string | null;
   year?: number | null;
+  late_policy?: LatePolicy | null;
 }
 
 export interface CourseUpdate {
@@ -143,6 +155,7 @@ export interface CourseUpdate {
   description?: string | null;
   semester?: string | null;
   year?: number | null;
+  late_policy?: LatePolicy | null;
 }
 
 export interface ModuleCreate {
@@ -941,6 +954,16 @@ export const courseStaff = {
   async getCourse(courseId: number): Promise<Course> {
     const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}`, {
       credentials: "include",
+    });
+    return handleResponse<Course>(res);
+  },
+
+  async updateCourse(courseId: number, data: CourseUpdate): Promise<Course> {
+    const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
     });
     return handleResponse<Course>(res);
   },
