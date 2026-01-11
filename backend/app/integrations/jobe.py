@@ -5,6 +5,8 @@ from typing import Any
 
 import httpx
 
+JOBE_OUTCOME_OK = 15
+
 
 class JobeError(RuntimeError):
     pass
