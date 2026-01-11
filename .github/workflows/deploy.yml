@@ -143,22 +143,24 @@ jobs:
               value = os.environ.get(name)
               return value if value else default
 
-          lines = [
-              f"POSTGRES_USER={get('POSTGRES_USER')}",
-              f"POSTGRES_PASSWORD={get('POSTGRES_PASSWORD')}",
-              f"POSTGRES_DB={get('POSTGRES_DB','marconi_elearn')}",
-              f"SUPERADMIN_EMAILS={get('SUPERADMIN_EMAILS')}",
-              f"SUPERADMIN_PASSWORD={get('SUPERADMIN_PASSWORD')}",
-              f"CORS_ALLOW_ORIGINS={get('CORS_ALLOW_ORIGINS')}",
-              f"JOBE_BASE_URL={get('JOBE_BASE_URL')}",
-              f"JOBE_TIMEOUT_SECONDS={get('JOBE_TIMEOUT_SECONDS','20')}",
-              f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp,python3,java')}",
-              f"REDIS_URL={get('REDIS_URL','redis://redis:6379/0')}",
-              f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
-              f"SESSION_COOKIE_SAMESITE={get('SESSION_COOKIE_SAMESITE','lax')}",
-              f"DOCKER_IMAGE={get('DOCKER_IMAGE')}",
-              f"DOCKER_TAG={get('DOCKER_TAG')}",
-          ]
+           lines = [
+               f"POSTGRES_USER={get('POSTGRES_USER')}",
+               f"POSTGRES_PASSWORD={get('POSTGRES_PASSWORD')}",
+               f"POSTGRES_DB={get('POSTGRES_DB','marconi_elearn')}",
+               f"SUPERADMIN_EMAILS={get('SUPERADMIN_EMAILS')}",
+               f"SUPERADMIN_PASSWORD={get('SUPERADMIN_PASSWORD')}",
+               f"CORS_ALLOW_ORIGINS={get('CORS_ALLOW_ORIGINS')}",
+               f"JOBE_BASE_URL={get('JOBE_BASE_URL')}",
+               f"JOBE_TIMEOUT_SECONDS={get('JOBE_TIMEOUT_SECONDS','20')}",
+               f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp,python3,java')}",
+               f"REDIS_URL={get('REDIS_URL','redis://redis:6379/0')}",
+               f"SESSION_COOKIE_NAME={get('SESSION_COOKIE_NAME','marconi_session')}",
+               f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
+               f"SESSION_COOKIE_SAMESITE={get('SESSION_COOKIE_SAMESITE','lax')}",
+               f"DOCKER_IMAGE={get('DOCKER_IMAGE')}",
+               f"DOCKER_TAG={get('DOCKER_TAG')}",
+               f"BACKEND_PORT={get('BACKEND_PORT','32316')}",
+           ]
 
           Path(".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
@@ -183,12 +185,12 @@ jobs:
             docker compose -p marconi -f docker-compose.yml down --remove-orphans || true
 
             # If older runs created fixed-name containers outside this compose project, remove them too.
-            docker rm -f marconi-backend marconi-postgres marconi-redis >/dev/null 2>&1 || true
+            docker rm -f marconi-backend marconi-postgres marconi-redis marconi-jobe >/dev/null 2>&1 || true
 
             docker compose -p marconi -f docker-compose.yml pull
 
             # Bring up dependencies first so we can ensure the DB exists.
-            docker compose -p marconi -f docker-compose.yml up -d --force-recreate postgres redis
+            docker compose -p marconi -f docker-compose.yml up -d --force-recreate postgres redis jobe
 
             # Wait for PostgreSQL to be ready.
             echo "Waiting for PostgreSQL..."
@@ -216,6 +218,21 @@ jobs:
               if [ "$i" -eq 15 ]; then
                 echo "Redis did not become ready in time"
                 docker compose -p marconi -f docker-compose.yml logs redis
+                exit 1
+              fi
+            done
+
+            # Wait for JOBE to be ready.
+            echo "Waiting for JOBE..."
+            for i in {1..30}; do
+              if docker compose -p marconi -f docker-compose.yml exec -T jobe curl -f http://localhost:80/ >/dev/null 2>&1; then
+                echo "JOBE is ready!"
+                break
+              fi
+              sleep 2
+              if [ "$i" -eq 30 ]; then
+                echo "JOBE did not become ready in time"
+                docker compose -p marconi -f docker-compose.yml logs jobe
                 exit 1
               fi
             done
