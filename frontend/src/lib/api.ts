@@ -54,7 +54,7 @@ export interface Assignment {
   description: string | null;
   due_date: string | null;
   max_points: number;
-  module_id: number;
+  module_id: number | null;
 }
 
 export interface Submission {
@@ -159,12 +159,16 @@ export interface AssignmentCreate {
   title: string;
   description?: string | null;
   module_id?: number | null;
+  due_date?: string | null;
+  max_points?: number;
 }
 
 export interface AssignmentUpdate {
   title?: string | null;
   description?: string | null;
   module_id?: number | null;
+  due_date?: string | null;
+  max_points?: number | null;
 }
 
 export interface CourseMembership {
