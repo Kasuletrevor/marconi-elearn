@@ -25,11 +25,13 @@ class CourseCreateInOrg(BaseModel):
 
 class CourseUpdate(BaseModel):
     code: str | None = Field(default=None, min_length=1, max_length=50)
-    title: str | None = Field(default=None, min_length=1, max_length=200)
+    title: str | None = Field(default=None, min_length=1, max_length=200)       
     description: str | None = Field(default=None, max_length=2000)
     semester: str | None = Field(default=None, max_length=50)
     year: int | None = None
     late_policy: LatePolicy | None = None
+    self_enroll_enabled: bool | None = None
+    regenerate_self_enroll_code: bool | None = None
 
 
 class CourseOut(BaseModel):
@@ -43,5 +45,10 @@ class CourseOut(BaseModel):
     semester: str | None
     year: int | None
     late_policy: dict | None
+    self_enroll_enabled: bool
     created_at: datetime
     updated_at: datetime
+
+
+class CourseStaffOut(CourseOut):
+    self_enroll_code: str | None
