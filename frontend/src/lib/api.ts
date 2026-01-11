@@ -237,6 +237,13 @@ export interface ImportCsvResult {
   invite_links: string[];
 }
 
+export interface CourseStudentInviteByEmail {
+  email: string;
+  full_name: string;
+  student_number: string;
+  programme: string;
+}
+
 export interface StaffSubmissionQueueItem {
   id: number;
   course_id: number;
@@ -1076,6 +1083,20 @@ export const courseStaff = {
     return handleResponse<CourseMembership>(res);
   },
 
+  async updateMembership(
+    courseId: number,
+    membershipId: number,
+    data: CourseMembershipUpdate
+  ): Promise<CourseMembership> {
+    const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}/memberships/${membershipId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<CourseMembership>(res);
+  },
+
   async removeMembership(courseId: number, membershipId: number): Promise<void> {
     const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}/memberships/${membershipId}`, {
       method: "DELETE",
@@ -1092,6 +1113,22 @@ export const courseStaff = {
       credentials: "include",
       body: form,
     });
+    return handleResponse<ImportCsvResult>(res);
+  },
+
+  async inviteStudentByEmail(
+    courseId: number,
+    data: CourseStudentInviteByEmail
+  ): Promise<ImportCsvResult> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/invites/by-email`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
     return handleResponse<ImportCsvResult>(res);
   },
 
