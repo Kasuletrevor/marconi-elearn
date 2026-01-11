@@ -24,6 +24,7 @@ import {
   type Assignment,
   type Submission,
   type Course,
+  type LatePolicy,
   ApiError,
 } from "@/lib/api";
 
@@ -44,7 +45,7 @@ type SubmissionStatus = "pending" | "grading" | "graded" | "error";
 
 const statusConfig: Record<
   SubmissionStatus,
-  { label: string; color: string; bgColor: string; icon: React.ElementType }
+  { label: string; color: string; bgColor: string; icon: React.ElementType }    
 > = {
   pending: {
     label: "Pending",
@@ -71,6 +72,31 @@ const statusConfig: Record<
     icon: AlertCircle,
   },
 };
+
+function resolveLatePolicy(course: Course, assignment: Assignment): LatePolicy | null {
+  const raw = assignment.late_policy ?? course.late_policy ?? null;
+  if (!raw) return null;
+  if (raw.enabled === false) return null;
+  return {
+    enabled: true,
+    type: "percent_per_day",
+    grace_minutes: Number(raw.grace_minutes ?? 0) || 0,
+    percent_per_day: Number(raw.percent_per_day ?? 0) || 0,
+    max_percent: Number(raw.max_percent ?? 100) || 100,
+  };
+}
+
+function formatDuration(seconds: number | null | undefined): string {
+  if (!seconds || seconds <= 0) return "0m";
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return `${hours}h ${remMins}m`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `${days}d ${remHours}h`;
+}
 
 export default function AssignmentDetailPage() {
   const params = useParams();
@@ -253,10 +279,17 @@ export default function AssignmentDetailPage() {
 
   if (!assignment || !course) return null;
 
-  const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;
+  const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;   
   const isPastDue = dueDate && dueDate < new Date();
   const latestSubmission = submissions[0];
-  const hasGradedSubmission = submissions.some((s) => s.status === "graded");
+  const hasGradedSubmission = submissions.some((s) => s.status === "graded");   
+  const latePolicy = resolveLatePolicy(course, assignment);
+  const latePolicySummary =
+    !dueDate
+      ? "No due date set."
+      : latePolicy
+      ? `Late policy: ${latePolicy.grace_minutes} min grace, ${latePolicy.percent_per_day}% per day, max ${latePolicy.max_percent}%.`
+      : "Late policy: not configured (no penalties).";
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -331,6 +364,10 @@ export default function AssignmentDetailPage() {
             </div>
           )}
         </div>
+
+        <p className="mt-3 text-xs text-[var(--muted-foreground)]">
+          {latePolicySummary} You can resubmit unlimited times; the latest submission counts.
+        </p>
       </motion.div>
 
       <motion.div
@@ -405,14 +442,14 @@ export default function AssignmentDetailPage() {
                   <p className="text-sm text-[var(--muted-foreground)] mb-4">
                     or click to browse
                   </p>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Accepts .c, .cpp, .h, .hpp files (max 1MB)
-                  </p>
-                </>
-              )}
+                    <p className="text-xs text-[var(--muted-foreground)]">  
+                      Accepts .c, .cpp, .h, .hpp, .zip (max 5MB)
+                    </p>
+                  </>
+                )}
               <input
                 type="file"
-                accept=".c,.cpp,.h,.hpp"
+                accept=".c,.cpp,.h,.hpp,.zip"
                 onChange={handleFileSelect}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
@@ -449,11 +486,14 @@ export default function AssignmentDetailPage() {
               )}
             </button>
 
-            {isPastDue && (
-              <p className="mt-3 text-xs text-[var(--secondary)] text-center">
-                This assignment is past due. Late submissions may not be accepted.
-              </p>
-            )}
+            {latestSubmission?.late_penalty_percent !== undefined &&
+              latestSubmission?.late_penalty_percent !== null &&
+              latestSubmission.late_penalty_percent > 0 && (
+                <p className="mt-3 text-xs text-[var(--muted-foreground)] text-center">
+                  Latest submission late penalty: {latestSubmission.late_penalty_percent}% (late by{" "}
+                  {formatDuration(latestSubmission.late_seconds)}).
+                </p>
+              )}
           </div>
         </motion.div>
 
@@ -503,7 +543,16 @@ function SubmissionCard({ submission, isLatest, maxPoints }: SubmissionCardProps
   const config = statusConfig[submission.status];
   const StatusIcon = config.icon;
   const submittedAt = new Date(submission.submitted_at);
-  const fileName = submission.file_path.split("/").pop() || "submission";
+  const fileName = submission.file_path.split("/").pop() || "submission"; 
+  const kindLabel: Record<
+    NonNullable<Submission["error_kind"]>,
+    { label: string; className: string }
+  > = {
+    compile_error: { label: "Compile", className: "bg-[var(--destructive)]/10 text-[var(--destructive)]" },
+    runtime_error: { label: "Runtime", className: "bg-[var(--destructive)]/10 text-[var(--destructive)]" },
+    infra_error: { label: "Infra", className: "bg-amber-500/10 text-amber-700" },
+    internal_error: { label: "Error", className: "bg-[var(--secondary)]/10 text-[var(--secondary)]" },
+  };
 
   return (
     <div
@@ -529,7 +578,7 @@ function SubmissionCard({ submission, isLatest, maxPoints }: SubmissionCardProps
         )}
       </div>
 
-      <div className="text-xs text-[var(--muted-foreground)] mb-2">
+      <div className="text-xs text-[var(--muted-foreground)] mb-2">       
         <p className="truncate">{fileName}</p>
         <p>
           {submittedAt.toLocaleDateString("en-US", {
@@ -541,11 +590,32 @@ function SubmissionCard({ submission, isLatest, maxPoints }: SubmissionCardProps
         </p>
       </div>
 
-      {submission.status === "graded" && submission.score !== null && (
+      {submission.error_kind && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${kindLabel[submission.error_kind].className}`}>
+            {kindLabel[submission.error_kind].label}
+          </span>
+          {submission.feedback ? (
+            <span className="text-[11px] text-[var(--muted-foreground)] truncate">
+              {submission.feedback}
+            </span>
+          ) : null}
+        </div>
+      )}
+
+      {submission.late_penalty_percent !== undefined &&
+        submission.late_penalty_percent !== null &&
+        submission.late_penalty_percent > 0 && (
+          <div className="text-[11px] text-[var(--muted-foreground)] mb-2">
+            Late penalty: {submission.late_penalty_percent}% (late by {formatDuration(submission.late_seconds)}).
+          </div>
+        )}
+
+      {submission.status === "graded" && submission.score !== null && (   
         <div className="pt-2 border-t border-[var(--border)]">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-1">        
             <span className="text-xs text-[var(--muted-foreground)]">Score</span>
-            <span className="font-semibold text-[var(--foreground)]">
+            <span className="font-semibold text-[var(--foreground)]">     
               {submission.score} / {maxPoints}
             </span>
           </div>
