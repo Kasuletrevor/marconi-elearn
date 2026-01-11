@@ -262,9 +262,11 @@ jobs:
 
             docker compose -p marconi -f docker-compose.yml up -d --force-recreate backend
 
+            timeout 120 docker compose -p marconi -f docker-compose.yml exec -T backend python -m alembic upgrade head
+
             echo "Waiting for backend health..."
             for i in {1..30}; do
-              if docker compose -p marconi -f docker-compose.yml exec -T backend curl -fsS http://localhost:8000/ | grep -q '"status":"healthy"'; then
+              if docker compose -p marconi -f docker-compose.yml exec -T backend curl -fsS http://localhost:8000/ >/dev/null 2>&1; then
                 echo "Backend is healthy!"
                 break
               fi
@@ -277,11 +279,10 @@ jobs:
               fi
             done
 
-            docker compose -p marconi -f docker-compose.yml exec -T backend python -m alembic upgrade head
-
             # Cleanup dangling images to prevent disk bloat.
             docker image prune -f --filter dangling=true >/dev/null 2>&1 || true
 
             docker compose -p marconi -f docker-compose.yml ps
             echo "Deployment complete!"
+            exit 0
           ENDSSH

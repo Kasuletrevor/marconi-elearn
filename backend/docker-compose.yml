@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   jobe:
     image: trampgeek/jobeinabox:latest
@@ -8,7 +6,7 @@ services:
     networks:
       - marconi-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: ["CMD", "curl", "-f", "http://localhost/jobe/index.php/restapi"]
       interval: 10s
       timeout: 5s
       retries: 3
