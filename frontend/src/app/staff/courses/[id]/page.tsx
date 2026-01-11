@@ -244,6 +244,10 @@ export default function StaffCoursePage() {
             course={course}
             assignments={assignments}
             modules={modules}
+            onRefreshAssignments={async () => {
+              const data = await courseStaff.listAssignments(courseId);
+              setAssignments(data);
+            }}
           />
         )}
         {activeTab === "modules" && (
@@ -1114,13 +1118,62 @@ interface AssignmentsTabProps {
   course: Course;
   assignments: Assignment[];
   modules: Module[];
+  onRefreshAssignments: () => Promise<void>;
 }
 
-function AssignmentsTab({ course, assignments, modules }: AssignmentsTabProps) {
-  const getModuleName = (moduleId: number) => {
+function AssignmentsTab({
+  course,
+  assignments,
+  modules,
+  onRefreshAssignments,
+}: AssignmentsTabProps) {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newModuleId, setNewModuleId] = useState<number | null>(null);
+  const [newMaxPoints, setNewMaxPoints] = useState<number>(100);
+  const [newDueDateLocal, setNewDueDateLocal] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  useEffect(() => {
+    if (!showCreateModal) return;
+    setNewTitle("");
+    setNewDescription("");
+    setNewModuleId(modules[0]?.id ?? null);
+    setNewMaxPoints(100);
+    setNewDueDateLocal("");
+    setCreateError("");
+  }, [showCreateModal, modules]);
+
+  const getModuleName = (moduleId: number | null) => {
+    if (moduleId === null) return "Unassigned";
     const module = modules.find((m) => m.id === moduleId);
     return module?.title || "Unknown Module";
   };
+
+  async function createAssignment() {
+    const title = newTitle.trim();
+    if (!title) return;
+    setIsCreating(true);
+    setCreateError("");
+    try {
+      await courseStaff.createAssignment(course.id, {
+        title,
+        description: newDescription.trim() ? newDescription.trim() : null,
+        module_id: newModuleId,
+        due_date: newDueDateLocal ? new Date(newDueDateLocal).toISOString() : null,
+        max_points: newMaxPoints,
+      });
+      await onRefreshAssignments();
+      setShowCreateModal(false);
+    } catch (err) {
+      if (err instanceof ApiError) setCreateError(err.detail);
+      else setCreateError("Failed to create assignment");
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -1129,11 +1182,147 @@ function AssignmentsTab({ course, assignments, modules }: AssignmentsTabProps) {
         <p className="text-[var(--muted-foreground)]">
           {assignments.length} assignments
         </p>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary)]/90 transition-colors">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary)]/90 transition-colors"
+        >
           <Plus className="w-4 h-4" />
           <span>Create Assignment</span>
         </button>
       </div>
+
+      <AnimatePresence>
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+            onClick={() => setShowCreateModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-xl bg-[var(--background)] border border-[var(--border)] rounded-2xl shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">New assignment</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">{course.code}</p>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-2 rounded-xl hover:bg-[var(--card)] transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {createError && (
+                  <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 text-sm text-[var(--secondary)]">
+                    {createError}
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                      Title
+                    </label>
+                    <input
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="e.g. Assignment 1: Hello World"
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                      Description (optional)
+                    </label>
+                    <textarea
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                      rows={5}
+                      placeholder="Instructions..."
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-y"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                      Module
+                    </label>
+                    <select
+                      value={newModuleId ?? ""}
+                      onChange={(e) => setNewModuleId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    >
+                      <option value="">Unassigned</option>
+                      {modules
+                        .slice()
+                        .sort((a, b) => a.position - b.position)
+                        .map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.position}. {m.title}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                      Max points
+                    </label>
+                    <input
+                      type="number"
+                      value={newMaxPoints}
+                      min={0}
+                      onChange={(e) => setNewMaxPoints(Number(e.target.value))}
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                      Due date (optional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newDueDateLocal}
+                      onChange={(e) => setNewDueDateLocal(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-[var(--border)] flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createAssignment}
+                  disabled={isCreating || !newTitle.trim()}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Create
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Assignments List */}
       {assignments.length === 0 ? (
