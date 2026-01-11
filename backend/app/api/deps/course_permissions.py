@@ -27,6 +27,26 @@ async def require_course_staff(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Course staff role required")
 
 
+async def require_course_instructor(
+    course_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    result = await db.execute(
+        select(CourseMembership).where(
+            CourseMembership.course_id == course_id,
+            CourseMembership.user_id == current_user.id,
+            CourseMembership.role.in_([CourseRole.owner, CourseRole.co_lecturer]),
+        )
+    )
+    membership = result.scalars().first()
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Course instructor role required",
+        )
+
+
 async def require_course_student_or_staff(
     course_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -42,4 +62,3 @@ async def require_course_student_or_staff(
     if membership is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Course enrollment required")
     return membership.role
-
