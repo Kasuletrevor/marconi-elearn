@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,7 @@ from sqlalchemy import select, update
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.integrations.jobe import JobeClient
+from app.integrations.jobe import JobeClient, JobeError, JobeMisconfiguredError, JobeTransientError
 from app.models.assignment import Assignment
 from app.models.submission import Submission, SubmissionStatus
 from app.models.submission_test_result import SubmissionTestResult
@@ -21,7 +22,7 @@ def _jobe_client() -> JobeClient:
 
 
 @broker.task
-async def grade_submission(submission_id: int) -> dict[str, Any]:
+async def grade_submission(submission_id: int, attempt: int = 0) -> dict[str, Any]:
     # Idempotency: only one worker transitions pending -> grading.
     async with SessionLocal() as db:
         result = await db.execute(
@@ -35,7 +36,20 @@ async def grade_submission(submission_id: int) -> dict[str, Any]:
             return {"status": "skipped"}
         await db.commit()
 
-    jobe = _jobe_client()
+    max_attempts = 3
+    attempt = max(0, int(attempt))
+    try:
+        jobe = _jobe_client()
+    except JobeMisconfiguredError as exc:
+        async with SessionLocal() as db:
+            submission = await db.get(Submission, submission_id)
+            if submission is None:
+                return {"status": "missing"}
+            submission.status = SubmissionStatus.error
+            submission.score = 0
+            submission.feedback = str(exc)
+            await db.commit()
+        return {"status": "error", "reason": "misconfigured"}
 
     async with SessionLocal() as db:
         submission = await db.get(Submission, submission_id)
@@ -65,13 +79,43 @@ async def grade_submission(submission_id: int) -> dict[str, Any]:
         max_points = sum(tc.points for tc in tests)
 
         for tc in tests:
-            check = await run_test_case(
-                jobe,
-                submission_path=submission_path,
-                stdin=tc.stdin,
-                expected_stdout=tc.expected_stdout,
-                expected_stderr=tc.expected_stderr,
-            )
+            try:
+                check = await run_test_case(
+                    jobe,
+                    submission_path=submission_path,
+                    stdin=tc.stdin,
+                    expected_stdout=tc.expected_stdout,
+                    expected_stderr=tc.expected_stderr,
+                )
+            except JobeTransientError:
+                if attempt < max_attempts - 1:
+                    submission.status = SubmissionStatus.pending
+                    submission.feedback = (
+                        f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
+                    )
+                    await db.commit()
+                    await db.close()
+                    await asyncio.sleep(min(2**attempt, 10))
+                    await grade_submission.kiq(submission_id=submission_id, attempt=attempt + 1)
+                    return {"status": "retrying", "attempt": attempt + 1}
+
+                submission.status = SubmissionStatus.error
+                submission.score = 0
+                submission.feedback = "Grading infrastructure temporarily unavailable. Please retry."
+                await db.commit()
+                return {"status": "error", "reason": "jobe_transient"}
+            except JobeError:
+                submission.status = SubmissionStatus.error
+                submission.score = 0
+                submission.feedback = "Grading failed due to JOBE error"
+                await db.commit()
+                return {"status": "error", "reason": "jobe_error"}
+            except Exception:
+                submission.status = SubmissionStatus.error
+                submission.score = 0
+                submission.feedback = "Grading failed due to internal error"
+                await db.commit()
+                return {"status": "error", "reason": "internal_error"}
             results.append(
                 SubmissionTestResult(
                     submission_id=submission.id,
