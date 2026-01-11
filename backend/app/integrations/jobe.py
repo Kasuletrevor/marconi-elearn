@@ -14,6 +14,14 @@ class JobeMisconfiguredError(JobeError):
     pass
 
 
+class JobeTransientError(JobeError):
+    pass
+
+
+class JobeUpstreamError(JobeError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class JobeLanguage:
     id: str
@@ -37,10 +45,17 @@ class JobeClient:
         self._timeout = httpx.Timeout(timeout_seconds)
 
     async def list_languages(self) -> list[JobeLanguage]:
-        async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
-            resp = await client.get("/languages")
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+                resp = await client.get("/languages")
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.TimeoutException as exc:
+            raise JobeTransientError("JOBE request timed out") from exc
+        except httpx.TransportError as exc:
+            raise JobeTransientError("JOBE connection error") from exc
+        except httpx.HTTPStatusError as exc:
+            raise JobeUpstreamError("JOBE returned an error response") from exc
 
         if not isinstance(data, list):
             raise JobeError("Unexpected JOBE response for /languages")
@@ -67,10 +82,17 @@ class JobeClient:
             "run_spec": {"language_id": language_id, "sourcecode": source_code, "input": stdin},
         }
 
-        async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
-            resp = await client.post("/runs", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+                resp = await client.post("/runs", json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.TimeoutException as exc:
+            raise JobeTransientError("JOBE request timed out") from exc
+        except httpx.TransportError as exc:
+            raise JobeTransientError("JOBE connection error") from exc
+        except httpx.HTTPStatusError as exc:
+            raise JobeUpstreamError("JOBE returned an error response") from exc
 
         if not isinstance(data, dict):
             raise JobeError("Unexpected JOBE response for /runs")
@@ -91,4 +113,3 @@ class JobeClient:
             stdout=stdout,
             stderr=stderr,
         )
-
