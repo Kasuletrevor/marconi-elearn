@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Enum, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -15,7 +15,16 @@ class CourseRole(str, enum.Enum):
 
 class CourseMembership(Base):
     __tablename__ = "course_memberships"
-    __table_args__ = (UniqueConstraint("course_id", "user_id", name="uq_course_membership"),)
+    __table_args__ = (
+        UniqueConstraint("course_id", "user_id", name="uq_course_membership"),
+        Index(
+            "uq_course_student_number",
+            "course_id",
+            "student_number",
+            unique=True,
+            postgresql_where=text("student_number IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
