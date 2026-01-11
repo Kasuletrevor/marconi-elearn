@@ -66,6 +66,7 @@ export interface Assignment {
   due_date: string | null;
   max_points: number;
   module_id: number | null;
+  late_policy?: LatePolicy | null;
 }
 
 export interface Submission {
@@ -77,6 +78,7 @@ export interface Submission {
   score: number | null;
   feedback: string | null;
   status: "pending" | "grading" | "graded" | "error";
+  error_kind?: "compile_error" | "runtime_error" | "infra_error" | "internal_error" | null;
   effective_due_date?: string | null;
   late_seconds?: number | null;
   late_penalty_percent?: number | null;
@@ -356,6 +358,7 @@ export interface StudentSubmission {
   score: number | null;
   max_points: number;
   feedback: string | null;
+  error_kind?: "compile_error" | "runtime_error" | "infra_error" | "internal_error" | null;
   due_date?: string | null;
   effective_due_date?: string | null;
   late_seconds?: number | null;
