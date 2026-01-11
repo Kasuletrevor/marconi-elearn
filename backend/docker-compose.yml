@@ -37,6 +37,12 @@ services:
       - "${BACKEND_PORT:-32316}:8000"
     volumes:
       - uploads:/app/backend/var/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - marconi-network
       - nginx-proxy-manager_npm-network
