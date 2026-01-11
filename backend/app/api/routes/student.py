@@ -21,6 +21,13 @@ from app.crud.late_policy import (
     resolve_late_policy,
 )
 from app.crud.submissions import create_submission, list_submissions
+from app.crud.self_enroll import (
+    SelfEnrollAlreadyEnrolledError,
+    SelfEnrollFailedError,
+    SelfEnrollInvalidCodeError,
+    SelfEnrollStudentNumberTakenError,
+    enroll_student_via_self_enroll_code,
+)
 from app.crud.student_submissions import get_student_submission_row, list_student_submission_rows
 from app.crud.student_views import list_course_assignments, list_course_modules, list_my_courses
 from app.db.deps import get_db
@@ -31,8 +38,9 @@ from app.models.user import User
 from app.schemas.assignment import AssignmentOut
 from app.schemas.course import CourseOut
 from app.schemas.module import ModuleOut
+from app.schemas.self_enroll import CourseSelfEnrollRequest
 from app.schemas.student_submissions import StudentSubmissionItem
-from app.schemas.submission import SubmissionOut, SubmissionStudentOut
+from app.schemas.submission import SubmissionOut, SubmissionStudentOut      
 from app.worker.enqueue import enqueue_grading
 
 router = APIRouter(prefix="/student", dependencies=[Depends(get_current_user)])
@@ -97,6 +105,31 @@ async def my_courses(
     limit: int = 100,
 ) -> Any:
     return await list_my_courses(db, user_id=current_user.id, offset=offset, limit=limit)
+
+
+@router.post("/courses/join", response_model=CourseOut, status_code=status.HTTP_201_CREATED)
+async def join_course_by_code(
+    payload: CourseSelfEnrollRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> CourseOut:
+    try:
+        return await enroll_student_via_self_enroll_code(
+            db,
+            user=current_user,
+            code=payload.code,
+            full_name=payload.full_name,
+            student_number=payload.student_number,
+            programme=payload.programme,
+        )
+    except SelfEnrollInvalidCodeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid self-enroll code") from exc
+    except SelfEnrollAlreadyEnrolledError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already enrolled in course") from exc
+    except SelfEnrollStudentNumberTakenError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student number already used in this course") from exc
+    except SelfEnrollFailedError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not enroll in course") from exc
 
 
 @router.get("/courses/{course_id}", response_model=CourseOut)
