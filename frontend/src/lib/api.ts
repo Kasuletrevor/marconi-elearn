@@ -479,6 +479,21 @@ export const student = {
     return handleResponse<Course[]>(res);
   },
 
+  async joinCourseByCode(data: {
+    code: string;
+    full_name: string;
+    student_number: string;
+    programme: string;
+  }): Promise<Course> {
+    const res = await fetch(`${API_BASE}/api/v1/student/courses/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Course>(res);
+  },
+
   async getCourse(courseId: number): Promise<Course> {
     const res = await fetch(`${API_BASE}/api/v1/student/courses/${courseId}`, {
       credentials: "include",
