@@ -66,6 +66,10 @@ async def test_staff_memberships_enroll_and_remove_permissions(client):
     student_membership_id = r.json()["id"]
 
     # TA cannot enroll staff
+    r = await client.post(
+        f"/api/v1/staff/courses/{course_id}/memberships",
+        json={"user_id": another_id, "role": "ta"},
+    )
     assert r.status_code == 403
 
     # TA can remove students
