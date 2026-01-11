@@ -8,12 +8,16 @@ import { student, ApiError } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 
+const PROGRAMMES = ["BELE", "BSCE", "BBIO", "BSTE"] as const;
+
 export default function JoinCoursePage() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [fullName, setFullName] = useState("");
   const [studentNumber, setStudentNumber] = useState("");
-  const [programme, setProgramme] = useState("");
+  const [programme, setProgramme] = useState<(typeof PROGRAMMES)[number] | "">(
+    ""
+  );
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,7 +29,7 @@ export default function JoinCoursePage() {
         code: code.trim(),
         full_name: fullName.trim(),
         student_number: studentNumber.trim(),
-        programme: programme.trim(),
+        programme,
       });
       router.push(`/dashboard/courses/${course.id}`);
     } catch (err) {
@@ -92,7 +96,7 @@ export default function JoinCoursePage() {
             <input
               value={studentNumber}
               onChange={(e) => setStudentNumber(e.target.value)}
-              placeholder="e.g. 2023-01234"
+              placeholder="e.g. 2100714449"
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
@@ -114,12 +118,18 @@ export default function JoinCoursePage() {
             <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
               Programme
             </label>
-            <input
+            <select
               value={programme}
-              onChange={(e) => setProgramme(e.target.value)}
-              placeholder="e.g. BSc Computer Science"
+              onChange={(e) => setProgramme(e.target.value as any)}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-            />
+            >
+              <option value="">Select programme...</option>
+              {PROGRAMMES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -131,7 +141,7 @@ export default function JoinCoursePage() {
               !code.trim() ||
               !fullName.trim() ||
               !studentNumber.trim() ||
-              !programme.trim()
+              !programme
             }
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
@@ -143,4 +153,3 @@ export default function JoinCoursePage() {
     </div>
   );
 }
-
