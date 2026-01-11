@@ -1203,6 +1203,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [isLoadingOrg, setIsLoadingOrg] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<string>("");
+  const [showStaffSection, setShowStaffSection] = useState(false);
 
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
@@ -1360,12 +1361,34 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Add Staff */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+    <div className="flex flex-col gap-8">
+      <div className="order-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowStaffSection((v) => !v)}
+          className="w-full p-4 bg-[var(--background)] flex items-center justify-between"
+        >
+          <h3 className="font-medium text-[var(--foreground)]">
+            Staff ({staffMembers.length})
+          </h3>
+          <span className="inline-flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+            {showStaffSection ? "Hide" : "Show"}
+            {showStaffSection ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </span>
+        </button>
+      </div>
+
+      {showStaffSection && (
+        <>
+          {/* Add Staff */}
+          <div className="order-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
         <h3 className="font-medium text-[var(--foreground)] mb-1">Add staff</h3>
         <p className="text-xs text-[var(--muted-foreground)] mb-4">
-          Staff are selected from organization members. Students are enrolled via invites (below).
+          Staff are selected from organization members. Students are enrolled via invites (above).
         </p>
         {error && (
           <div className="mb-4 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
@@ -1429,7 +1452,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       </div>
 
       {/* Staff List */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="order-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <div className="p-4 bg-[var(--background)] border-b border-[var(--border)] flex justify-between items-center">
           <h3 className="font-medium text-[var(--foreground)]">
             Staff ({staffMembers.length})
@@ -1481,8 +1504,11 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
         </div>
       </div>
 
+        </>
+      )}
+
       {/* Enroll Students */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+      <div className="order-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="font-medium text-[var(--foreground)] mb-1">Enroll students</h3>
@@ -1582,7 +1608,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       </div>
 
       {/* Student List */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+      <div className="order-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <div className="p-4 bg-[var(--background)] border-b border-[var(--border)]">
           <h3 className="font-medium text-[var(--foreground)]">
             Students ({students.length})
