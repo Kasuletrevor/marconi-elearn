@@ -36,6 +36,9 @@ async def enroll_student_via_self_enroll_code(
     programme: str,
 ) -> Course:
     normalized_code = code.strip().upper()
+    normalized_student_number = student_number.strip()
+    normalized_full_name = full_name.strip()
+    normalized_programme = programme.strip()
     result = await db.execute(
         select(Course).where(
             Course.self_enroll_enabled.is_(True),
@@ -45,10 +48,11 @@ async def enroll_student_via_self_enroll_code(
     course = result.scalars().first()
     if course is None:
         raise SelfEnrollInvalidCodeError
+    course_id = int(course.id)
 
     existing = await db.execute(
         select(CourseMembership).where(
-            CourseMembership.course_id == course.id,
+            CourseMembership.course_id == course_id,
             CourseMembership.user_id == user.id,
         )
     )
@@ -59,20 +63,20 @@ async def enroll_student_via_self_enroll_code(
     if profile is None:
         profile = StudentProfile(
             user_id=user.id,
-            full_name=full_name.strip(),
-            programme=programme.strip(),
+            full_name=normalized_full_name,
+            programme=normalized_programme,
         )
         db.add(profile)
     else:
-        profile.full_name = full_name.strip()
-        profile.programme = programme.strip()
+        profile.full_name = normalized_full_name
+        profile.programme = normalized_programme
 
     db.add(
         CourseMembership(
-            course_id=course.id,
+            course_id=course_id,
             user_id=user.id,
             role=CourseRole.student,
-            student_number=student_number.strip(),
+            student_number=normalized_student_number,
         )
     )
 
@@ -83,7 +87,7 @@ async def enroll_student_via_self_enroll_code(
 
         existing = await db.execute(
             select(CourseMembership).where(
-                CourseMembership.course_id == course.id,
+                CourseMembership.course_id == course_id,
                 CourseMembership.user_id == user.id,
             )
         )
@@ -92,8 +96,8 @@ async def enroll_student_via_self_enroll_code(
 
         number_taken = await db.execute(
             select(CourseMembership.id).where(
-                CourseMembership.course_id == course.id,
-                CourseMembership.student_number == student_number.strip(),
+                CourseMembership.course_id == course_id,
+                CourseMembership.student_number == normalized_student_number,
             )
         )
         if number_taken.scalar_one_or_none() is not None:
@@ -103,4 +107,3 @@ async def enroll_student_via_self_enroll_code(
 
     await db.refresh(course)
     return course
-
