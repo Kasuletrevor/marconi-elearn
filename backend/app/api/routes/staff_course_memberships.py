@@ -55,8 +55,16 @@ async def enroll_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> CourseMembershipOut:
-    await require_course_staff(course_id, current_user, db)
+    if payload.role == CourseRole.student:
+        await require_course_staff(course_id, current_user, db)
+    else:
+        await require_course_instructor(course_id, current_user, db)
     await _require_course(db, course_id=course_id)
+    if payload.role == CourseRole.owner:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot enroll a user as owner; transfer ownership via role update",
+        )
     try:
         return await add_course_membership(db, course_id=course_id, user_id=payload.user_id, role=payload.role)
     except CourseMembershipExistsError as exc:
@@ -72,9 +80,16 @@ async def remove_from_course(
 ) -> None:
     await require_course_staff(course_id, current_user, db)
     await _require_course(db, course_id=course_id)
-    membership = await get_course_membership(db, membership_id=membership_id)   
+    membership = await get_course_membership(db, membership_id=membership_id)
     if membership is None or membership.course_id != course_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
+    if membership.role != CourseRole.student:
+        await require_course_instructor(course_id, current_user, db)
+    if membership.role == CourseRole.owner:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot remove the course owner; transfer ownership first",
+        )
     await delete_course_membership(db, membership=membership)
     return None
 
