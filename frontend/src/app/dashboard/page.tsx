@@ -12,6 +12,7 @@ import {
   Clock,
   FileText,
   AlertCircle,
+  Users,
 } from "lucide-react";
 import { student, type Course, type Assignment, ApiError } from "@/lib/api";
 
@@ -97,14 +98,23 @@ export default function DashboardPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-8 flex items-start justify-between gap-4"
       >
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)] mb-2">
-          Dashboard
-        </h1>
-        <p className="text-[var(--muted-foreground)]">
-          Welcome back! Here&apos;s what&apos;s happening with your courses.
-        </p>
+        <div>
+          <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)] mb-2">
+            Dashboard
+          </h1>
+          <p className="text-[var(--muted-foreground)]">
+            Welcome back! Here&apos;s what&apos;s happening with your courses.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/join"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors text-sm"
+        >
+          <Users className="w-4 h-4" />
+          Join course
+        </Link>
       </motion.div>
 
       {/* Loading State */}
