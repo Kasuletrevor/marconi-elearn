@@ -23,7 +23,9 @@ from app.crud.submissions import create_submission, list_submissions
 from app.crud.student_submissions import get_student_submission_row, list_student_submission_rows
 from app.crud.student_views import list_course_assignments, list_course_modules, list_my_courses
 from app.db.deps import get_db
+from app.integrations.jobe import JOBE_OUTCOME_OK
 from app.models.course import Course
+from app.models.submission_test_result import SubmissionTestResult
 from app.models.user import User
 from app.schemas.assignment import AssignmentOut
 from app.schemas.course import CourseOut
@@ -42,6 +44,48 @@ def _uploads_root() -> Path:
     root = Path(__file__).resolve().parents[3] / "var" / "uploads"
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+async def _error_kind_by_submission_id(
+    db: AsyncSession, *, submission_ids: list[int]
+) -> dict[int, str]:
+    if not submission_ids:
+        return {}
+
+    compile_error: set[int] = set()
+    runtime_error: set[int] = set()
+    result = await db.execute(
+        select(
+            SubmissionTestResult.submission_id,
+            SubmissionTestResult.outcome,
+            SubmissionTestResult.compile_output,
+        ).where(SubmissionTestResult.submission_id.in_(submission_ids))
+    )
+    for submission_id, outcome, compile_output in result.all():
+        if isinstance(compile_output, str) and compile_output.strip():
+            compile_error.add(int(submission_id))
+        if isinstance(outcome, int) and outcome != JOBE_OUTCOME_OK:
+            runtime_error.add(int(submission_id))
+
+    out: dict[int, str] = {}
+    for submission_id in submission_ids:
+        if submission_id in compile_error:
+            out[submission_id] = "compile_error"
+        elif submission_id in runtime_error:
+            out[submission_id] = "runtime_error"
+    return out
+
+
+def _is_infra_feedback(feedback: str | None) -> bool:
+    if not feedback:
+        return False
+    text = feedback.lower()
+    return (
+        "grading infrastructure" in text
+        or "jobe request timed out" in text
+        or "jobe connection error" in text
+        or "jobe base url is not configured" in text
+    )
 
 
 @router.get("/courses", response_model=list[CourseOut])
@@ -128,6 +172,10 @@ async def my_assignment_submissions(
         limit=limit,
     )
 
+    error_kind_by_id = await _error_kind_by_submission_id(
+        db, submission_ids=[s.id for s in submissions]
+    )
+
     out: list[SubmissionStudentOut] = []
     for submission in submissions:
         late_seconds, late_penalty_percent = compute_late_penalty_percent(
@@ -135,6 +183,15 @@ async def my_assignment_submissions(
             effective_due_date=effective_due_date,
             policy=policy,
         )
+        error_kind: str | None = None
+        if submission.status.value == "error":
+            error_kind = (
+                "infra_error"
+                if _is_infra_feedback(submission.feedback)
+                else error_kind_by_id.get(submission.id) or "internal_error"
+            )
+        else:
+            error_kind = error_kind_by_id.get(submission.id)
         out.append(
             SubmissionStudentOut(
                 id=submission.id,
@@ -149,6 +206,7 @@ async def my_assignment_submissions(
                 status=submission.status,
                 score=submission.score,
                 feedback=submission.feedback,
+                error_kind=error_kind,
                 effective_due_date=effective_due_date,
                 late_seconds=late_seconds,
                 late_penalty_percent=late_penalty_percent,
@@ -229,6 +287,10 @@ async def my_submissions(
         e.assignment_id: e.extended_due_date for e in extensions
     }
 
+    error_kind_by_id = await _error_kind_by_submission_id(
+        db, submission_ids=[r.submission.id for r in rows]
+    )
+
     out: list[StudentSubmissionItem] = []
     for row in rows:
         effective_due_date = compute_effective_due_date(
@@ -244,6 +306,15 @@ async def my_submissions(
             effective_due_date=effective_due_date,
             policy=policy,
         )
+        error_kind: str | None = None
+        if row.submission.status.value == "error":
+            error_kind = (
+                "infra_error"
+                if _is_infra_feedback(row.submission.feedback)
+                else error_kind_by_id.get(row.submission.id) or "internal_error"
+            )
+        else:
+            error_kind = error_kind_by_id.get(row.submission.id)
         out.append(
             StudentSubmissionItem(
                 id=row.submission.id,
@@ -258,6 +329,7 @@ async def my_submissions(
                 status=row.submission.status,
                 score=row.submission.score,
                 feedback=row.submission.feedback,
+                error_kind=error_kind,
                 due_date=row.assignment.due_date,
                 effective_due_date=effective_due_date,
                 late_seconds=late_seconds,
