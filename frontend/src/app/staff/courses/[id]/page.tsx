@@ -285,6 +285,7 @@ export default function StaffCoursePage() {
           <CourseSettingsModal
             course={course}
             onClose={() => setShowSettingsModal(false)}
+            onUpdated={(updated) => setCourse(updated)}
             onSaved={(updated) => {
               setCourse(updated);
               setShowSettingsModal(false);
@@ -310,17 +311,26 @@ function normalizeLatePolicy(policy: Course["late_policy"]): LatePolicy {
 function CourseSettingsModal({
   course,
   onClose,
+  onUpdated,
   onSaved,
 }: {
   course: Course;
   onClose: () => void;
+  onUpdated: (course: Course) => void;
   onSaved: (course: Course) => void;
 }) {
   const [code, setCode] = useState(course.code);
   const [title, setTitle] = useState(course.title);
-  const [description, setDescription] = useState(course.description ?? "");
+  const [description, setDescription] = useState(course.description ?? "");     
   const [semester, setSemester] = useState(course.semester ?? "");
   const [year, setYear] = useState(course.year?.toString() ?? "");
+  const [selfEnrollEnabled, setSelfEnrollEnabled] = useState(
+    course.self_enroll_enabled ?? false
+  );
+  const [selfEnrollCode, setSelfEnrollCode] = useState<string | null>(
+    course.self_enroll_code ?? null
+  );
+  const [isRegeneratingEnrollCode, setIsRegeneratingEnrollCode] = useState(false);
 
   const initialLate = normalizeLatePolicy(course.late_policy);
   const [latePolicyEnabled, setLatePolicyEnabled] = useState(
@@ -332,6 +342,31 @@ function CourseSettingsModal({
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  async function regenerateEnrollCode() {
+    if (!selfEnrollEnabled) {
+      setSaveError("Enable self-enroll before regenerating the code.");
+      return;
+    }
+    if (!confirm("Regenerate the self-enroll code? Old codes will stop working.")) {
+      return;
+    }
+
+    setIsRegeneratingEnrollCode(true);
+    setSaveError("");
+    try {
+      const updated = await courseStaff.updateCourse(course.id, {
+        regenerate_self_enroll_code: true,
+      });
+      onUpdated(updated);
+      setSelfEnrollCode(updated.self_enroll_code ?? null);
+    } catch (err) {
+      if (err instanceof ApiError) setSaveError(err.detail);
+      else setSaveError("Failed to regenerate self-enroll code");
+    } finally {
+      setIsRegeneratingEnrollCode(false);
+    }
+  }
 
   async function save() {
     setIsSaving(true);
@@ -353,6 +388,7 @@ function CourseSettingsModal({
             max_percent: Number(maxPercent) || 0,
           }
         : null,
+      self_enroll_enabled: selfEnrollEnabled,
     };
 
     try {
@@ -457,6 +493,69 @@ function CourseSettingsModal({
               rows={3}
               className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
+          </div>
+
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-[var(--foreground)]">Enrollment</p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Optional self-enroll code for students. Students still provide profile details via invites/CSV.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelfEnrollEnabled((v) => !v)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                  selfEnrollEnabled
+                    ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                    : "bg-[var(--background)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--background)]/60"
+                }`}
+                type="button"
+              >
+                {selfEnrollEnabled ? "Enabled" : "Disabled"}
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-12 gap-3 items-end">
+              <div className="md:col-span-8">
+                <label className="block text-[11px] font-medium text-[var(--muted-foreground)] mb-2">
+                  Self-enroll code
+                </label>
+                <input
+                  value={selfEnrollCode ?? ""}
+                  readOnly
+                  placeholder={selfEnrollEnabled ? "Save to generate code" : "Disabled"}
+                  className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none"
+                />
+              </div>
+              <div className="md:col-span-4 flex gap-2">
+                <button
+                  type="button"
+                  disabled={!selfEnrollEnabled || !selfEnrollCode}
+                  onClick={async () => {
+                    if (!selfEnrollCode) return;
+                    await navigator.clipboard.writeText(selfEnrollCode);
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={regenerateEnrollCode}
+                  disabled={!selfEnrollEnabled || isRegeneratingEnrollCode}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  {isRegeneratingEnrollCode ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  Regenerate
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-4">
