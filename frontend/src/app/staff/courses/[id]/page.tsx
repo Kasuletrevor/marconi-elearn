@@ -57,7 +57,6 @@ import {
   type CourseMembershipUpdate,
   type CourseUpdate,
   type LatePolicy,
-  staff,
   ApiError,
 } from "@/lib/api";
 import { useAuthStore, getCourseRole } from "@/lib/store";
@@ -1100,10 +1099,17 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [orgMembers, setOrgMembers] = useState<OrgMembership[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [newRole, setNewRole] = useState<"owner" | "co_lecturer" | "ta" | "student">("student");
-  const [isAdding, setIsAdding] = useState(false);
+  const [newRole, setNewRole] = useState<"owner" | "co_lecturer" | "ta">("ta");
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isLoadingOrg, setIsLoadingOrg] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState<string>("");
+
+  const [studentEmail, setStudentEmail] = useState("");
+  const [studentName, setStudentName] = useState("");
+  const [studentNumber, setStudentNumber] = useState("");
+  const [studentProgramme, setStudentProgramme] = useState("");
 
   useEffect(() => {
     async function loadOrgMembers() {
@@ -1118,7 +1124,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       }
     }
     loadOrgMembers();
-  }, [course.organization_id]);
+  }, [course.id]);
 
   const students = memberships.filter((m) => m.role === "student");
   const staffMembers = memberships.filter((m) => m.role !== "student");
@@ -1134,21 +1140,23 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     return filtered.sort((a, b) => (a.user_email ?? "").localeCompare(b.user_email ?? ""));
   }, [orgMembers, memberships, memberSearch]);
 
-  async function addMember() {
+  async function addStaffMember() {
     if (selectedUserId === null) return;
-    setIsAdding(true);
+    setIsAddingStaff(true);
     setError("");
+    setSuccess("");
     try {
       const payload: CourseMembershipCreate = { user_id: selectedUserId, role: newRole };
       await courseStaff.enrollUser(course.id, payload);
       await onRefresh();
       setSelectedUserId(null);
       setMemberSearch("");
+      setSuccess("Staff member added.");
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
-      else setError("Failed to add member");
+      else setError("Failed to add staff member");
     } finally {
-      setIsAdding(false);
+      setIsAddingStaff(false);
     }
   }
 
@@ -1156,7 +1164,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     setError("");
     try {
       const payload: CourseMembershipUpdate = { role };
-      await staff.updateMembership(course.organization_id, course.id, membershipId, payload);
+      await courseStaff.updateMembership(course.id, membershipId, payload);
       await onRefresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
@@ -1168,7 +1176,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     if (!confirm("Remove this member from the course?")) return;
     setError("");
     try {
-      await courseStaff.removeMembership(course.id, membershipId);
+      await courseStaff.removeMembership(course.id, membershipId);        
       await onRefresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
@@ -1178,27 +1186,67 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  async function addStudentByEmail() {
+    const email = studentEmail.trim();
+    const full_name = studentName.trim();
+    const student_number = studentNumber.trim();
+    const programme = studentProgramme.trim();
+    if (!email || !full_name || !student_number || !programme) return;
+
+    setIsAddingStudent(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await courseStaff.inviteStudentByEmail(course.id, {
+        email,
+        full_name,
+        student_number,
+        programme,
+      });
+
+      await onRefresh();
+
+      if (res.auto_enrolled > 0) {
+        setSuccess("Student enrolled (existing account).");
+      } else if (res.created_invites > 0) {
+        setSuccess("Invite created. Student will enroll after accepting the invite.");
+      } else {
+        setSuccess("No invite created.");
+      }
+
+      setStudentEmail("");
+      setStudentName("");
+      setStudentNumber("");
+      setStudentProgramme("");
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to invite student");
+    } finally {
+      setIsAddingStudent(false);
+    }
+  }
+
   async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsAdding(true);
+    setIsAddingStudent(true);
     setError("");
+    setSuccess("");
     try {
-      const res = await courseStaff.importRosterCsv(course.id, file);
+      const res = await courseStaff.importRosterCsv(course.id, file);     
       const msg = `Imported: ${res.created_invites} invites created, ${res.auto_enrolled} auto-enrolled.`;
       if (res.issues.length > 0) {
         setError(`${msg} Some rows had issues.`);
       } else {
-        // Use a simple alert for now, or just clear error
-        // alert(msg); 
+        setSuccess(msg);
       }
       await onRefresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to import CSV");
     } finally {
-      setIsAdding(false);
+      setIsAddingStudent(false);
       // Reset input
       e.target.value = "";
     }
@@ -1213,18 +1261,26 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
 
   return (
     <div className="space-y-8">
-      {/* Add Member Section */}
+      {/* Add Staff */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
-        <h3 className="font-medium text-[var(--foreground)] mb-4">Add Member</h3>
+        <h3 className="font-medium text-[var(--foreground)] mb-1">Add staff</h3>
+        <p className="text-xs text-[var(--muted-foreground)] mb-4">
+          Staff are selected from organization members. Students are enrolled via invites (below).
+        </p>
         {error && (
           <div className="mb-4 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
             {error}
           </div>
         )}
+        {success && (
+          <div className="mb-4 p-3 bg-[var(--success)]/10 border border-[var(--success)]/20 rounded-xl text-sm text-[var(--success)]">
+            {success}
+          </div>
+        )}
         <div className="grid md:grid-cols-12 gap-3 items-end">
           <div className="md:col-span-5">
             <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Select User
+              Select staff member
             </label>
             <select
               value={selectedUserId ?? ""}
@@ -1248,14 +1304,13 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
           </div>
           <div className="md:col-span-3">
             <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Role
+              Staff role
             </label>
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as any)}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             >
-              <option value="student">Student</option>
               <option value="ta">TA</option>
               <option value="co_lecturer">Co-Lecturer</option>
               <option value="owner">Owner</option>
@@ -1263,29 +1318,12 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
           </div>
           <div className="md:col-span-2">
             <button
-              onClick={addMember}
-              disabled={isAdding || selectedUserId === null}
+              onClick={addStaffMember}
+              disabled={isAddingStaff || selectedUserId === null}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
-              {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Add
-            </button>
-          </div>
-          <div className="md:col-span-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".csv"
-              onChange={handleCsvUpload}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isAdding}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] hover:bg-[var(--card)] transition-colors disabled:opacity-60"
-            >
-              <Upload className="w-4 h-4" />
-              CSV
+              {isAddingStaff ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Add staff
             </button>
           </div>
         </div>
@@ -1341,6 +1379,101 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
               </div>
             ))
           )}
+        </div>
+      </div>
+
+      {/* Enroll Students */}
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-medium text-[var(--foreground)] mb-1">Enroll students</h3>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Students are enrolled via invites. Use roster import (CSV) or invite a student by email with their profile details.
+            </p>
+          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept=".csv"
+            onChange={handleCsvUpload}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isAddingStudent}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] disabled:opacity-60 transition-colors text-sm"
+          >
+            {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
+          </button>
+        </div>
+
+        <div className="grid md:grid-cols-12 gap-3 items-end">
+          <div className="md:col-span-4">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Email
+            </label>
+            <input
+              value={studentEmail}
+              onChange={(e) => setStudentEmail(e.target.value)}
+              placeholder="student@example.com"
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+            />
+          </div>
+          <div className="md:col-span-4">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Full name
+            </label>
+            <input
+              value={studentName}
+              onChange={(e) => setStudentName(e.target.value)}
+              placeholder="Jane Doe"
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Student #
+            </label>
+            <input
+              value={studentNumber}
+              onChange={(e) => setStudentNumber(e.target.value)}
+              placeholder="2024-001"
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Programme
+            </label>
+            <input
+              value={studentProgramme}
+              onChange={(e) => setStudentProgramme(e.target.value)}
+              placeholder="BSc CS"
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+            />
+          </div>
+          <div className="md:col-span-12">
+            <button
+              type="button"
+              onClick={addStudentByEmail}
+              disabled={
+                isAddingStudent ||
+                !studentEmail.trim() ||
+                !studentName.trim() ||
+                !studentNumber.trim() ||
+                !studentProgramme.trim()
+              }
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Enroll / invite student
+            </button>
+            <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+              Existing accounts auto-enroll immediately. New students get an invite link (valid 7 days) via the invite flow.
+            </p>
+          </div>
         </div>
       </div>
 
