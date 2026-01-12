@@ -11,6 +11,7 @@ from app.db.base import Base
 
 class NotificationKind(str, enum.Enum):
     submission_graded = "submission_graded"
+    submissions_received = "submissions_received"
 
 
 class Notification(Base):
@@ -24,4 +25,3 @@ class Notification(Base):
     link_url: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-

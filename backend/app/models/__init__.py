@@ -8,6 +8,7 @@ from app.models.assignment_extension import AssignmentExtension
 from app.models.audit_event import AuditEvent
 from app.models.module import Module
 from app.models.module_resource import ModuleResource
+from app.models.course_notification_preference import CourseNotificationPreference
 from app.models.notification import Notification
 from app.models.submission import Submission
 from app.models.submission_test_result import SubmissionTestResult
@@ -22,6 +23,7 @@ __all__ = [
     "AuditEvent",
     "Course",
     "CourseMembership",
+    "CourseNotificationPreference",
     "InviteToken",
     "Module",
     "ModuleResource",

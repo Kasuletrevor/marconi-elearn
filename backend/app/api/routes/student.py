@@ -20,6 +20,7 @@ from app.crud.late_policy import (
     compute_late_penalty_percent,
     resolve_late_policy,
 )
+from app.crud.notifications import notify_staff_new_submission_digest
 from app.crud.submissions import create_submission, list_submissions
 from app.crud.self_enroll import (
     SelfEnrollAlreadyEnrolledError,
@@ -290,6 +291,19 @@ async def submit_assignment(
         size_bytes=len(data),
         storage_path=str(dest),
     )
+    try:
+        course = await db.get(Course, course_id)
+        await notify_staff_new_submission_digest(
+            db,
+            course_id=course_id,
+            course_code=course.code if course is not None else str(course_id),
+            assignment_title=assignment.title,
+            student_email=current_user.email,
+            submitter_user_id=current_user.id,
+        )
+    except Exception:
+        # Best-effort only: never block submission creation on notifications.
+        pass
     # Fire-and-forget: enqueue background grading if Redis is configured.
     try:
         await enqueue_grading(submission_id=submission.id)

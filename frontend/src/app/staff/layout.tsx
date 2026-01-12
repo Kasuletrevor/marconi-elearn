@@ -19,6 +19,7 @@ import {
   ChevronDown,
   User,
 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import { auth, ApiError, type User as UserType, type Course, courseStaff } from "@/lib/api";
 import { useAuthStore, getRedirectPath, isStaff } from "@/lib/store";
 
@@ -26,12 +27,13 @@ interface StaffLayoutProps {
   children: React.ReactNode;
 }
 
-export default function StaffLayout({ children }: StaffLayoutProps) {
+export default function StaffLayout({ children }: StaffLayoutProps) {     
   const router = useRouter();
   const pathname = usePathname();
   const { user, setUser, logout: logoutStore, isLoading } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   // Check auth and role on mount
   useEffect(() => {
@@ -49,6 +51,8 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
           logoutStore();
           router.push("/login");
         }
+      } finally {
+        setHasCheckedAuth(true);
       }
     }
 
@@ -84,6 +88,8 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
     return null; // Will redirect in useEffect
   }
 
+  const notificationsEnabled = Boolean(user) && hasCheckedAuth;
+
   return (
     <div className="min-h-screen bg-[var(--background)]">
       {/* Mobile Header */}
@@ -97,12 +103,15 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
               Staff
             </span>
           </Link>
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 text-[var(--foreground)] hover:bg-[var(--card)] rounded-lg"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <NotificationBell enabled={notificationsEnabled} />
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 text-[var(--foreground)] hover:bg-[var(--card)] rounded-lg"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -127,6 +136,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
               <SidebarContent
                 pathname={pathname}
                 user={user}
+                notificationsEnabled={notificationsEnabled}
                 onLogout={handleLogout}
                 isLoggingOut={isLoggingOut}
                 onClose={() => setSidebarOpen(false)}
@@ -141,6 +151,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
         <SidebarContent
           pathname={pathname}
           user={user}
+          notificationsEnabled={notificationsEnabled}
           onLogout={handleLogout}
           isLoggingOut={isLoggingOut}
         />
@@ -157,6 +168,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
 interface SidebarContentProps {
   pathname: string;
   user: UserType | null;
+  notificationsEnabled: boolean;
   onLogout: () => void;
   isLoggingOut: boolean;
   onClose?: () => void;
@@ -165,6 +177,7 @@ interface SidebarContentProps {
 function SidebarContent({
   pathname,
   user,
+  notificationsEnabled,
   onLogout,
   isLoggingOut,
   onClose,
@@ -216,6 +229,9 @@ function SidebarContent({
             </span>
           </div>
         </Link>
+        <div className="hidden lg:block">
+          <NotificationBell enabled={notificationsEnabled} align="left" />
+        </div>
         {onClose && (
           <button
             onClick={onClose}

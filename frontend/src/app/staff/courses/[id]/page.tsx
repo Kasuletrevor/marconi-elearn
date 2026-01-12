@@ -1206,6 +1206,9 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [success, setSuccess] = useState<string>("");
   const [showStaffSection, setShowStaffSection] = useState(false);
   const [inviteLinks, setInviteLinks] = useState<string[]>([]);
+  const [notifyNewSubmissions, setNotifyNewSubmissions] = useState(true);
+  const [isSavingNotifyNewSubmissions, setIsSavingNotifyNewSubmissions] = useState(false);
+  const [notifyPrefError, setNotifyPrefError] = useState("");
 
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
@@ -1227,6 +1230,23 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       }
     }
     loadOrgMembers();
+  }, [course.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNotificationPrefs() {
+      try {
+        const prefs = await courseStaff.getNotificationPreferences(course.id);
+        if (cancelled) return;
+        setNotifyNewSubmissions(Boolean(prefs.notify_new_submissions));
+      } catch {
+        // Default to enabled if prefs aren't available.
+      }
+    }
+    loadNotificationPrefs();
+    return () => {
+      cancelled = true;
+    };
   }, [course.id]);
 
   const students = memberships.filter((m) => m.role === "student");
@@ -1252,6 +1272,23 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       return `${origin}/${link}`;
     });
   }, [inviteLinks]);
+
+  async function toggleNotifyNewSubmissions() {
+    const next = !notifyNewSubmissions;
+    setIsSavingNotifyNewSubmissions(true);
+    setNotifyPrefError("");
+    try {
+      const updated = await courseStaff.setNotificationPreferences(course.id, {
+        notify_new_submissions: next,
+      });
+      setNotifyNewSubmissions(Boolean(updated.notify_new_submissions));
+    } catch (err) {
+      if (err instanceof ApiError) setNotifyPrefError(err.detail);
+      else setNotifyPrefError("Failed to update notification preferences");
+    } finally {
+      setIsSavingNotifyNewSubmissions(false);
+    }
+  }
 
   async function addStaffMember() {
     if (selectedUserId === null) return;
@@ -1406,6 +1443,34 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Notifications */}
+      <div className="order-0 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-medium text-[var(--foreground)] mb-1">Notifications</h3>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              New submissions are grouped into a digest (10-minute window).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleNotifyNewSubmissions}
+            disabled={isSavingNotifyNewSubmissions}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifyNewSubmissions ? "bg-[var(--primary)]" : "bg-[var(--border)]"} disabled:opacity-60`}
+            aria-label="Toggle new submission notifications"
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifyNewSubmissions ? "translate-x-6" : "translate-x-1"}`}
+            />
+          </button>
+        </div>
+        {notifyPrefError && (
+          <div className="mt-3 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
+            {notifyPrefError}
+          </div>
+        )}
+      </div>
+
       <div className="order-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
         <button
           type="button"

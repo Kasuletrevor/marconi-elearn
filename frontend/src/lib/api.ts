@@ -248,6 +248,11 @@ export interface CourseStudentInviteByEmail {
   programme: string;
 }
 
+export interface CourseNotificationPreferences {
+  course_id: number;
+  notify_new_submissions: boolean;
+}
+
 export interface StaffSubmissionQueueItem {
   id: number;
   course_id: number;
@@ -995,6 +1000,30 @@ export const courseStaff = {
       body: JSON.stringify(data),
     });
     return handleResponse<Course>(res);
+  },
+
+  async getNotificationPreferences(courseId: number): Promise<CourseNotificationPreferences> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/notification-preferences`,
+      { credentials: "include" }
+    );
+    return handleResponse<CourseNotificationPreferences>(res);
+  },
+
+  async setNotificationPreferences(
+    courseId: number,
+    data: Pick<CourseNotificationPreferences, "notify_new_submissions">
+  ): Promise<CourseNotificationPreferences> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/notification-preferences`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse<CourseNotificationPreferences>(res);
   },
 
   async listModules(courseId: number, offset = 0, limit = 100): Promise<Module[]> {
