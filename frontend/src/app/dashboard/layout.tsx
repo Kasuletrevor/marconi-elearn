@@ -29,20 +29,22 @@ interface DashboardLayoutProps {
    NOTIFICATION BELL COMPONENT
    ============================================ */
 
-function NotificationBell() {
+function NotificationBell({ enabled }: { enabled: boolean }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [notificationList, setNotificationList] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDisabled, setIsDisabled] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Fetch notifications on mount and periodically
   useEffect(() => {
+    if (!enabled || isDisabled) return;
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000); // refresh every minute
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled, isDisabled]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -64,7 +66,12 @@ function NotificationBell() {
       setNotificationList(all);
       setUnreadCount(unread.length);
     } catch (err) {
-      // Silently fail for notifications
+      if (err instanceof ApiError && err.status === 401) {
+        setIsDisabled(true);
+        setNotificationList([]);
+        setUnreadCount(0);
+        return;
+      }
       console.error("Failed to fetch notifications:", err);
     }
   }
@@ -236,6 +243,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   // Check auth on mount
   useEffect(() => {
@@ -261,6 +269,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           logoutStore();
           router.push("/login");
         }
+      } finally {
+        setHasCheckedAuth(true);
       }
     }
 
@@ -300,6 +310,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }
 
+  const notificationsEnabled = Boolean(user) && hasCheckedAuth;
+
   return (
     <div className="min-h-screen bg-[var(--background)]">
       {/* Mobile Header */}
@@ -314,7 +326,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </span>
           </Link>
           <div className="flex items-center gap-2">
-            <NotificationBell />
+            <NotificationBell enabled={notificationsEnabled} />
             <button
               onClick={() => setSidebarOpen(true)}
               className="p-2 text-[var(--foreground)] hover:bg-[var(--card)] rounded-lg"
@@ -346,6 +358,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <SidebarContent
                 pathname={pathname}
                 user={user}
+                notificationsEnabled={notificationsEnabled}
                 onLogout={handleLogout}
                 isLoggingOut={isLoggingOut}
                 onClose={() => setSidebarOpen(false)}
@@ -360,6 +373,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <SidebarContent
           pathname={pathname}
           user={user}
+          notificationsEnabled={notificationsEnabled}
           onLogout={handleLogout}
           isLoggingOut={isLoggingOut}
         />
@@ -376,6 +390,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 interface SidebarContentProps {
   pathname: string;
   user: UserType | null;
+  notificationsEnabled: boolean;
   onLogout: () => void;
   isLoggingOut: boolean;
   onClose?: () => void;
@@ -384,6 +399,7 @@ interface SidebarContentProps {
 function SidebarContent({
   pathname,
   user,
+  notificationsEnabled,
   onLogout,
   isLoggingOut,
   onClose,
@@ -407,7 +423,7 @@ function SidebarContent({
         <div className="flex items-center gap-1">
           {/* Desktop notification bell - hidden on mobile since it's in the header */}
           <div className="hidden lg:block">
-            <NotificationBell />
+            <NotificationBell enabled={notificationsEnabled} />
           </div>
           {onClose && (
             <button
