@@ -29,7 +29,7 @@ interface DashboardLayoutProps {
    NOTIFICATION BELL COMPONENT
    ============================================ */
 
-function NotificationBell({ enabled }: { enabled: boolean }) {
+function NotificationBell({ enabled, align = "right" }: { enabled: boolean; align?: "left" | "right" }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [notificationList, setNotificationList] = useState<Notification[]>([]);
@@ -147,7 +147,7 @@ function NotificationBell({ enabled }: { enabled: boolean }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-80 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden z-50"
+            className={`absolute ${align === "left" ? "left-0" : "right-0"} mt-2 w-80 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden z-50`}
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--background)]">
@@ -369,7 +369,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 bg-[var(--card)] border-r border-[var(--border)] overflow-y-auto">
+      <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 bg-[var(--card)] border-r border-[var(--border)]">
         <SidebarContent
           pathname={pathname}
           user={user}
@@ -423,7 +423,7 @@ function SidebarContent({
         <div className="flex items-center gap-1">
           {/* Desktop notification bell - hidden on mobile since it's in the header */}
           <div className="hidden lg:block">
-            <NotificationBell enabled={notificationsEnabled} />
+            <NotificationBell enabled={notificationsEnabled} align="left" />
           </div>
           {onClose && (
             <button
@@ -437,7 +437,7 @@ function SidebarContent({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {sidebarLinks.map((link) => {
           const isActive =
             link.href === "/dashboard"
