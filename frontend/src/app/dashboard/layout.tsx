@@ -16,6 +16,7 @@ import {
   User,
   Bell,
   Check,
+  Code,
 } from "lucide-react";
 import { auth, notifications, ApiError, type User as UserType, type Notification } from "@/lib/api";
 import { useAuthStore, getRedirectPath } from "@/lib/store";
@@ -215,6 +216,7 @@ function NotificationBell() {
 
 const sidebarLinks = [
   { href: "/dashboard", label: "My Courses", icon: BookOpen },
+  { href: "/playground", label: "Playground", icon: Code },
   { href: "/dashboard/submissions", label: "Submissions", icon: FileText },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
@@ -433,8 +435,8 @@ function SidebarContent({
               href={link.href}
               onClick={onClose}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
-                  ? "bg-[var(--primary)] text-white"
-                  : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                ? "bg-[var(--primary)] text-white"
+                : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                 }`}
             >
               <link.icon className="w-5 h-5" />
