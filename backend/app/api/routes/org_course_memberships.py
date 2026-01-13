@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +19,8 @@ from app.crud.courses import get_course
 from app.db.deps import get_db
 from app.models.user import User
 from app.schemas.course_membership import CourseMembershipCreate, CourseMembershipOut, CourseMembershipUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/orgs/{org_id}/courses/{course_id}/memberships",
@@ -55,7 +58,13 @@ async def enroll_user(
                 metadata={"course_id": course_id, "role": membership.role},
             )
         except Exception:
-            pass
+            logger.exception(
+                "Failed to write audit event course_membership.added. org_id=%s actor_user_id=%s course_id=%s target_user_id=%s",
+                org_id,
+                _current_user.id,
+                course_id,
+                membership.user_id,
+            )
         return membership
     except CourseMembershipExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in course") from exc
@@ -97,7 +106,13 @@ async def remove_from_course(
             metadata={"course_id": course_id, "role": membership.role},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event course_membership.removed. org_id=%s actor_user_id=%s course_id=%s target_user_id=%s",
+            org_id,
+            _current_user.id,
+            course_id,
+            membership.user_id,
+        )
     return None
 
 
@@ -126,5 +141,11 @@ async def update_membership_role(
             metadata={"course_id": course_id, "role": updated.role},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event course_membership.updated. org_id=%s actor_user_id=%s course_id=%s target_user_id=%s",
+            org_id,
+            _current_user.id,
+            course_id,
+            updated.user_id,
+        )
     return updated
