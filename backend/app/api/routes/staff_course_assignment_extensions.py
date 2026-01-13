@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,6 +22,8 @@ from app.models.course import Course
 from app.models.course_membership import CourseMembership, CourseRole
 from app.models.user import User
 from app.schemas.assignment_extension import AssignmentExtensionOut, AssignmentExtensionUpsert
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/staff/courses/{course_id}/assignments/{assignment_id}/extensions",
@@ -113,7 +116,13 @@ async def upsert_extension(
             metadata={"student_user_id": user_id, "extended_due_date": str(payload.extended_due_date)},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event assignment_extension.upserted. course_id=%s assignment_id=%s actor_user_id=%s student_user_id=%s",
+            course_id,
+            assignment_id,
+            current_user.id,
+            user_id,
+        )
     return updated
 
 
@@ -143,5 +152,11 @@ async def delete_extension(
             metadata={"student_user_id": user_id},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event assignment_extension.deleted. course_id=%s assignment_id=%s actor_user_id=%s student_user_id=%s",
+            course_id,
+            assignment_id,
+            current_user.id,
+            user_id,
+        )
     return None
