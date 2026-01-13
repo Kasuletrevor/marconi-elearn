@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -35,6 +36,8 @@ from app.schemas.staff_submissions import (
 )
 from app.schemas.submission import SubmissionOut
 from app.worker.enqueue import enqueue_grading
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/staff/submissions", dependencies=[Depends(get_current_user)])
 
@@ -154,7 +157,11 @@ async def bulk_update_submissions(
             metadata={"count": len(rows), "action": payload.action.value},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event submissions.bulk_updated. actor_user_id=%s submission_ids=%s",
+            current_user.id,
+            payload.submission_ids,
+        )
 
     if target_status == SubmissionStatus.graded:
         for r in rows:
@@ -253,7 +260,11 @@ async def update_submission(
             },
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event submission.updated. actor_user_id=%s submission_id=%s",
+            current_user.id,
+            submission.id,
+        )
 
     if prior_status != SubmissionStatus.graded and submission.status == SubmissionStatus.graded:
         link = f"/dashboard/courses/{row.course.id}/assignments/{row.assignment.id}"
@@ -321,7 +332,7 @@ async def regrade_submission(
     try:
         await enqueue_grading(submission_id=submission_id)
     except Exception:
-        pass
+        logger.exception("Failed to enqueue grading job. submission_id=%s", submission_id)
 
     await db.refresh(submission)
     return submission
