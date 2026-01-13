@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -20,6 +21,7 @@ from app.models.user import User
 from app.schemas.organization import OrganizationCreate, OrganizationOut, OrganizationUpdate
 
 router = APIRouter(prefix="/orgs")
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=OrganizationOut, status_code=status.HTTP_201_CREATED)
@@ -41,7 +43,7 @@ async def create_org(
                 metadata={"name": org.name},
             )
         except Exception:
-            pass
+            logger.exception("Failed to write audit event org.created")
         return org
     except OrgNameTakenError as exc:
         raise HTTPException(
@@ -104,6 +106,19 @@ async def delete_org(
     org = await get_organization(db, org_id=org_id)
     if org is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+
+    try:
+        await create_audit_event(
+            db,
+            organization_id=org.id,
+            actor_user_id=_current_user.id,
+            action="org.deleted",
+            target_type="organization",
+            target_id=org.id,
+            metadata={"name": org.name},
+        )
+    except Exception:
+        logger.exception("Failed to write audit event org.deleted")
 
     await delete_organization(db, org=org)
     return None
