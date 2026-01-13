@@ -1,10 +1,11 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
-from app.api.deps.permissions import require_org_admin
+from app.api.deps.permissions import require_org_admin, require_org_member
 from app.crud.audit import create_audit_event
 from app.crud.invites import create_org_member_invite
 from app.crud.org_memberships import (
@@ -25,6 +26,8 @@ from app.schemas.org_membership import (
     OrgMembershipOut,
     OrgMembershipUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orgs/{org_id}/memberships")
 
@@ -52,7 +55,12 @@ async def add_member(
                 metadata={"role": membership.role},
             )
         except Exception:
-            pass
+            logger.exception(
+                "Failed to write audit event org_membership.added. org_id=%s actor_user_id=%s target_user_id=%s",
+                org_id,
+                _current_user.id,
+                membership.user_id,
+            )
         return membership
     except OrgMembershipExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in organization") from exc
@@ -92,7 +100,12 @@ async def add_member_by_email(
             metadata={"email": email, "role": membership.role, "invite": bool(invite_link)},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event org_membership.invited. org_id=%s actor_user_id=%s target_user_id=%s",
+            org_id,
+            _current_user.id,
+            membership.user_id,
+        )
 
     return OrgMembershipInviteOut(
         id=membership.id,
@@ -109,7 +122,7 @@ async def list_members(
     org_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     _current_user: Annotated[User, Depends(get_current_user)],
-    _require_admin: Annotated[None, Depends(require_org_admin)],
+    _require_member: Annotated[None, Depends(require_org_member)],
     offset: int = 0,
     limit: int = 100,
 ) -> list[OrgMembershipOut]:
@@ -141,7 +154,12 @@ async def update_member(
             metadata={"role": updated.role},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event org_membership.updated. org_id=%s actor_user_id=%s target_user_id=%s",
+            org_id,
+            _current_user.id,
+            updated.user_id,
+        )
     return updated
 
 
@@ -169,5 +187,10 @@ async def remove_member(
             metadata={"role": membership.role},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event org_membership.removed. org_id=%s actor_user_id=%s target_user_id=%s",
+            org_id,
+            _current_user.id,
+            membership.user_id,
+        )
     return None
