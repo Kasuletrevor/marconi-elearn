@@ -15,6 +15,8 @@ async def require_course_staff(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    if getattr(current_user, "is_superadmin", False):
+        return
     result = await db.execute(
         select(CourseMembership).where(
             CourseMembership.course_id == course_id,
@@ -32,6 +34,8 @@ async def require_course_instructor(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    if getattr(current_user, "is_superadmin", False):
+        return
     result = await db.execute(
         select(CourseMembership).where(
             CourseMembership.course_id == course_id,
@@ -52,6 +56,8 @@ async def require_course_student_or_staff(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CourseRole:
+    if getattr(current_user, "is_superadmin", False):
+        return CourseRole.owner
     result = await db.execute(
         select(CourseMembership).where(
             CourseMembership.course_id == course_id,
