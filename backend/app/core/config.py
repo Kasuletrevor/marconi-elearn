@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     session_cookie_name: str = "marconi_session"
     session_cookie_secure: bool = False
     session_cookie_samesite: SameSitePolicy = "lax"
+    # Server-side session TTL (days). Cookie is session-only, but server sessions
+    # must still expire for safety/cleanup.
+    session_ttl_days: int = 30
     # Comma-separated list. Kept as string to avoid Pydantic JSON parsing for list types in .env.
     superadmin_emails: str = ""
     # Optional: enables first-login bootstrap for configured superadmins.
@@ -34,6 +37,8 @@ class Settings(BaseSettings):
     # Queue/worker
     redis_url: str = ""
     taskiq_queue_name: str = "marconi"
+    # File uploads
+    uploads_dir: str = ""
 
     model_config = SettingsConfigDict(
         env_file=str((Path(__file__).resolve().parents[3] / ".env")),
@@ -58,6 +63,9 @@ class Settings(BaseSettings):
 
         if not self.database_url:
             raise ValueError("DATABASE_URL or POSTGRES_* must be configured")
+
+        if not self.uploads_dir.strip():
+            self.uploads_dir = str((Path(__file__).resolve().parents[3] / "var" / "uploads"))
 
         return self
 

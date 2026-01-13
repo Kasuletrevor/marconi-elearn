@@ -1,9 +1,11 @@
 import hashlib
 import secrets
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.session import Session
 
 
@@ -14,7 +16,8 @@ def _hash_token(token: str) -> str:
 async def create_session(db: AsyncSession, *, user_id: int) -> tuple[str, Session]:
     token = secrets.token_urlsafe(32)
     token_hash = _hash_token(token)
-    session = Session(user_id=user_id, token_hash=token_hash)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=int(settings.session_ttl_days))
+    session = Session(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
     db.add(session)
     await db.commit()
     await db.refresh(session)
@@ -30,4 +33,3 @@ async def get_session_by_token(db: AsyncSession, *, token: str) -> Session | Non
 async def delete_session(db: AsyncSession, *, session: Session) -> None:
     await db.delete(session)
     await db.commit()
-
