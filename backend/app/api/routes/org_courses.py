@@ -1,5 +1,6 @@
 from typing import Annotated
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,8 @@ from app.db.deps import get_db
 from app.models.course_membership import CourseRole
 from app.models.user import User
 from app.schemas.course import CourseCreateInOrg, CourseOut, CourseUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/orgs/{org_id}/courses",
@@ -48,7 +51,12 @@ async def create_course_in_org(
             metadata={"code": course.code, "title": course.title},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event course.created. org_id=%s actor_user_id=%s course_id=%s",
+            org_id,
+            current_user.id,
+            course.id,
+        )
     return course
 
 
@@ -111,7 +119,12 @@ async def update_course_in_org(
             metadata={"code": updated.code, "title": updated.title},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event course.updated. org_id=%s actor_user_id=%s course_id=%s",
+            org_id,
+            current_user.id,
+            updated.id,
+        )
     return updated
 
 
@@ -137,5 +150,10 @@ async def delete_course_in_org(
             metadata={"code": course.code, "title": course.title},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event course.deleted. org_id=%s actor_user_id=%s course_id=%s",
+            org_id,
+            current_user.id,
+            course_id,
+        )
     return None
