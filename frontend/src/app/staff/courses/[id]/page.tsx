@@ -62,6 +62,7 @@ import { useAuthStore, getCourseRole } from "@/lib/store";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
+import { ConfirmModal } from "@/components/ui/Modal";
 import { reportError } from "@/lib/reportError";
 import { PROGRAMMES, type Programme } from "@/lib/programmes";
 
@@ -333,6 +334,7 @@ function CourseSettingsModal({
     course.self_enroll_code ?? null
   );
   const [isRegeneratingEnrollCode, setIsRegeneratingEnrollCode] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   const initialLate = normalizeLatePolicy(course.late_policy);
   const [latePolicyEnabled, setLatePolicyEnabled] = useState(
@@ -345,15 +347,15 @@ function CourseSettingsModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  async function regenerateEnrollCode() {
+  function requestRegenerateEnrollCode() {
     if (!selfEnrollEnabled) {
       setSaveError("Enable self-enroll before regenerating the code.");
       return;
     }
-    if (!confirm("Regenerate the self-enroll code? Old codes will stop working.")) {
-      return;
-    }
+    setShowRegenerateConfirm(true);
+  }
 
+  async function regenerateEnrollCodeConfirmed() {
     setIsRegeneratingEnrollCode(true);
     setSaveError("");
     try {
@@ -405,7 +407,8 @@ function CourseSettingsModal({
   }
 
   return (
-    <motion.div
+    <>
+      <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -545,7 +548,7 @@ function CourseSettingsModal({
                 </button>
                 <button
                   type="button"
-                  onClick={regenerateEnrollCode}
+                  onClick={requestRegenerateEnrollCode}
                   disabled={!selfEnrollEnabled || isRegeneratingEnrollCode}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
                 >
@@ -644,6 +647,21 @@ function CourseSettingsModal({
         </div>
       </motion.div>
     </motion.div>
+
+    <ConfirmModal
+      isOpen={showRegenerateConfirm}
+      onClose={() => setShowRegenerateConfirm(false)}
+      onConfirm={() => {
+        setShowRegenerateConfirm(false);
+        void regenerateEnrollCodeConfirmed();
+      }}
+      title="Regenerate self-enroll code?"
+      description="Old codes will stop working immediately. Continue?"
+      confirmLabel="Regenerate"
+      confirmVariant="danger"
+      isLoading={isRegeneratingEnrollCode}
+    />
+    </>
   );
 }
 
@@ -1211,6 +1229,8 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [notifyNewSubmissions, setNotifyNewSubmissions] = useState(true);
   const [isSavingNotifyNewSubmissions, setIsSavingNotifyNewSubmissions] = useState(false);
   const [notifyPrefError, setNotifyPrefError] = useState("");
+  const [confirmRemoveMembershipId, setConfirmRemoveMembershipId] = useState<number | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
 
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
@@ -1325,16 +1345,24 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     }
   }
 
-  async function removeMember(membershipId: number) {
-    if (!confirm("Remove this member from the course?")) return;
+  function requestRemoveMember(membershipId: number) {
+    setConfirmRemoveMembershipId(membershipId);
+  }
+
+  async function removeMemberConfirmed() {
+    if (confirmRemoveMembershipId === null) return;
+    setIsRemovingMember(true);
     setNoticeArea("staff");
     setError("");
     try {
-      await courseStaff.removeMembership(course.id, membershipId);
+      await courseStaff.removeMembership(course.id, confirmRemoveMembershipId);
       await onRefresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to remove member");
+    } finally {
+      setIsRemovingMember(false);
+      setConfirmRemoveMembershipId(null);
     }
   }
 
@@ -1608,7 +1636,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
                     <option value="ta">TA</option>
                   </select>
                   <button
-                    onClick={() => removeMember(member.id)}
+                    onClick={() => requestRemoveMember(member.id)}
                     className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                     title="Remove member"
                   >
@@ -1811,7 +1839,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={() => removeMember(member.id)}
+                    onClick={() => requestRemoveMember(member.id)}
                     className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                     title="Remove student"
                   >
@@ -1823,6 +1851,17 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmRemoveMembershipId !== null}
+        onClose={() => setConfirmRemoveMembershipId(null)}
+        onConfirm={() => void removeMemberConfirmed()}
+        title="Remove member?"
+        description="This will remove the member from the course. Continue?"
+        confirmLabel="Remove"
+        confirmVariant="danger"
+        isLoading={isRemovingMember}
+      />
     </div >
   );
 }
@@ -1851,6 +1890,8 @@ function AssignmentsTab({
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [error, setError] = useState("");
+  const [confirmDeleteAssignment, setConfirmDeleteAssignment] = useState<Assignment | null>(null);
+  const [isDeletingAssignment, setIsDeletingAssignment] = useState(false);
 
   function toDateTimeLocalValue(date: Date): string {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -1898,6 +1939,22 @@ function AssignmentsTab({
     const moduleRow = modules.find((m) => m.id === moduleId);
     return moduleRow?.title || "Unknown Module";
   };
+
+  async function deleteAssignmentConfirmed() {
+    if (!confirmDeleteAssignment) return;
+    setIsDeletingAssignment(true);
+    setError("");
+    try {
+      await courseStaff.deleteAssignment(course.id, confirmDeleteAssignment.id);
+      await onRefreshAssignments();
+    } catch (err) {
+      reportError("Failed to delete assignment", err);
+      setError("Failed to delete assignment");
+    } finally {
+      setIsDeletingAssignment(false);
+      setConfirmDeleteAssignment(null);
+    }
+  }
 
   async function createAssignment() {
     const title = newTitle.trim();
@@ -2153,16 +2210,7 @@ function AssignmentsTab({
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={async () => {
-                      if (!confirm(`Delete \"${assignment.title}\"?`)) return;
-                      try {
-                        await courseStaff.deleteAssignment(course.id, assignment.id);
-                        await onRefreshAssignments();
-                      } catch (err) {
-                        reportError("Failed to delete assignment", err);
-                        setError("Failed to delete assignment");
-                      }
-                    }}
+                    onClick={() => setConfirmDeleteAssignment(assignment)}
                     className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                     aria-label="Delete assignment"
                     title="Delete assignment"
@@ -2175,6 +2223,17 @@ function AssignmentsTab({
           })}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmDeleteAssignment !== null}
+        onClose={() => setConfirmDeleteAssignment(null)}
+        onConfirm={() => void deleteAssignmentConfirmed()}
+        title={confirmDeleteAssignment ? `Delete \"${confirmDeleteAssignment.title}\"?` : "Delete assignment?"}
+        description="This cannot be undone. Continue?"
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        isLoading={isDeletingAssignment}
+      />
     </div>
   );
 }
@@ -2409,6 +2468,10 @@ function ModuleCard(
   const [moduleEditError, setModuleEditError] = useState("");
   const [isMovingModule, setIsMovingModule] = useState(false);
   const [movingResourceId, setMovingResourceId] = useState<number | null>(null);
+  const [showDeleteModuleConfirm, setShowDeleteModuleConfirm] = useState(false);
+  const [confirmDeleteResourceId, setConfirmDeleteResourceId] = useState<number | null>(null);
+  const [isDeletingModule, setIsDeletingModule] = useState(false);
+  const [isDeletingResource, setIsDeletingResource] = useState(false);
 
   useEffect(() => {
     setEditTitle(module.title);
@@ -2456,10 +2519,12 @@ function ModuleCard(
     }
   }
 
-  async function deleteModule() {
-    if (!confirm(`Delete \"${module.title}\"? This removes module content ordering (resources and assignments remain).`)) {
-      return;
-    }
+  function requestDeleteModule() {
+    setShowDeleteModuleConfirm(true);
+  }
+
+  async function deleteModuleConfirmed() {
+    setIsDeletingModule(true);
     setModuleEditError("");
     try {
       await courseStaff.deleteModule(courseId, module.id);
@@ -2467,6 +2532,9 @@ function ModuleCard(
     } catch (err) {
       if (err instanceof ApiError) setModuleEditError(err.detail);
       else setModuleEditError("Failed to delete module");
+    } finally {
+      setIsDeletingModule(false);
+      setShowDeleteModuleConfirm(false);
     }
   }
 
@@ -2514,13 +2582,21 @@ function ModuleCard(
     }
   }
 
-  async function handleDeleteResource(resourceId: number) {
-    if (!confirm("Are you sure you want to delete this resource?")) return;     
+  function requestDeleteResource(resourceId: number) {
+    setConfirmDeleteResourceId(resourceId);
+  }
+
+  async function deleteResourceConfirmed() {
+    if (confirmDeleteResourceId === null) return;
+    setIsDeletingResource(true);
     try {
-      await courseStaff.deleteModuleResource(courseId, module.id, resourceId);  
-      setResources((prev) => prev.filter((r) => r.id !== resourceId));
+      await courseStaff.deleteModuleResource(courseId, module.id, confirmDeleteResourceId);
+      setResources((prev) => prev.filter((r) => r.id !== confirmDeleteResourceId));
     } catch (err) {
       reportError("Failed to delete resource", err);
+    } finally {
+      setIsDeletingResource(false);
+      setConfirmDeleteResourceId(null);
     }
   }
 
@@ -2551,7 +2627,13 @@ function ModuleCard(
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  const deleteResourceTitle = useMemo(() => {
+    if (confirmDeleteResourceId === null) return null;
+    return resources.find((r) => r.id === confirmDeleteResourceId)?.title ?? null;
+  }, [confirmDeleteResourceId, resources]);
+
   return (
+    <>
     <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
       {/* Module Header */}
       <div
@@ -2621,7 +2703,7 @@ function ModuleCard(
           <button
             onClick={(e) => {
               e.stopPropagation();
-              deleteModule();
+              requestDeleteModule();
             }}
             className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
           >
@@ -2862,7 +2944,7 @@ function ModuleCard(
 
                       {/* Delete */}
                       <button
-                        onClick={() => handleDeleteResource(resource.id)}
+                        onClick={() => requestDeleteResource(resource.id)}
                         className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                         title="Delete"
                       >
@@ -2903,6 +2985,29 @@ function ModuleCard(
         />
       )}
     </div>
+
+    <ConfirmModal
+      isOpen={showDeleteModuleConfirm}
+      onClose={() => setShowDeleteModuleConfirm(false)}
+      onConfirm={() => void deleteModuleConfirmed()}
+      title={`Delete \"${module.title}\"?`}
+      description="This removes module content ordering (resources and assignments remain). Continue?"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      isLoading={isDeletingModule}
+    />
+
+    <ConfirmModal
+      isOpen={confirmDeleteResourceId !== null}
+      onClose={() => setConfirmDeleteResourceId(null)}
+      onConfirm={() => void deleteResourceConfirmed()}
+      title={deleteResourceTitle ? `Delete \"${deleteResourceTitle}\"?` : "Delete resource?"}
+      description="This cannot be undone. Continue?"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      isLoading={isDeletingResource}
+    />
+    </>
   );
 }
 
