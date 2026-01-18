@@ -81,5 +81,6 @@
 - Accessibility: replace `confirm()` delete confirmations with accessible modal components.
 - Form validation: tighten validation consistently across remaining forms (length limits, required fields, better inline errors).
 - Hooks hygiene: remove remaining `eslint-disable-next-line react-hooks/exhaustive-deps` suppressions by fixing dependencies properly.
+- Staff analytics: "At-Risk Students" view is not built yet; keep it out of navigation until implemented (avoid dead links).
 
 
