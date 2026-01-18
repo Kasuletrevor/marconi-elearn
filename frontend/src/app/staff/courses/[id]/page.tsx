@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -90,11 +90,15 @@ export default function StaffCoursePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [memberships, setMemberships] = useState<CourseMembership[]>([]);
+  const [memberships, setMemberships] = useState<CourseMembership[]>([]);       
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [openCreateAssignmentFromQuickAction, setOpenCreateAssignmentFromQuickAction] =
+    useState(false);
+  const [openCreateModuleFromQuickAction, setOpenCreateModuleFromQuickAction] =
+    useState(false);
 
   const role = getCourseRole(user, courseId);
   const canEditCourseSettings = role === "owner" || role === "co_lecturer";     
@@ -245,6 +249,21 @@ export default function StaffCoursePage() {
             modules={modules}
             assignments={assignments}
             memberships={memberships}
+            onQuickAction={(action) => {
+              switch (action) {
+                case "create_assignment":
+                  setActiveTab("assignments");
+                  setOpenCreateAssignmentFromQuickAction(true);
+                  break;
+                case "import_roster":
+                  setActiveTab("roster");
+                  break;
+                case "add_module":
+                  setActiveTab("modules");
+                  setOpenCreateModuleFromQuickAction(true);
+                  break;
+              }
+            }}
           />
         )}
         {activeTab === "submissions" && (
@@ -266,9 +285,11 @@ export default function StaffCoursePage() {
             assignments={assignments}
             modules={modules}
             onRefreshAssignments={async () => {
-              const data = await courseStaff.listAssignments(courseId);
+              const data = await courseStaff.listAssignments(courseId);    
               setAssignments(data);
             }}
+            openCreateOnMount={openCreateAssignmentFromQuickAction}
+            onConsumedOpenCreate={() => setOpenCreateAssignmentFromQuickAction(false)}
           />
         )}
         {activeTab === "modules" && (
@@ -276,9 +297,11 @@ export default function StaffCoursePage() {
             course={course}
             modules={modules}
             onRefreshModules={async () => {
-              const data = await courseStaff.listModules(courseId);
+              const data = await courseStaff.listModules(courseId);        
               setModules(data);
             }}
+            openCreateOnMount={openCreateModuleFromQuickAction}
+            onConsumedOpenCreate={() => setOpenCreateModuleFromQuickAction(false)}
           />
         )}
       </motion.div>
@@ -671,6 +694,7 @@ interface OverviewTabProps {
   modules: Module[];
   assignments: Assignment[];
   memberships: CourseMembership[];
+  onQuickAction: (action: "create_assignment" | "import_roster" | "add_module") => void;
 }
 
 function OverviewTab({
@@ -678,6 +702,7 @@ function OverviewTab({
   modules,
   assignments,
   memberships,
+  onQuickAction,
 }: OverviewTabProps) {
   const studentCount = memberships.filter((m) => m.role === "student").length;
   const upcomingAssignments = assignments
@@ -738,7 +763,10 @@ function OverviewTab({
             Quick Actions
           </h3>
           <div className="grid gap-3">
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group">
+            <button
+              onClick={() => onQuickAction("create_assignment")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
+            >
               <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
                 <Plus className="w-5 h-5" />
               </div>
@@ -746,7 +774,10 @@ function OverviewTab({
                 Create Assignment
               </span>
             </button>
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group">
+            <button
+              onClick={() => onQuickAction("import_roster")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
+            >
               <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
                 <Upload className="w-5 h-5" />
               </div>
@@ -754,7 +785,10 @@ function OverviewTab({
                 Import Roster
               </span>
             </button>
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group">
+            <button
+              onClick={() => onQuickAction("add_module")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
+            >
               <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
                 <FolderOpen className="w-5 h-5" />
               </div>
@@ -1872,6 +1906,8 @@ interface AssignmentsTabProps {
   assignments: Assignment[];
   modules: Module[];
   onRefreshAssignments: () => Promise<void>;
+  openCreateOnMount?: boolean;
+  onConsumedOpenCreate?: () => void;
 }
 
 function AssignmentsTab({
@@ -1879,6 +1915,8 @@ function AssignmentsTab({
   assignments,
   modules,
   onRefreshAssignments,
+  openCreateOnMount = false,
+  onConsumedOpenCreate,
 }: AssignmentsTabProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
@@ -1906,7 +1944,7 @@ function AssignmentsTab({
     return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
   }
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditingAssignmentId(null);
     setNewTitle("");
     setNewDescription("");
@@ -1919,7 +1957,13 @@ function AssignmentsTab({
     setCreateError("");
     setError("");
     setShowCreateModal(true);
-  }
+  }, [modules]);
+
+  useEffect(() => {
+    if (!openCreateOnMount) return;
+    openCreate();
+    onConsumedOpenCreate?.();
+  }, [openCreate, onConsumedOpenCreate, openCreateOnMount]);
 
   function openEdit(assignment: Assignment) {
     setEditingAssignmentId(assignment.id);
@@ -2322,9 +2366,17 @@ interface ModulesTabProps {
   course: Course;
   modules: Module[];
   onRefreshModules: () => Promise<void>;
+  openCreateOnMount?: boolean;
+  onConsumedOpenCreate?: () => void;
 }
 
-function ModulesTab({ course, modules, onRefreshModules }: ModulesTabProps) {
+function ModulesTab({
+  course,
+  modules,
+  onRefreshModules,
+  openCreateOnMount = false,
+  onConsumedOpenCreate,
+}: ModulesTabProps) {
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -2348,6 +2400,12 @@ function ModulesTab({ course, modules, onRefreshModules }: ModulesTabProps) {
     setNewPosition(nextPosition);
     setCreateError("");
   }, [showCreateModal, nextPosition]);
+
+  useEffect(() => {
+    if (!openCreateOnMount) return;
+    setShowCreateModal(true);
+    onConsumedOpenCreate?.();
+  }, [onConsumedOpenCreate, openCreateOnMount]);
 
   async function createModule() {
     const title = newTitle.trim();
