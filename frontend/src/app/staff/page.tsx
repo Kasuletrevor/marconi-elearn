@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import {
   BookOpen,
   FileText,
-  Users,
   AlertTriangle,
   ArrowRight,
   CheckCircle,
@@ -14,7 +13,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { useAuthStore, getCourseRole } from "@/lib/store";
-import { courseStaff, type Course, ApiError } from "@/lib/api";
+import { courseStaff, type Course, ApiError, type User as ApiUser } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 
@@ -175,11 +174,11 @@ export default function StaffDashboardPage() {
 
 interface CourseCardProps {
   course: Course;
-  user: { course_roles: { course_id: number; role: string }[] } | null;
+  user: ApiUser | null;
 }
 
 function CourseCard({ course, user }: CourseCardProps) {
-  const role = getCourseRole(user as any, course.id);
+  const role = getCourseRole(user, course.id);
 
   const roleLabels: Record<string, string> = {
     owner: "Owner",
