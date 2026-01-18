@@ -290,6 +290,11 @@ async def submit_assignment(
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename")
     ext = Path(file.filename).suffix.lower()
+    if ext == ".zip":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ZIP submissions are not supported yet. Upload a .c or .cpp file.",
+        )
     if ext not in _ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
 
