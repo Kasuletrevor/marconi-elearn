@@ -15,7 +15,8 @@ from app.models.submission import Submission, SubmissionStatus
 from app.models.submission_test_result import SubmissionTestResult
 from app.models.test_case import TestCase
 from app.worker.broker import broker
-from app.worker.grading import run_test_case
+from app.worker.grading import prepare_jobe_run, run_test_case
+from app.worker.zip_extract import ZipExtractionError
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,58 @@ async def grade_submission(submission_id: int, attempt: int = 0) -> dict[str, An
             return {"status": "error", "score": 0, "tests": 0}
 
         submission_path = Path(submission.storage_path)
+        try:
+            prepared = await prepare_jobe_run(
+                jobe,
+                submission_path=submission_path,
+                assignment=assignment,
+            )
+        except ZipExtractionError as exc:
+            submission.status = SubmissionStatus.error
+            submission.score = 0
+            submission.feedback = str(exc)
+            await db.commit()
+            return {"status": "error", "reason": "invalid_submission"}
+        except JobeTransientError:
+            if attempt < max_attempts - 1:
+                submission.status = SubmissionStatus.pending
+                submission.feedback = (
+                    f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
+                )
+                await db.commit()
+                await db.close()
+                await asyncio.sleep(min(2**attempt, 10))
+                await grade_submission.kiq(submission_id=submission_id, attempt=attempt + 1)
+                return {"status": "retrying", "attempt": attempt + 1}
+
+            submission.status = SubmissionStatus.error
+            submission.score = 0
+            submission.feedback = "Grading infrastructure temporarily unavailable. Please retry."
+            await db.commit()
+            return {"status": "error", "reason": "jobe_transient"}
+        except JobeError:
+            submission.status = SubmissionStatus.error
+            submission.score = 0
+            submission.feedback = "Grading failed due to JOBE error"
+            logger.exception(
+                "Grading failed due to JOBE error during prepare. submission_id=%s attempt=%s",
+                submission_id,
+                attempt,
+            )
+            await db.commit()
+            return {"status": "error", "reason": "jobe_error"}
+        except Exception:
+            submission.status = SubmissionStatus.error
+            submission.score = 0
+            submission.feedback = "Grading failed due to internal error"
+            logger.exception(
+                "Grading failed due to internal error during prepare. submission_id=%s attempt=%s",
+                submission_id,
+                attempt,
+            )
+            await db.commit()
+            return {"status": "error", "reason": "internal_error"}
+
         results: list[SubmissionTestResult] = []
         passed_points = 0
         max_points = sum(tc.points for tc in tests)
@@ -85,7 +138,7 @@ async def grade_submission(submission_id: int, attempt: int = 0) -> dict[str, An
             try:
                 check = await run_test_case(
                     jobe,
-                    submission_path=submission_path,
+                    prepared=prepared,
                     stdin=tc.stdin,
                     expected_stdout=tc.expected_stdout,
                     expected_stderr=tc.expected_stderr,
