@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -12,15 +12,13 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  GraduationCap,
   Activity,
   Settings,
   ShieldCheck,
   Zap,
 } from "lucide-react";
-import { ApiError, superadmin, type SuperadminStats } from "@/lib/api";
+import { ApiError, health, superadmin, type SuperadminStats } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { EmptyState } from "@/components/shared/EmptyState";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -35,28 +33,91 @@ const staggerContainer = {
   },
 };
 
-// Placeholder system status
-const systemStatus = [
-  { service: "API Gateway", status: "healthy", icon: Zap },
-  { service: "Relational Database", status: "healthy", icon: Activity },
-  { service: "JOBE Sandbox", status: "pending", icon: ShieldCheck },
-  { service: "SMTP Relay", status: "healthy", icon: CheckCircle2 },
-];
+type ServiceStatus = "healthy" | "degraded" | "pending" | "down";
+type StatusIcon = ComponentType<{ className?: string }>;
+interface SystemStatusItem {
+  service: string;
+  status: ServiceStatus;
+  icon: StatusIcon;
+  hint?: string;
+}
 
 export default function SuperadminPage() {
   const router = useRouter();
   const [stats, setStats] = useState<SuperadminStats | null>(null);
   const [metricsError, setMetricsError] = useState("");
+  const [systemStatus, setSystemStatus] = useState<SystemStatusItem[]>([
+    {
+      service: "API",
+      status: "pending",
+      icon: Zap,
+      hint: "Checked via /api/v1/health",
+    },
+    {
+      service: "Database",
+      status: "pending",
+      icon: Activity,
+      hint: "Checked via superadmin telemetry read",
+    },
+    {
+      service: "JOBE Sandbox",
+      status: "pending",
+      icon: ShieldCheck,
+      hint: "Not wired to an API check yet",
+    },
+    {
+      service: "SMTP Relay",
+      status: "pending",
+      icon: CheckCircle2,
+      hint: "Not wired to an API check yet",
+    },
+  ]);
+  const [systemSummary, setSystemSummary] = useState<{
+    label: string;
+    className: string;
+  }>({
+    label: "Checking status…",
+    className:
+      "text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-widest bg-[var(--background)] px-2 py-1 rounded-full border border-[var(--border)]",
+  });
 
   useEffect(() => {
     async function load() {
       setMetricsError("");
       try {
-        const data = await superadmin.getStats();
+        const [healthRes, data] = await Promise.all([
+          health.get(),
+          superadmin.getStats(),
+        ]);
         setStats(data);
+        setSystemStatus((prev) => {
+          const apiOk = healthRes?.status === "ok";
+          return prev.map((s) => {
+            if (s.service === "API") return { ...s, status: apiOk ? "healthy" : "down" };
+            if (s.service === "Database") return { ...s, status: "healthy" };
+            return s;
+          });
+        });
+        setSystemSummary({
+          label: "Core Services Operational",
+          className:
+            "text-[10px] font-bold text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded-full border border-green-100",
+        });
       } catch (err) {
         if (err instanceof ApiError) setMetricsError(err.detail);
         else setMetricsError("Failed to load metrics");
+        setSystemStatus((prev) =>
+          prev.map((s) => {
+            if (s.service === "API") return { ...s, status: "down" };
+            if (s.service === "Database") return { ...s, status: "degraded" };
+            return s;
+          })
+        );
+        setSystemSummary({
+          label: "Degraded",
+          className:
+            "text-[10px] font-bold text-amber-700 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-full border border-amber-200/60",
+        });
       }
     }
     load();
@@ -142,9 +203,7 @@ export default function SuperadminPage() {
             <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
               Infrastructure Health
             </h2>
-            <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded-full border border-green-100">
-              All Systems Operational
-            </span>
+            <span className={systemSummary.className}>{systemSummary.label}</span>
           </div>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
             <div className="divide-y divide-[var(--border)]/50">
@@ -152,6 +211,7 @@ export default function SuperadminPage() {
                 <div
                   key={item.service}
                   className="flex items-center justify-between p-4 bg-[var(--background)]/30 hover:bg-[var(--background)] transition-colors"
+                  title={item.hint || ""}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-white border border-[var(--border)] flex items-center justify-center">
@@ -215,10 +275,18 @@ export default function SuperadminPage() {
             The platform admin view provides unrestricted access to all data. Every action taken from this dashboard is recorded in the global immutable audit ledger for institutional compliance.
           </p>
           <div className="flex gap-3">
-            <button className="px-4 py-2 bg-white text-[var(--primary)] rounded-xl text-xs font-bold hover:bg-white/90 transition-colors">
+            <button
+              className="px-4 py-2 bg-white text-[var(--primary)] rounded-xl text-xs font-bold opacity-60 cursor-not-allowed"
+              disabled
+              title="Not implemented yet"
+            >
               Access Global Ledger
             </button>
-            <button className="px-4 py-2 bg-[var(--primary-hover)] text-white border border-white/20 rounded-xl text-xs font-bold hover:bg-white/10 transition-colors">
+            <button
+              className="px-4 py-2 bg-[var(--primary-hover)] text-white border border-white/20 rounded-xl text-xs font-bold opacity-60 cursor-not-allowed"
+              disabled
+              title="Not implemented yet"
+            >
               Export Transparency Report
             </button>
           </div>
@@ -228,7 +296,7 @@ export default function SuperadminPage() {
   );
 }
 
-function OperationButton({ onClick, title, description, icon: Icon }: { onClick: () => void; title: string; description: string; icon: any }) {
+function OperationButton({ onClick, title, description, icon: Icon }: { onClick: () => void; title: string; description: string; icon: ComponentType<{ className?: string }> }) {
   return (
     <button
       onClick={onClick}
