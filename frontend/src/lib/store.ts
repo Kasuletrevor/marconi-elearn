@@ -23,7 +23,12 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (isLoading) => set({ isLoading }),
       enterStudentView: () => set({ viewAsStudent: true }),
       exitStudentView: () => set({ viewAsStudent: false }),
-      logout: () => set({ user: null, isLoading: false, viewAsStudent: false }),
+      logout: () => {
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("marconi:admin_org_id");
+        }
+        set({ user: null, isLoading: false, viewAsStudent: false });
+      },
     }),
     {
       name: "marconi-auth",
