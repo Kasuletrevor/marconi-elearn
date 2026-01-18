@@ -62,6 +62,8 @@ import { useAuthStore, getCourseRole } from "@/lib/store";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
+import { reportError } from "@/lib/reportError";
+import { PROGRAMMES, type Programme } from "@/lib/programmes";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -927,8 +929,8 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
     const emails = missingStudents.map((s) => s.email).join(", ");
     try {
       await navigator.clipboard.writeText(emails);
-    } catch {
-      // ignore
+    } catch (err) {
+      reportError("Failed to copy missing student emails", err);
     }
   }
 
@@ -1213,9 +1215,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
   const [studentNumber, setStudentNumber] = useState("");
-  const [studentProgramme, setStudentProgramme] = useState<
-    "BELE" | "BSCE" | "BBIO" | "BSTE" | ""
-  >("");
+  const [studentProgramme, setStudentProgramme] = useState<Programme | "">("");
 
   useEffect(() => {
     async function loadOrgMembers() {
@@ -1224,7 +1224,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
         const data = await courseStaff.listOrgMembers(course.id);
         setOrgMembers(data);
       } catch (err) {
-        console.error("Failed to load org members", err);
+        reportError("Failed to load org members", err);
       } finally {
         setIsLoadingOrg(false);
       }
@@ -1540,7 +1540,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             </label>
             <select
               value={newRole}
-              onChange={(e) => setNewRole(e.target.value as any)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "ta" || value === "co_lecturer") setNewRole(value);
+              }}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             >
               <option value="ta">TA</option>
@@ -1592,7 +1595,12 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <select
                     value={member.role}
-                    onChange={(e) => updateRole(member.id, e.target.value as any)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "owner" || value === "co_lecturer" || value === "ta") {
+                        updateRole(member.id, value);
+                      }
+                    }}
                     className="text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] px-2 py-1"
                   >
                     <option value="owner">Owner</option>
@@ -1730,14 +1738,18 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             </label>
             <select
               value={studentProgramme}
-              onChange={(e) => setStudentProgramme(e.target.value as any)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setStudentProgramme(value ? (value as Programme) : "");
+              }}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
             >
               <option value="">Select programme...</option>
-              <option value="BELE">BELE</option>
-              <option value="BSCE">BSCE</option>
-              <option value="BBIO">BBIO</option>
-              <option value="BSTE">BSTE</option>
+              {PROGRAMMES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
           <div className="md:col-span-12">
@@ -1838,6 +1850,7 @@ function AssignmentsTab({
   const [newDueDateLocal, setNewDueDateLocal] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [error, setError] = useState("");
 
   function toDateTimeLocalValue(date: Date): string {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -1857,6 +1870,7 @@ function AssignmentsTab({
     setNewMaxPoints(100);
     setNewDueDateLocal("");
     setCreateError("");
+    setError("");
     setShowCreateModal(true);
   }
 
@@ -1870,6 +1884,7 @@ function AssignmentsTab({
       assignment.due_date ? toDateTimeLocalValue(new Date(assignment.due_date)) : ""
     );
     setCreateError("");
+    setError("");
     setShowCreateModal(true);
   }
 
@@ -1880,8 +1895,8 @@ function AssignmentsTab({
 
   const getModuleName = (moduleId: number | null) => {
     if (moduleId === null) return "Unassigned";
-    const module = modules.find((m) => m.id === moduleId);
-    return module?.title || "Unknown Module";
+    const moduleRow = modules.find((m) => m.id === moduleId);
+    return moduleRow?.title || "Unknown Module";
   };
 
   async function createAssignment() {
@@ -1889,6 +1904,7 @@ function AssignmentsTab({
     if (!title) return;
     setIsCreating(true);
     setCreateError("");
+    setError("");
     try {
       const payload = {
         title,
@@ -1927,6 +1943,12 @@ function AssignmentsTab({
           <span>Create Assignment</span>
         </button>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 text-sm text-[var(--secondary)]">
+          {error}
+        </div>
+      )}
 
       <AnimatePresence>
         {showCreateModal && (
@@ -2136,8 +2158,9 @@ function AssignmentsTab({
                       try {
                         await courseStaff.deleteAssignment(course.id, assignment.id);
                         await onRefreshAssignments();
-                      } catch {
-                        // ignore
+                      } catch (err) {
+                        reportError("Failed to delete assignment", err);
+                        setError("Failed to delete assignment");
                       }
                     }}
                     className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
@@ -2459,7 +2482,7 @@ function ModuleCard(
         prev.map((r) => (r.id === resource.id ? updated : r))
       );
     } catch (err) {
-      console.error("Failed to toggle publish:", err);
+      reportError("Failed to toggle publish", err);
     }
   }
 
@@ -2485,7 +2508,7 @@ function ModuleCard(
           .sort((x, y) => x.position - y.position)
       );
     } catch (err) {
-      console.error("Failed to reorder resource:", err);
+      reportError("Failed to reorder resource", err);
     } finally {
       setMovingResourceId(null);
     }
@@ -2497,7 +2520,7 @@ function ModuleCard(
       await courseStaff.deleteModuleResource(courseId, module.id, resourceId);  
       setResources((prev) => prev.filter((r) => r.id !== resourceId));
     } catch (err) {
-      console.error("Failed to delete resource:", err);
+      reportError("Failed to delete resource", err);
     }
   }
 
@@ -2517,7 +2540,7 @@ function ModuleCard(
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Failed to download:", err);
+      reportError("Failed to download resource", err);
     }
   }
 
