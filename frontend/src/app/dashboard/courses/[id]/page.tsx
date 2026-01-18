@@ -212,7 +212,7 @@ export default function CourseDetailPage() {
       </motion.div>
 
       {/* Empty state */}
-      {modules.length === 0 && (
+      {modules.length === 0 && assignments.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -226,6 +226,29 @@ export default function CourseDetailPage() {
             Your instructor hasn&apos;t added any modules or assignments to this
             course yet. Check back later!
           </p>
+        </motion.div>
+      )}
+
+      {/* Assignments-only (no modules yet) */}
+      {modules.length === 0 && assignments.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden"
+        >
+          <div className="p-4 bg-[var(--background)] border-b border-[var(--border)]">
+            <h2 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
+              Assignments
+            </h2>
+            <p className="text-xs text-[var(--muted-foreground)] mt-1">
+              This course hasn&apos;t organized modules yet — assignments are listed here.
+            </p>
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {assignments.map((assignment) => (
+              <AssignmentRow key={assignment.id} assignment={assignment} courseId={courseId} />
+            ))}
+          </div>
         </motion.div>
       )}
 
