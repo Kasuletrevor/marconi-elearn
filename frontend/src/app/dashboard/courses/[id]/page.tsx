@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -10,7 +10,6 @@ import {
   Calendar,
   Clock,
   FileText,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   ChevronRight,
@@ -28,6 +27,7 @@ import {
   type ModuleResource,
   ApiError,
 } from "@/lib/api";
+import { reportError } from "@/lib/reportError";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -41,6 +41,9 @@ const staggerContainer = {
     transition: { staggerChildren: 0.08, delayChildren: 0.1 },
   },
 };
+
+// Capture "now" once at module load to keep render output pure/deterministic.
+const NOW_MS = Date.now();
 
 interface ModuleWithAssignments extends Module {
   assignments: Assignment[];
@@ -276,14 +279,7 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
   const [isLoadingResources, setIsLoadingResources] = useState(false);
   const [resourcesLoaded, setResourcesLoaded] = useState(false);
 
-  // Fetch resources when expanded for the first time
-  useEffect(() => {
-    if (isExpanded && !resourcesLoaded) {
-      fetchResources();
-    }
-  }, [isExpanded, resourcesLoaded]);
-
-  async function fetchResources() {
+  const fetchResources = useCallback(async () => {
     setIsLoadingResources(true);
     try {
       const data = await student.getModuleResources(courseId, module.id);
@@ -291,12 +287,19 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
       setResourcesLoaded(true);
     } catch (err) {
       // Silently fail - resources are optional
-      console.error("Failed to load resources:", err);
+      reportError("Failed to load resources", err);
       setResourcesLoaded(true);
     } finally {
       setIsLoadingResources(false);
     }
-  }
+  }, [courseId, module.id]);
+
+  // Fetch resources when expanded for the first time
+  useEffect(() => {
+    if (isExpanded && !resourcesLoaded) {
+      void fetchResources();
+    }
+  }, [fetchResources, isExpanded, resourcesLoaded]);
 
   async function handleDownload(resource: ModuleResource) {
     try {
@@ -310,7 +313,7 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Failed to download:", err);
+      reportError("Failed to download resource", err);
     }
   }
 
@@ -477,11 +480,12 @@ interface AssignmentRowProps {
 
 function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
   const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;
-  const isPastDue = dueDate && dueDate < new Date();
-  const isUpcoming =
-    dueDate &&
-    dueDate > new Date() &&
-    dueDate.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000; // within 7 days
+  const nowMs = NOW_MS;
+
+  const isPastDue = dueDate ? dueDate.getTime() < nowMs : false;
+  const isUpcoming = dueDate
+    ? dueDate.getTime() > nowMs && dueDate.getTime() - nowMs < 7 * 24 * 60 * 60 * 1000
+    : false; // within 7 days
 
   return (
     <Link
