@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,8 @@ from app.models.submission_test_result import SubmissionTestResult
 from app.models.test_case import TestCase
 from app.worker.broker import broker
 from app.worker.grading import run_test_case
+
+logger = logging.getLogger(__name__)
 
 
 def _jobe_client() -> JobeClient:
@@ -108,12 +111,24 @@ async def grade_submission(submission_id: int, attempt: int = 0) -> dict[str, An
                 submission.status = SubmissionStatus.error
                 submission.score = 0
                 submission.feedback = "Grading failed due to JOBE error"
+                logger.exception(
+                    "Grading failed due to JOBE error. submission_id=%s test_case_id=%s attempt=%s",
+                    submission_id,
+                    tc.id,
+                    attempt,
+                )
                 await db.commit()
                 return {"status": "error", "reason": "jobe_error"}
             except Exception:
                 submission.status = SubmissionStatus.error
                 submission.score = 0
                 submission.feedback = "Grading failed due to internal error"
+                logger.exception(
+                    "Grading failed due to internal error. submission_id=%s test_case_id=%s attempt=%s",
+                    submission_id,
+                    tc.id,
+                    attempt,
+                )
                 await db.commit()
                 return {"status": "error", "reason": "internal_error"}
             results.append(
