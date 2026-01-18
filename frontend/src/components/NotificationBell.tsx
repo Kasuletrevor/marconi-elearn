@@ -186,7 +186,7 @@ export function NotificationBell({
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
                   style={{ top: panelPos.top, left: panelPos.left }}
-                  className="fixed w-80 bg-[var(--background)] border border-[var(--border)] rounded-2xl shadow-xl z-[100] overflow-hidden"
+                  className="fixed w-80 bg-[var(--background)] border border-[var(--border)] rounded-2xl shadow-xl z-[1000] overflow-hidden"
                 >
                   <div className="p-4 border-b border-[var(--border)]">
                     <div className="flex items-center justify-between">
