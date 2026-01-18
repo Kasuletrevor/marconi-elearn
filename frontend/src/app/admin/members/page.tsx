@@ -9,7 +9,6 @@ import {
   UserPlus,
   Loader2,
   AlertCircle,
-  Plus,
   Copy,
   Mail,
   Trash2,
@@ -28,11 +27,8 @@ import {
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0 },
-};
+import { reportError } from "@/lib/reportError";
+import { ConfirmModal } from "@/components/ui/Modal";
 
 function roleLabel(role: OrgMembership["role"]): string {
   switch (role) {
@@ -63,6 +59,8 @@ export default function AdminMembersPage() {
     inviteLink: string | null;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   const adminOrgIds = useMemo(() => new Set(user?.org_admin_of ?? []), [user]);
 
@@ -161,8 +159,8 @@ export default function AdminMembersPage() {
       await navigator.clipboard.writeText(addResult.inviteLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
+    } catch (err) {
+      reportError("Failed to copy invite link", err);
     }
   }
 
@@ -180,14 +178,23 @@ export default function AdminMembersPage() {
 
   async function removeMember(membershipId: number) {
     if (!selectedOrgId) return;
-    if (!confirm("Remove this user from the organization?")) return;
+    setConfirmRemoveId(membershipId);
+    return;
+  }
+
+  async function confirmRemoveMember() {
+    if (!selectedOrgId || confirmRemoveId == null) return;
     setError("");
     try {
-      await staff.removeOrgMembership(selectedOrgId, membershipId);
-      setMemberships((prev) => prev.filter((m) => m.id !== membershipId));
+      setIsRemoving(true);
+      await staff.removeOrgMembership(selectedOrgId, confirmRemoveId);
+      setMemberships((prev) => prev.filter((m) => m.id !== confirmRemoveId));
+      setConfirmRemoveId(null);
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to remove member");
+    } finally {
+      setIsRemoving(false);
     }
   }
 
@@ -394,6 +401,17 @@ export default function AdminMembersPage() {
           </DataList>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmRemoveId != null}
+        onClose={() => setConfirmRemoveId(null)}
+        onConfirm={confirmRemoveMember}
+        title="Remove member?"
+        description="Remove this user from the organization. They will lose access to all org resources."
+        confirmLabel="Remove"
+        confirmVariant="danger"
+        isLoading={isRemoving}
+      />
     </div>
   );
 }
