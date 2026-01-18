@@ -33,6 +33,7 @@ import {
   Link as LinkIcon,
   Download,
   ExternalLink,
+  Beaker,
   Eye,
   EyeOff,
   GripVertical,
@@ -878,10 +879,8 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
   const [statusFilter, setStatusFilter] = useState<StaffSubmissionQueueItem["status"] | "all">("pending");
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(25);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isBulkWorking, setIsBulkWorking] = useState(false);
   const [isNavigatingNext, setIsNavigatingNext] = useState(false);
   const [error, setError] = useState("");
 
@@ -891,53 +890,11 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
   const [isMissingLoading, setIsMissingLoading] = useState(false);
   const [missingError, setMissingError] = useState("");
 
-  const selectedCount = selectedIds.size;
-  const allOnPageSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
   const canGoPrev = offset > 0;
   const canGoNext = offset + items.length < total;
 
   function resetPaging() {
     setOffset(0);
-    setSelectedIds(new Set());
-  }
-
-  function toggleSelect(id: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAllOnPage() {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (allOnPageSelected) {
-        for (const item of items) next.delete(item.id);
-      } else {
-        for (const item of items) next.add(item.id);
-      }
-      return next;
-    });
-  }
-
-  async function runBulk(action: "mark_pending" | "mark_grading" | "mark_graded") {
-    if (selectedIds.size === 0) return;
-    setIsBulkWorking(true);
-    try {
-      await staffSubmissions.bulkUpdate({
-        submission_ids: Array.from(selectedIds),
-        action,
-      });
-      setSelectedIds(new Set());
-      await fetchQueue(true);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.detail);
-      else setError("Bulk update failed");
-    } finally {
-      setIsBulkWorking(false);
-    }
   }
 
   async function goNextUngraded() {
@@ -1112,33 +1069,12 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
             <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--background)]">
               <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-xs text-[var(--muted-foreground)] select-none cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={allOnPageSelected}
-                    onChange={toggleSelectAllOnPage}
-                    className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
-                  />
-                  Select page
-                </label>
                 <span className="text-xs text-[var(--muted-foreground)] font-mono">
                   {total === 0 ? "0" : `${offset + 1}–${offset + items.length}`} of {total}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedCount > 0 && (
-                  <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
-                    <span className="text-xs text-[var(--muted-foreground)] font-medium">{selectedCount} selected</span>
-                    <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm">
-                      <button onClick={() => runBulk("mark_grading")} disabled={isBulkWorking} className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide">Grading</button>
-                      <div className="w-px h-6 bg-[var(--border)]" />
-                      <button onClick={() => runBulk("mark_graded")} disabled={isBulkWorking} className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide">Graded</button>
-                      <div className="w-px h-6 bg-[var(--border)]" />
-                      <button onClick={() => runBulk("mark_pending")} disabled={isBulkWorking} className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide">Reset</button>
-                    </div>
-                  </div>
-                )}
                 <div className="flex items-center gap-1">
                   <button onClick={() => setOffset((o) => Math.max(0, o - limit))} disabled={!canGoPrev} className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="w-4 h-4" /></button>
                   <button onClick={() => setOffset((o) => o + limit)} disabled={!canGoNext} className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronRight className="w-4 h-4" /></button>
@@ -1149,10 +1085,7 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
             <div className="divide-y divide-[var(--border)]">
               {items.map((s) => (
                 <div key={s.id} onClick={() => router.push(`/staff/submissions/${s.id}`)} className="group grid grid-cols-12 gap-4 px-5 py-4 hover:bg-[var(--background)] transition-colors cursor-pointer items-center">
-                  <div className="col-span-1 flex items-center">
-                    <input type="checkbox" checked={selectedIds.has(s.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggleSelect(s.id)} className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] cursor-pointer" />
-                  </div>
-                  <div className="col-span-5 min-w-0">
+                  <div className="col-span-6 min-w-0">
                     <p className="text-sm font-medium text-[var(--foreground)] truncate">{s.student_full_name || s.student_email}</p>
                     <p className="text-xs text-[var(--muted-foreground)] truncate mt-0.5">{s.assignment_title}</p>
                   </div>
@@ -2353,6 +2286,14 @@ function AssignmentsTab({
                     <span className="text-xs text-[var(--muted-foreground)]">
                       {assignment.max_points} pts
                     </span>
+                    <Link
+                      href={`/staff/courses/${course.id}/assignments/${assignment.id}`}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] transition-colors"
+                      title="Manage test cases"
+                    >
+                      <Beaker className="w-3.5 h-3.5" />
+                      Tests
+                    </Link>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
