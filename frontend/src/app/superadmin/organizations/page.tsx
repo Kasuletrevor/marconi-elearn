@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { ApiError, orgs, staff, superadmin, type Organization } from "@/lib/api";
+import { reportError } from "@/lib/reportError";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -116,8 +117,8 @@ export default function SuperadminOrganizationsPage() {
       await navigator.clipboard.writeText(createResult.inviteLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
+    } catch (err) {
+      reportError("Failed to copy invite link", err);
     }
   }
 
