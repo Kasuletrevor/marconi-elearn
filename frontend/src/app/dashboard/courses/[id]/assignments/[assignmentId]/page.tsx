@@ -18,6 +18,9 @@ import {
   X,
   RefreshCw,
   MessageSquare,
+  Beaker,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   student,
@@ -25,6 +28,7 @@ import {
   type Submission,
   type Course,
   type LatePolicy,
+  type StudentSubmissionTests,
   ApiError,
 } from "@/lib/api";
 
@@ -532,6 +536,8 @@ export default function AssignmentDetailPage() {
                     submission={submission}
                     isLatest={index === 0}
                     maxPoints={assignment.max_points}
+                    courseId={courseId}
+                    assignmentId={assignmentId}
                     attemptNumber={submissions.length - index}
                     totalAttempts={submissions.length}
                   />
@@ -549,6 +555,8 @@ interface SubmissionCardProps {
   submission: Submission;
   isLatest: boolean;
   maxPoints: number;
+  courseId: number;
+  assignmentId: number;
   attemptNumber: number;
   totalAttempts: number;
 }
@@ -557,10 +565,17 @@ function SubmissionCard({
   submission,
   isLatest,
   maxPoints,
+  courseId,
+  assignmentId,
   attemptNumber,
   totalAttempts,
 }: SubmissionCardProps) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isTestsOpen, setIsTestsOpen] = useState(false);
+  const [isTestsLoading, setIsTestsLoading] = useState(false);
+  const [testsError, setTestsError] = useState("");
+  const [testsData, setTestsData] = useState<StudentSubmissionTests | null>(null);
+  const [expandedTestId, setExpandedTestId] = useState<number | null>(null);
   const config = statusConfig[submission.status];
   const StatusIcon = config.icon;
   const submittedAt = new Date(submission.submitted_at);
@@ -595,6 +610,43 @@ function SubmissionCard({
   };
 
   const submissionKind = submission.error_kind ? kindMeta[submission.error_kind] : null;
+
+  const canShowTests = submission.status === "graded" || submission.status === "error";
+
+  const loadTestsIfNeeded = useCallback(async () => {
+    if (!canShowTests) return;
+    if (testsData || isTestsLoading) return;
+    if (!courseId || !assignmentId) return;
+
+    setIsTestsLoading(true);
+    setTestsError("");
+    try {
+      const data = await student.getSubmissionTests(courseId, assignmentId, submission.id);
+      setTestsData(data);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 404) {
+          setTestsError("No test results available yet.");
+        } else if (err.status === 401) {
+          setTestsError("Not authenticated.");
+        } else {
+          setTestsError(err.detail || "Failed to load tests.");
+        }
+      } else {
+        setTestsError("Failed to load tests.");
+      }
+    } finally {
+      setIsTestsLoading(false);
+    }
+  }, [assignmentId, canShowTests, courseId, isTestsLoading, submission.id, testsData]);
+
+  const toggleTests = useCallback(async () => {
+    const nextOpen = !isTestsOpen;
+    setIsTestsOpen(nextOpen);
+    if (nextOpen) {
+      await loadTestsIfNeeded();
+    }
+  }, [isTestsOpen, loadTestsIfNeeded]);
 
   return (
     <div
@@ -703,6 +755,166 @@ function SubmissionCard({
           )}
         </div>
       )}
+
+      <div className="mt-3 pt-2 border-t border-[var(--border)]">
+        <button
+          type="button"
+          onClick={toggleTests}
+          disabled={!canShowTests}
+          className={`w-full flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${
+            canShowTests ? "hover:bg-[var(--muted)]/40" : "opacity-60 cursor-not-allowed"
+          }`}
+        >
+          <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+            <Beaker className="w-3.5 h-3.5" />
+            <span>Autograder tests</span>
+            {!canShowTests ? (
+              <span className="text-[11px] text-[var(--muted-foreground)]">(available after grading)</span>
+            ) : null}
+          </div>
+          {isTestsOpen ? (
+            <ChevronUp className="w-4 h-4 text-[var(--muted-foreground)]" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
+          )}
+        </button>
+
+        {isTestsOpen && (
+          <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+            <p className="text-[11px] text-[var(--muted-foreground)]">
+              You’ll see results for <span className="font-medium">visible</span> tests only. Hidden tests aren’t shown.
+            </p>
+
+            {isTestsLoading ? (
+              <div className="flex items-center gap-2 mt-3 text-xs text-[var(--muted-foreground)]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Loading tests…</span>
+              </div>
+            ) : testsError ? (
+              <div className="mt-3 text-xs bg-[var(--destructive)]/10 text-[var(--destructive)] px-3 py-2 rounded-lg">
+                {testsError}
+              </div>
+            ) : (
+              <>
+                {testsData?.compile_output ? (
+                  <div className="mt-3">
+                    <div className="text-[11px] text-[var(--muted-foreground)] mb-1">Compile output</div>
+                    <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                      {testsData.compile_output}
+                    </pre>
+                  </div>
+                ) : null}
+
+                <div className="mt-3 space-y-2">
+                  {(testsData?.tests ?? []).length === 0 ? (
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      No visible tests to display for this submission.
+                    </div>
+                  ) : (
+                    (testsData?.tests ?? []).map((t) => {
+                      const isExpanded = expandedTestId === t.test_case_id;
+                      return (
+                        <div
+                          key={t.test_case_id}
+                          className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-[var(--foreground)] truncate">
+                                  {t.name}
+                                </span>
+                                <span className="text-[11px] text-[var(--muted-foreground)]">{t.points} pts</span>
+                              </div>
+                              <div className="text-[11px] text-[var(--muted-foreground)]">
+                                Test #{t.position}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                                  t.passed
+                                    ? "bg-[var(--success)]/10 text-[var(--success)]"
+                                    : "bg-[var(--destructive)]/10 text-[var(--destructive)]"
+                                }`}
+                              >
+                                {t.passed ? "Pass" : "Fail"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedTestId((prev) =>
+                                    prev === t.test_case_id ? null : t.test_case_id
+                                  )
+                                }
+                                className="text-[11px] text-[var(--primary)] hover:underline"
+                              >
+                                {isExpanded ? "Hide" : "View"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="mt-2 grid gap-2">
+                              {t.stdin ? (
+                                <div>
+                                  <div className="text-[11px] text-[var(--muted-foreground)] mb-1">stdin</div>
+                                  <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                    {t.stdin}
+                                  </pre>
+                                </div>
+                              ) : null}
+
+                              <div className="grid md:grid-cols-2 gap-2">
+                                <div>
+                                  <div className="text-[11px] text-[var(--muted-foreground)] mb-1">
+                                    Expected stdout
+                                  </div>
+                                  <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                    {t.expected_stdout || "∅"}
+                                  </pre>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] text-[var(--muted-foreground)] mb-1">Your stdout</div>
+                                  <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                    {t.stdout || "∅"}
+                                  </pre>
+                                </div>
+                              </div>
+
+                              {(t.expected_stderr || t.stderr) && (
+                                <div className="grid md:grid-cols-2 gap-2">
+                                  <div>
+                                    <div className="text-[11px] text-[var(--muted-foreground)] mb-1">
+                                      Expected stderr
+                                    </div>
+                                    <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                      {t.expected_stderr || "∅"}
+                                    </pre>
+                                  </div>
+                                  <div>
+                                    <div className="text-[11px] text-[var(--muted-foreground)] mb-1">
+                                      Your stderr
+                                    </div>
+                                    <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                      {t.stderr || "∅"}
+                                    </pre>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
