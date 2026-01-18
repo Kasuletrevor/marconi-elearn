@@ -1887,6 +1887,9 @@ function AssignmentsTab({
   const [newModuleId, setNewModuleId] = useState<number | null>(null);
   const [newMaxPoints, setNewMaxPoints] = useState<number>(100);
   const [newDueDateLocal, setNewDueDateLocal] = useState("");
+  const [newAllowsZip, setNewAllowsZip] = useState(false);
+  const [newExpectedFilename, setNewExpectedFilename] = useState("");
+  const [newCompileCommand, setNewCompileCommand] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [error, setError] = useState("");
@@ -1910,6 +1913,9 @@ function AssignmentsTab({
     setNewModuleId(modules[0]?.id ?? null);
     setNewMaxPoints(100);
     setNewDueDateLocal("");
+    setNewAllowsZip(false);
+    setNewExpectedFilename("");
+    setNewCompileCommand("");
     setCreateError("");
     setError("");
     setShowCreateModal(true);
@@ -1924,6 +1930,9 @@ function AssignmentsTab({
     setNewDueDateLocal(
       assignment.due_date ? toDateTimeLocalValue(new Date(assignment.due_date)) : ""
     );
+    setNewAllowsZip(Boolean(assignment.allows_zip));
+    setNewExpectedFilename(assignment.expected_filename ?? "");
+    setNewCompileCommand(assignment.compile_command ?? "");
     setCreateError("");
     setError("");
     setShowCreateModal(true);
@@ -1963,12 +1972,22 @@ function AssignmentsTab({
     setCreateError("");
     setError("");
     try {
+      const expectedFilename = newExpectedFilename.trim();
+      const compileCommand = newCompileCommand.trim();
+      if (newAllowsZip && expectedFilename && compileCommand) {
+        setCreateError("Choose either expected filename or compile command (not both).");
+        return;
+      }
+
       const payload = {
         title,
         description: newDescription.trim() ? newDescription.trim() : null,
         module_id: newModuleId,
         due_date: newDueDateLocal ? new Date(newDueDateLocal).toISOString() : null,
         max_points: newMaxPoints,
+        allows_zip: newAllowsZip,
+        expected_filename: newAllowsZip ? (expectedFilename || null) : null,
+        compile_command: newAllowsZip ? (compileCommand || null) : null,
       };
       if (editingAssignmentId !== null) {
         await courseStaff.updateAssignment(course.id, editingAssignmentId, payload);
@@ -2117,6 +2136,66 @@ function AssignmentsTab({
                       onChange={(e) => setNewDueDateLocal(e.target.value)}
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                      <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
+                        <input
+                          type="checkbox"
+                          checked={newAllowsZip}
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            setNewAllowsZip(next);
+                            if (!next) {
+                              setNewExpectedFilename("");
+                              setNewCompileCommand("");
+                            }
+                          }}
+                          className="w-4 h-4"
+                        />
+                        Allow ZIP submissions
+                      </label>
+
+                      {newAllowsZip ? (
+                        <div className="mt-4 grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                              Expected filename (optional)
+                            </label>
+                            <input
+                              value={newExpectedFilename}
+                              onChange={(e) => setNewExpectedFilename(e.target.value)}
+                              placeholder="e.g., solution.c"
+                              disabled={Boolean(newCompileCommand.trim())}
+                              className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                              If set, we grade that file from the ZIP.
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                              Compile command (optional)
+                            </label>
+                            <input
+                              value={newCompileCommand}
+                              onChange={(e) => setNewCompileCommand(e.target.value)}
+                              placeholder="e.g., gcc main.c utils.c"
+                              disabled={Boolean(newExpectedFilename.trim())}
+                              className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                              Use for multi-file projects (gcc/g++ only; -o is ignored).
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <p className="mt-3 text-xs text-[var(--muted-foreground)]">
+                        ZIP rules: flat structure (no folders), max 50 files, max 10MB uncompressed.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
