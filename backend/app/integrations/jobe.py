@@ -79,10 +79,23 @@ class JobeClient:
         language_id: str,
         source_code: str,
         stdin: str,
+        source_filename: str | None = None,
+        file_list: list[tuple[str, str]] | None = None,
+        parameters: dict[str, Any] | None = None,
     ) -> JobeRunResult:
-        payload: dict[str, Any] = {
-            "run_spec": {"language_id": language_id, "sourcecode": source_code, "input": stdin},
+        run_spec: dict[str, Any] = {
+            "language_id": language_id,
+            "sourcecode": source_code,
+            "input": stdin,
         }
+        if source_filename:
+            run_spec["sourcefilename"] = source_filename
+        if file_list:
+            run_spec["file_list"] = [[file_id, file_name] for file_id, file_name in file_list]
+        if parameters:
+            run_spec["parameters"] = parameters
+
+        payload: dict[str, Any] = {"run_spec": run_spec}
 
         try:
             async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
@@ -115,3 +128,38 @@ class JobeClient:
             stdout=stdout,
             stderr=stderr,
         )
+
+    async def check_file(self, *, file_id: str) -> bool:
+        try:
+            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+                resp = await client.head(f"/files/{file_id}")
+        except httpx.TimeoutException as exc:
+            raise JobeTransientError("JOBE request timed out") from exc
+        except httpx.TransportError as exc:
+            raise JobeTransientError("JOBE connection error") from exc
+
+        if resp.status_code == 204:
+            return True
+        if resp.status_code == 404:
+            return False
+        raise JobeUpstreamError("JOBE returned an error response")  # pragma: no cover
+
+    async def put_file(self, *, file_id: str, content: bytes) -> None:
+        try:
+            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+                resp = await client.put(f"/files/{file_id}", content=content)
+        except httpx.TimeoutException as exc:
+            raise JobeTransientError("JOBE request timed out") from exc
+        except httpx.TransportError as exc:
+            raise JobeTransientError("JOBE connection error") from exc
+
+        if resp.status_code == 204:
+            return
+        if resp.status_code == 403:
+            return
+        raise JobeUpstreamError("JOBE returned an error response")  # pragma: no cover
+
+    async def ensure_file(self, *, file_id: str, content: bytes) -> None:
+        if await self.check_file(file_id=file_id):
+            return
+        await self.put_file(file_id=file_id, content=content)
