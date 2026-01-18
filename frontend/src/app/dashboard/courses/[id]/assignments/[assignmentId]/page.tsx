@@ -116,6 +116,11 @@ export default function AssignmentDetailPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
+  const allowsZip = Boolean(assignment?.allows_zip);
+  const expectedZipFile = assignment?.expected_filename ?? null;
+  const allowedExtensions = allowsZip ? [".c", ".cpp", ".zip"] : [".c", ".cpp"];
+  const acceptAttr = allowedExtensions.join(",");
+
   const fetchData = useCallback(async () => {
     if (!courseId || isNaN(courseId) || !assignmentId || isNaN(assignmentId)) {
       setError("Invalid course or assignment ID");
@@ -192,12 +197,11 @@ export default function AssignmentDetailPage() {
   }, []);
 
   const validateAndSetFile = (file: File) => {
-    const validExtensions = [".c", ".cpp", ".h", ".hpp", ".zip"];
     const fileName = file.name.toLowerCase();
-    const isValid = validExtensions.some((ext) => fileName.endsWith(ext));     
+    const isValid = allowedExtensions.some((ext) => fileName.endsWith(ext));
 
     if (!isValid) {
-      setUploadError("Please upload a C/C++ file or zip (.c, .cpp, .h, .hpp, .zip)");
+      setUploadError(`Please upload ${allowsZip ? "a .c, .cpp, or .zip" : "a .c or .cpp"} file`);
       return;
     }
 
@@ -442,14 +446,16 @@ export default function AssignmentDetailPage() {
                   <p className="text-sm text-[var(--muted-foreground)] mb-4">
                     or click to browse
                   </p>
-                    <p className="text-xs text-[var(--muted-foreground)]">  
-                      Accepts .c, .cpp, .h, .hpp, .zip (max 5MB)
-                    </p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Accepts {allowsZip ? ".c, .cpp, .zip" : ".c, .cpp"} (max 5MB)
+                    {allowsZip ? " • ZIP must be flat (no folders)" : ""}
+                    {allowsZip && expectedZipFile ? ` • ZIP must include: ${expectedZipFile}` : ""}
+                  </p>
                   </>
                 )}
               <input
                 type="file"
-                accept=".c,.cpp,.h,.hpp,.zip"
+                accept={acceptAttr}
                 onChange={handleFileSelect}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
