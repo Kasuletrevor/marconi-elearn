@@ -13,7 +13,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { useAuthStore, getCourseRole } from "@/lib/store";
-import { courseStaff, type Course, ApiError, type User as ApiUser } from "@/lib/api";
+import { courseStaff, staffSubmissions, type Course, ApiError, type User as ApiUser } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 
@@ -35,6 +35,12 @@ export default function StaffDashboardPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [queueTotals, setQueueTotals] = useState<{
+    pending: number;
+    grading: number;
+    graded: number;
+    error: number;
+  } | null>(null);
 
   useEffect(() => {
     async function fetchCourses() {
@@ -42,6 +48,23 @@ export default function StaffDashboardPage() {
         if (!user) return;
         const staffCourses = await courseStaff.listCourses();
         setCourses(staffCourses);
+
+        try {
+          const [pendingPage, gradingPage, errorPage, gradedPage] = await Promise.all([
+            staffSubmissions.listPage({ status: "pending", limit: 1, offset: 0 }),
+            staffSubmissions.listPage({ status: "grading", limit: 1, offset: 0 }),
+            staffSubmissions.listPage({ status: "error", limit: 1, offset: 0 }),
+            staffSubmissions.listPage({ status: "graded", limit: 1, offset: 0 }),
+          ]);
+          setQueueTotals({
+            pending: pendingPage.total,
+            grading: gradingPage.total,
+            error: errorPage.total,
+            graded: gradedPage.total,
+          });
+        } catch {
+          setQueueTotals(null);
+        }
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.detail);
@@ -56,24 +79,32 @@ export default function StaffDashboardPage() {
     fetchCourses();
   }, [user]);
 
+  const formatCount = (n: number | null | undefined) => {
+    if (n === null || n === undefined) return "—";
+    return n > 999 ? "999+" : String(n);
+  };
+
   const stats = [
     {
-      label: "Pending Reviews",
-      value: "—",
+      label: "Pending",
+      value: formatCount(queueTotals?.pending),
       icon: FileText,
       color: "var(--secondary)",
+      href: "/staff/submissions?status=pending",
     },
     {
-      label: "Graded Today",
-      value: "—",
+      label: "Grading",
+      value: formatCount(queueTotals?.grading),
       icon: CheckCircle,
       color: "#22c55e",
+      href: "/staff/submissions?status=grading",
     },
     {
-      label: "At-Risk Students",
-      value: "—",
+      label: "Needs attention",
+      value: formatCount(queueTotals?.error),
       icon: AlertTriangle,
       color: "#f59e0b",
+      href: "/staff/submissions?status=error",
     },
     {
       label: "Active Courses",
@@ -115,31 +146,61 @@ export default function StaffDashboardPage() {
         className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {stats.map((stat) => (
-          <motion.div
-            key={stat.label}
-            variants={fadeInUp}
-            className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm relative overflow-hidden group"
-          >
-            <div
-              className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity"
-              aria-hidden="true"
-            >
-              <stat.icon size={80} />
-            </div>
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 border border-white/50"
-              style={{
-                backgroundColor: `color-mix(in srgb, ${stat.color} 10%, transparent)`,
-              }}
-            >
-              <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
-            </div>
-            <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)]">
-              {stat.value}
-            </p>
-            <p className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider mt-1">
-              {stat.label}
-            </p>
+          <motion.div key={stat.label} variants={fadeInUp}>
+            {stat.href ? (
+              <Link
+                href={stat.href}
+                className="block p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm relative overflow-hidden group transition-all hover:border-[var(--primary)]/30 hover:shadow-lg"
+              >
+                <div
+                  className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity"
+                  aria-hidden="true"
+                >
+                  <stat.icon size={80} />
+                </div>
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 border border-white/50"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${stat.color} 10%, transparent)`,
+                  }}
+                >
+                  <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
+                </div>
+                <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)]">
+                  {stat.value}
+                </p>
+                <p className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider mt-1">
+                  {stat.label}
+                </p>
+                <div className="mt-4 text-xs text-[var(--muted-foreground)] flex items-center gap-2">
+                  <span>Open queue</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+            ) : (
+              <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm relative overflow-hidden group">
+                <div
+                  className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity"
+                  aria-hidden="true"
+                >
+                  <stat.icon size={80} />
+                </div>
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 border border-white/50"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${stat.color} 10%, transparent)`,
+                  }}
+                >
+                  <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
+                </div>
+                <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)]">
+                  {stat.value}
+                </p>
+                <p className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider mt-1">
+                  {stat.label}
+                </p>
+              </div>
+            )}
           </motion.div>
         ))}
       </motion.div>
