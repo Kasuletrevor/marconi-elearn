@@ -69,6 +69,9 @@ export interface Assignment {
   max_points: number;
   module_id: number | null;
   late_policy?: LatePolicy | null;
+  allows_zip: boolean;
+  expected_filename: string | null;
+  compile_command: string | null;
 }
 
 export interface Submission {
@@ -76,6 +79,7 @@ export interface Submission {
   assignment_id: number;
   user_id: number;
   file_path: string;
+  file_name?: string | null;
   submitted_at: string;
   score: number | null;
   feedback: string | null;
@@ -113,6 +117,71 @@ export interface PlaygroundRunResponse {
   stderr: string;
 }
 
+export interface TestCase {
+  id: number;
+  assignment_id: number;
+  name: string;
+  position: number;
+  points: number;
+  is_hidden: boolean;
+  stdin: string;
+  expected_stdout: string;
+  expected_stderr: string;
+  created_at: string;
+}
+
+export interface TestCaseCreate {
+  name: string;
+  position?: number;
+  points?: number;
+  is_hidden?: boolean;
+  stdin?: string;
+  expected_stdout?: string;
+  expected_stderr?: string;
+}
+
+export interface TestCaseUpdate {
+  name?: string;
+  position?: number;
+  points?: number;
+  is_hidden?: boolean;
+  stdin?: string;
+  expected_stdout?: string;
+  expected_stderr?: string;
+}
+
+export interface SubmissionTestResult {
+  id: number;
+  submission_id: number;
+  test_case_id: number;
+  passed: boolean;
+  outcome: number;
+  compile_output: string;
+  stdout: string;
+  stderr: string;
+  created_at: string;
+}
+
+export interface StudentVisibleTestResult {
+  test_case_id: number;
+  name: string;
+  position: number;
+  points: number;
+  passed: boolean;
+  outcome: number;
+  stdin: string;
+  expected_stdout: string;
+  expected_stderr: string;
+  stdout: string;
+  stderr: string;
+}
+
+export interface StudentSubmissionTests {
+  submission_id: number;
+  compile_output: string;
+  tests: StudentVisibleTestResult[];
+}
+
 export interface Organization {
   id: number;
   name: string;
@@ -141,6 +210,10 @@ export interface AuditEvent {
 }
 
 export interface OrganizationCreate {
+  name: string;
+}
+
+export interface OrganizationUpdate {
   name: string;
 }
 
@@ -180,6 +253,9 @@ export interface AssignmentCreate {
   module_id?: number | null;
   due_date?: string | null;
   max_points?: number;
+  allows_zip?: boolean;
+  expected_filename?: string | null;
+  compile_command?: string | null;
 }
 
 export interface AssignmentUpdate {
@@ -188,6 +264,9 @@ export interface AssignmentUpdate {
   module_id?: number | null;
   due_date?: string | null;
   max_points?: number | null;
+  allows_zip?: boolean | null;
+  expected_filename?: string | null;
+  compile_command?: string | null;
 }
 
 export interface CourseMembership {
@@ -271,6 +350,17 @@ export interface StaffSubmissionQueueItem {
   status: "pending" | "grading" | "graded" | "error";
   score: number | null;
   feedback: string | null;
+}
+
+export interface ZipEntry {
+  name: string;
+  size: number;
+}
+
+export interface ZipContents {
+  files: ZipEntry[];
+  total_size: number;
+  file_count: number;
 }
 
 export interface StaffSubmissionDetail extends StaffSubmissionQueueItem {
@@ -422,14 +512,31 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
     throw new ApiError(response.status, detail);
   }
-  
+
   // Handle 204 No Content
   if (response.status === 204) {
     return undefined as T;
   }
-  
+
   return response.json();
 }
+
+/* ============================================
+   HEALTH ENDPOINTS
+   ============================================ */
+
+export interface HealthResponse {
+  status: string;
+}
+
+export const health = {
+  async get(): Promise<HealthResponse> {
+    const res = await fetch(`${API_BASE}/api/v1/health`, {
+      credentials: "include",
+    });
+    return handleResponse<HealthResponse>(res);
+  },
+};
 
 /* ============================================
    AUTH ENDPOINTS
@@ -527,6 +634,18 @@ export const student = {
       { credentials: "include" }
     );
     return handleResponse<Submission[]>(res);
+  },
+
+  async getSubmissionTests(
+    courseId: number,
+    assignmentId: number,
+    submissionId: number
+  ): Promise<StudentSubmissionTests> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/student/courses/${courseId}/assignments/${assignmentId}/submissions/${submissionId}/tests`,
+      { credentials: "include" }
+    );
+    return handleResponse<StudentSubmissionTests>(res);
   },
 
   async submitAssignment(
@@ -686,9 +805,26 @@ export const orgs = {
     return handleResponse<Organization[]>(res);
   },
 
+  async get(orgId: number): Promise<Organization> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}`, {
+      credentials: "include",
+    });
+    return handleResponse<Organization>(res);
+  },
+
   async create(data: OrganizationCreate): Promise<Organization> {
     const res = await fetch(`${API_BASE}/api/v1/orgs`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Organization>(res);
+  },
+
+  async update(orgId: number, data: OrganizationUpdate): Promise<Organization> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify(data),
@@ -1113,6 +1249,66 @@ export const courseStaff = {
     return handleResponse<void>(res);
   },
 
+  async listTestCases(
+    courseId: number,
+    assignmentId: number,
+    offset = 0,
+    limit = 200
+  ): Promise<TestCase[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/assignments/${assignmentId}/testcases?offset=${offset}&limit=${limit}`,
+      { credentials: "include" }
+    );
+    return handleResponse<TestCase[]>(res);
+  },
+
+  async createTestCase(
+    courseId: number,
+    assignmentId: number,
+    data: TestCaseCreate
+  ): Promise<TestCase> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/assignments/${assignmentId}/testcases`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse<TestCase>(res);
+  },
+
+  async updateTestCase(
+    courseId: number,
+    assignmentId: number,
+    testCaseId: number,
+    data: TestCaseUpdate
+  ): Promise<TestCase> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/assignments/${assignmentId}/testcases/${testCaseId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse<TestCase>(res);
+  },
+
+  async deleteTestCase(
+    courseId: number,
+    assignmentId: number,
+    testCaseId: number
+  ): Promise<void> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/assignments/${assignmentId}/testcases/${testCaseId}`,
+      { method: "DELETE", credentials: "include" }
+    );
+    return handleResponse<void>(res);
+  },
+
   async listMemberships(courseId: number, offset = 0, limit = 100): Promise<CourseMembership[]> {
     const res = await fetch(
       `${API_BASE}/api/v1/staff/courses/${courseId}/memberships?offset=${offset}&limit=${limit}`,
@@ -1393,6 +1589,30 @@ export const staffSubmissions = {
       throw new ApiError(res.status, detail);
     }
     return res.blob();
+  },
+
+  async zipContents(submissionId: number): Promise<ZipContents> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/submissions/${submissionId}/zip-contents`,
+      { credentials: "include" }
+    );
+    return handleResponse<ZipContents>(res);
+  },
+
+  async tests(submissionId: number): Promise<SubmissionTestResult[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/submissions/${submissionId}/tests`,
+      { credentials: "include" }
+    );
+    return handleResponse<SubmissionTestResult[]>(res);
+  },
+
+  async regrade(submissionId: number): Promise<Submission> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/submissions/${submissionId}/regrade`,
+      { method: "POST", credentials: "include" }
+    );
+    return handleResponse<Submission>(res);
   },
 };
 

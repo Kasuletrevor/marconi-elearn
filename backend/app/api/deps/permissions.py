@@ -28,3 +28,24 @@ async def require_org_admin(
     membership = result.scalars().first()
     if membership is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+
+
+async def require_org_member(
+    org_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    if is_superadmin(current_user):
+        return
+    result = await db.execute(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == org_id,
+            OrganizationMembership.user_id == current_user.id,
+        )
+    )
+    membership = result.scalars().first()
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization membership required",
+        )

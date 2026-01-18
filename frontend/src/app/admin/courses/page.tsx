@@ -33,6 +33,8 @@ import {
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
+import { reportError } from "@/lib/reportError";
+import { ConfirmModal } from "@/components/ui/Modal";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -314,6 +316,14 @@ function CourseCard(props: {
   const [newRole, setNewRole] = useState<StaffRole>("ta");
   const [isAdding, setIsAdding] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirm, setConfirm] = useState<null | {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    confirmVariant: "danger" | "primary";
+    action: () => Promise<void>;
+  }>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const staffMembers = memberships.filter((m) => m.role !== "student");
   const availableOrgMembers = useMemo(() => {
@@ -379,27 +389,54 @@ function CourseCard(props: {
   }
 
   async function removeMember(membershipId: number) {
-    if (!confirm("Remove this member from the course?")) return;
-    setError("");
-    try {
-      await staff.removeMembership(orgId, course.id, membershipId);
-      setMemberships((prev) => prev.filter((m) => m.id !== membershipId));
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.detail);
-      else setError("Failed to remove member");
-    }
+    setConfirm({
+      title: "Remove member?",
+      description:
+        "Remove this member from the course. They will lose access to course features based on their role.",
+      confirmLabel: "Remove",
+      confirmVariant: "danger",
+      action: async () => {
+        setError("");
+        await staff.removeMembership(orgId, course.id, membershipId);
+        setMemberships((prev) => prev.filter((m) => m.id !== membershipId));
+      },
+    });
   }
 
   async function deleteCourse() {
-    if (!confirm(`Delete ${course.code}? This removes course data.`)) return;
-    setIsDeleting(true);
+    setConfirm({
+      title: `Delete ${course.code}?`,
+      description:
+        "This permanently removes course data (modules, assignments, and submissions).",
+      confirmLabel: "Delete",
+      confirmVariant: "danger",
+      action: async () => {
+        setIsDeleting(true);
+        try {
+          await staff.deleteCourse(orgId, course.id);
+          await onDeleted();
+        } catch (err) {
+          reportError("Failed to delete course", err);
+          setError("Failed to delete course");
+        } finally {
+          setIsDeleting(false);
+        }
+      },
+    });
+  }
+
+  async function runConfirm() {
+    if (!confirm) return;
+    setIsConfirming(true);
     try {
-      await staff.deleteCourse(orgId, course.id);
-      await onDeleted();
+      await confirm.action();
+      setConfirm(null);
     } catch (err) {
-      // ignore
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Action failed");
+      setConfirm(null);
     } finally {
-      setIsDeleting(false);
+      setIsConfirming(false);
     }
   }
 
@@ -605,6 +642,17 @@ function CourseCard(props: {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirm != null}
+        onClose={() => setConfirm(null)}
+        onConfirm={runConfirm}
+        title={confirm?.title ?? ""}
+        description={confirm?.description ?? ""}
+        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+        confirmVariant={confirm?.confirmVariant ?? "primary"}
+        isLoading={isConfirming || isDeleting}
+      />
     </motion.div>
   );
 }

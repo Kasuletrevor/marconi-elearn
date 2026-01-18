@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +33,7 @@ import {
   Link as LinkIcon,
   Download,
   ExternalLink,
+  Beaker,
   Eye,
   EyeOff,
   GripVertical,
@@ -62,6 +63,9 @@ import { useAuthStore, getCourseRole } from "@/lib/store";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
+import { ConfirmModal } from "@/components/ui/Modal";
+import { reportError } from "@/lib/reportError";
+import { PROGRAMMES, type Programme } from "@/lib/programmes";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -87,11 +91,17 @@ export default function StaffCoursePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [memberships, setMemberships] = useState<CourseMembership[]>([]);
+  const [memberships, setMemberships] = useState<CourseMembership[]>([]);       
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [openCreateAssignmentFromQuickAction, setOpenCreateAssignmentFromQuickAction] =
+    useState(false);
+  const [openCreateModuleFromQuickAction, setOpenCreateModuleFromQuickAction] =
+    useState(false);
+  const [openImportRosterFromQuickAction, setOpenImportRosterFromQuickAction] =
+    useState(false);
 
   const role = getCourseRole(user, courseId);
   const canEditCourseSettings = role === "owner" || role === "co_lecturer";     
@@ -242,6 +252,22 @@ export default function StaffCoursePage() {
             modules={modules}
             assignments={assignments}
             memberships={memberships}
+            onQuickAction={(action) => {
+              switch (action) {
+                case "create_assignment":
+                  setActiveTab("assignments");
+                  setOpenCreateAssignmentFromQuickAction(true);
+                  break;
+                case "import_roster":
+                  setActiveTab("roster");
+                  setOpenImportRosterFromQuickAction(true);
+                  break;
+                case "add_module":
+                  setActiveTab("modules");
+                  setOpenCreateModuleFromQuickAction(true);
+                  break;
+              }
+            }}
           />
         )}
         {activeTab === "submissions" && (
@@ -252,9 +278,11 @@ export default function StaffCoursePage() {
             course={course}
             memberships={memberships}
             onRefresh={async () => {
-              const data = await courseStaff.listMemberships(courseId);
+              const data = await courseStaff.listMemberships(courseId);    
               setMemberships(data);
             }}
+            focusImportCsvOnMount={openImportRosterFromQuickAction}
+            onConsumedFocusImportCsv={() => setOpenImportRosterFromQuickAction(false)}
           />
         )}
         {activeTab === "assignments" && (
@@ -263,9 +291,11 @@ export default function StaffCoursePage() {
             assignments={assignments}
             modules={modules}
             onRefreshAssignments={async () => {
-              const data = await courseStaff.listAssignments(courseId);
+              const data = await courseStaff.listAssignments(courseId);    
               setAssignments(data);
             }}
+            openCreateOnMount={openCreateAssignmentFromQuickAction}
+            onConsumedOpenCreate={() => setOpenCreateAssignmentFromQuickAction(false)}
           />
         )}
         {activeTab === "modules" && (
@@ -273,9 +303,11 @@ export default function StaffCoursePage() {
             course={course}
             modules={modules}
             onRefreshModules={async () => {
-              const data = await courseStaff.listModules(courseId);
+              const data = await courseStaff.listModules(courseId);        
               setModules(data);
             }}
+            openCreateOnMount={openCreateModuleFromQuickAction}
+            onConsumedOpenCreate={() => setOpenCreateModuleFromQuickAction(false)}
           />
         )}
       </motion.div>
@@ -331,6 +363,7 @@ function CourseSettingsModal({
     course.self_enroll_code ?? null
   );
   const [isRegeneratingEnrollCode, setIsRegeneratingEnrollCode] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   const initialLate = normalizeLatePolicy(course.late_policy);
   const [latePolicyEnabled, setLatePolicyEnabled] = useState(
@@ -343,15 +376,15 @@ function CourseSettingsModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  async function regenerateEnrollCode() {
+  function requestRegenerateEnrollCode() {
     if (!selfEnrollEnabled) {
       setSaveError("Enable self-enroll before regenerating the code.");
       return;
     }
-    if (!confirm("Regenerate the self-enroll code? Old codes will stop working.")) {
-      return;
-    }
+    setShowRegenerateConfirm(true);
+  }
 
+  async function regenerateEnrollCodeConfirmed() {
     setIsRegeneratingEnrollCode(true);
     setSaveError("");
     try {
@@ -403,7 +436,8 @@ function CourseSettingsModal({
   }
 
   return (
-    <motion.div
+    <>
+      <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -543,7 +577,7 @@ function CourseSettingsModal({
                 </button>
                 <button
                   type="button"
-                  onClick={regenerateEnrollCode}
+                  onClick={requestRegenerateEnrollCode}
                   disabled={!selfEnrollEnabled || isRegeneratingEnrollCode}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
                 >
@@ -642,6 +676,21 @@ function CourseSettingsModal({
         </div>
       </motion.div>
     </motion.div>
+
+    <ConfirmModal
+      isOpen={showRegenerateConfirm}
+      onClose={() => setShowRegenerateConfirm(false)}
+      onConfirm={() => {
+        setShowRegenerateConfirm(false);
+        void regenerateEnrollCodeConfirmed();
+      }}
+      title="Regenerate self-enroll code?"
+      description="Old codes will stop working immediately. Continue?"
+      confirmLabel="Regenerate"
+      confirmVariant="danger"
+      isLoading={isRegeneratingEnrollCode}
+    />
+    </>
   );
 }
 
@@ -651,6 +700,7 @@ interface OverviewTabProps {
   modules: Module[];
   assignments: Assignment[];
   memberships: CourseMembership[];
+  onQuickAction: (action: "create_assignment" | "import_roster" | "add_module") => void;
 }
 
 function OverviewTab({
@@ -658,6 +708,7 @@ function OverviewTab({
   modules,
   assignments,
   memberships,
+  onQuickAction,
 }: OverviewTabProps) {
   const studentCount = memberships.filter((m) => m.role === "student").length;
   const upcomingAssignments = assignments
@@ -718,7 +769,11 @@ function OverviewTab({
             Quick Actions
           </h3>
           <div className="grid gap-3">
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group">
+            <button
+              type="button"
+              onClick={() => onQuickAction("create_assignment")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
+            >
               <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
                 <Plus className="w-5 h-5" />
               </div>
@@ -726,7 +781,11 @@ function OverviewTab({
                 Create Assignment
               </span>
             </button>
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group">
+            <button
+              type="button"
+              onClick={() => onQuickAction("import_roster")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
+            >
               <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
                 <Upload className="w-5 h-5" />
               </div>
@@ -734,7 +793,11 @@ function OverviewTab({
                 Import Roster
               </span>
             </button>
-            <button className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group">
+            <button
+              type="button"
+              onClick={() => onQuickAction("add_module")}
+              className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
+            >
               <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
                 <FolderOpen className="w-5 h-5" />
               </div>
@@ -816,10 +879,8 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
   const [statusFilter, setStatusFilter] = useState<StaffSubmissionQueueItem["status"] | "all">("pending");
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(25);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isBulkWorking, setIsBulkWorking] = useState(false);
   const [isNavigatingNext, setIsNavigatingNext] = useState(false);
   const [error, setError] = useState("");
 
@@ -829,53 +890,11 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
   const [isMissingLoading, setIsMissingLoading] = useState(false);
   const [missingError, setMissingError] = useState("");
 
-  const selectedCount = selectedIds.size;
-  const allOnPageSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
   const canGoPrev = offset > 0;
   const canGoNext = offset + items.length < total;
 
   function resetPaging() {
     setOffset(0);
-    setSelectedIds(new Set());
-  }
-
-  function toggleSelect(id: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAllOnPage() {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (allOnPageSelected) {
-        for (const item of items) next.delete(item.id);
-      } else {
-        for (const item of items) next.add(item.id);
-      }
-      return next;
-    });
-  }
-
-  async function runBulk(action: "mark_pending" | "mark_grading" | "mark_graded") {
-    if (selectedIds.size === 0) return;
-    setIsBulkWorking(true);
-    try {
-      await staffSubmissions.bulkUpdate({
-        submission_ids: Array.from(selectedIds),
-        action,
-      });
-      setSelectedIds(new Set());
-      await fetchQueue(true);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.detail);
-      else setError("Bulk update failed");
-    } finally {
-      setIsBulkWorking(false);
-    }
   }
 
   async function goNextUngraded() {
@@ -927,8 +946,8 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
     const emails = missingStudents.map((s) => s.email).join(", ");
     try {
       await navigator.clipboard.writeText(emails);
-    } catch {
-      // ignore
+    } catch (err) {
+      reportError("Failed to copy missing student emails", err);
     }
   }
 
@@ -1050,33 +1069,12 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
             <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--background)]">
               <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-xs text-[var(--muted-foreground)] select-none cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={allOnPageSelected}
-                    onChange={toggleSelectAllOnPage}
-                    className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
-                  />
-                  Select page
-                </label>
                 <span className="text-xs text-[var(--muted-foreground)] font-mono">
                   {total === 0 ? "0" : `${offset + 1}–${offset + items.length}`} of {total}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedCount > 0 && (
-                  <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
-                    <span className="text-xs text-[var(--muted-foreground)] font-medium">{selectedCount} selected</span>
-                    <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm">
-                      <button onClick={() => runBulk("mark_grading")} disabled={isBulkWorking} className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide">Grading</button>
-                      <div className="w-px h-6 bg-[var(--border)]" />
-                      <button onClick={() => runBulk("mark_graded")} disabled={isBulkWorking} className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide">Graded</button>
-                      <div className="w-px h-6 bg-[var(--border)]" />
-                      <button onClick={() => runBulk("mark_pending")} disabled={isBulkWorking} className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide">Reset</button>
-                    </div>
-                  </div>
-                )}
                 <div className="flex items-center gap-1">
                   <button onClick={() => setOffset((o) => Math.max(0, o - limit))} disabled={!canGoPrev} className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="w-4 h-4" /></button>
                   <button onClick={() => setOffset((o) => o + limit)} disabled={!canGoNext} className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronRight className="w-4 h-4" /></button>
@@ -1087,10 +1085,7 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
             <div className="divide-y divide-[var(--border)]">
               {items.map((s) => (
                 <div key={s.id} onClick={() => router.push(`/staff/submissions/${s.id}`)} className="group grid grid-cols-12 gap-4 px-5 py-4 hover:bg-[var(--background)] transition-colors cursor-pointer items-center">
-                  <div className="col-span-1 flex items-center">
-                    <input type="checkbox" checked={selectedIds.has(s.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggleSelect(s.id)} className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] cursor-pointer" />
-                  </div>
-                  <div className="col-span-5 min-w-0">
+                  <div className="col-span-6 min-w-0">
                     <p className="text-sm font-medium text-[var(--foreground)] truncate">{s.student_full_name || s.student_email}</p>
                     <p className="text-xs text-[var(--muted-foreground)] truncate mt-0.5">{s.assignment_title}</p>
                   </div>
@@ -1191,9 +1186,17 @@ interface RosterTabProps {
   course: Course;
   memberships: CourseMembership[];
   onRefresh: () => Promise<void>;
+  focusImportCsvOnMount?: boolean;
+  onConsumedFocusImportCsv?: () => void;
 }
 
-function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {        
+function RosterTab({
+  course,
+  memberships,
+  onRefresh,
+  focusImportCsvOnMount = false,
+  onConsumedFocusImportCsv,
+}: RosterTabProps) {
   const [orgMembers, setOrgMembers] = useState<OrgMembership[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);    
@@ -1209,13 +1212,16 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [notifyNewSubmissions, setNotifyNewSubmissions] = useState(true);
   const [isSavingNotifyNewSubmissions, setIsSavingNotifyNewSubmissions] = useState(false);
   const [notifyPrefError, setNotifyPrefError] = useState("");
+  const [confirmRemoveMembershipId, setConfirmRemoveMembershipId] = useState<number | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
 
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
   const [studentNumber, setStudentNumber] = useState("");
-  const [studentProgramme, setStudentProgramme] = useState<
-    "BELE" | "BSCE" | "BBIO" | "BSTE" | ""
-  >("");
+  const [studentProgramme, setStudentProgramme] = useState<Programme | "">("");
+
+  const enrollStudentsRef = useRef<HTMLDivElement>(null);
+  const importCsvButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     async function loadOrgMembers() {
@@ -1224,13 +1230,22 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
         const data = await courseStaff.listOrgMembers(course.id);
         setOrgMembers(data);
       } catch (err) {
-        console.error("Failed to load org members", err);
+        reportError("Failed to load org members", err);
       } finally {
         setIsLoadingOrg(false);
       }
     }
     loadOrgMembers();
   }, [course.id]);
+
+  useEffect(() => {
+    if (!focusImportCsvOnMount) return;
+    // Browsers may block opening a file picker without a direct user gesture,
+    // so we scroll + focus the Import CSV button instead.
+    enrollStudentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    importCsvButtonRef.current?.focus();
+    onConsumedFocusImportCsv?.();
+  }, [focusImportCsvOnMount, onConsumedFocusImportCsv]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1325,16 +1340,24 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     }
   }
 
-  async function removeMember(membershipId: number) {
-    if (!confirm("Remove this member from the course?")) return;
+  function requestRemoveMember(membershipId: number) {
+    setConfirmRemoveMembershipId(membershipId);
+  }
+
+  async function removeMemberConfirmed() {
+    if (confirmRemoveMembershipId === null) return;
+    setIsRemovingMember(true);
     setNoticeArea("staff");
     setError("");
     try {
-      await courseStaff.removeMembership(course.id, membershipId);
+      await courseStaff.removeMembership(course.id, confirmRemoveMembershipId);
       await onRefresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to remove member");
+    } finally {
+      setIsRemovingMember(false);
+      setConfirmRemoveMembershipId(null);
     }
   }
 
@@ -1540,7 +1563,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             </label>
             <select
               value={newRole}
-              onChange={(e) => setNewRole(e.target.value as any)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "ta" || value === "co_lecturer") setNewRole(value);
+              }}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             >
               <option value="ta">TA</option>
@@ -1592,7 +1618,12 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <select
                     value={member.role}
-                    onChange={(e) => updateRole(member.id, e.target.value as any)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "owner" || value === "co_lecturer" || value === "ta") {
+                        updateRole(member.id, value);
+                      }
+                    }}
                     className="text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] px-2 py-1"
                   >
                     <option value="owner">Owner</option>
@@ -1600,7 +1631,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
                     <option value="ta">TA</option>
                   </select>
                   <button
-                    onClick={() => removeMember(member.id)}
+                    onClick={() => requestRemoveMember(member.id)}
                     className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                     title="Remove member"
                   >
@@ -1617,7 +1648,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       )}
 
       {/* Enroll Students */}
-      <div className="order-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+      <div
+        ref={enrollStudentsRef}
+        className="order-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5"
+      >
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="font-medium text-[var(--foreground)] mb-1">Enroll students</h3>
@@ -1633,6 +1667,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             onChange={handleCsvUpload}
           />
           <button
+            ref={importCsvButtonRef}
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isAddingStudent}
@@ -1730,14 +1765,18 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             </label>
             <select
               value={studentProgramme}
-              onChange={(e) => setStudentProgramme(e.target.value as any)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setStudentProgramme(value ? (value as Programme) : "");
+              }}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
             >
               <option value="">Select programme...</option>
-              <option value="BELE">BELE</option>
-              <option value="BSCE">BSCE</option>
-              <option value="BBIO">BBIO</option>
-              <option value="BSTE">BSTE</option>
+              {PROGRAMMES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
           <div className="md:col-span-12">
@@ -1799,7 +1838,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={() => removeMember(member.id)}
+                    onClick={() => requestRemoveMember(member.id)}
                     className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                     title="Remove student"
                   >
@@ -1811,6 +1850,17 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmRemoveMembershipId !== null}
+        onClose={() => setConfirmRemoveMembershipId(null)}
+        onConfirm={() => void removeMemberConfirmed()}
+        title="Remove member?"
+        description="This will remove the member from the course. Continue?"
+        confirmLabel="Remove"
+        confirmVariant="danger"
+        isLoading={isRemovingMember}
+      />
     </div >
   );
 }
@@ -1821,6 +1871,8 @@ interface AssignmentsTabProps {
   assignments: Assignment[];
   modules: Module[];
   onRefreshAssignments: () => Promise<void>;
+  openCreateOnMount?: boolean;
+  onConsumedOpenCreate?: () => void;
 }
 
 function AssignmentsTab({
@@ -1828,6 +1880,8 @@ function AssignmentsTab({
   assignments,
   modules,
   onRefreshAssignments,
+  openCreateOnMount = false,
+  onConsumedOpenCreate,
 }: AssignmentsTabProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
@@ -1836,8 +1890,14 @@ function AssignmentsTab({
   const [newModuleId, setNewModuleId] = useState<number | null>(null);
   const [newMaxPoints, setNewMaxPoints] = useState<number>(100);
   const [newDueDateLocal, setNewDueDateLocal] = useState("");
+  const [newAllowsZip, setNewAllowsZip] = useState(false);
+  const [newExpectedFilename, setNewExpectedFilename] = useState("");
+  const [newCompileCommand, setNewCompileCommand] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [error, setError] = useState("");
+  const [confirmDeleteAssignment, setConfirmDeleteAssignment] = useState<Assignment | null>(null);
+  const [isDeletingAssignment, setIsDeletingAssignment] = useState(false);
 
   function toDateTimeLocalValue(date: Date): string {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -1849,16 +1909,26 @@ function AssignmentsTab({
     return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
   }
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditingAssignmentId(null);
     setNewTitle("");
     setNewDescription("");
     setNewModuleId(modules[0]?.id ?? null);
     setNewMaxPoints(100);
     setNewDueDateLocal("");
+    setNewAllowsZip(false);
+    setNewExpectedFilename("");
+    setNewCompileCommand("");
     setCreateError("");
+    setError("");
     setShowCreateModal(true);
-  }
+  }, [modules]);
+
+  useEffect(() => {
+    if (!openCreateOnMount) return;
+    openCreate();
+    onConsumedOpenCreate?.();
+  }, [openCreate, onConsumedOpenCreate, openCreateOnMount]);
 
   function openEdit(assignment: Assignment) {
     setEditingAssignmentId(assignment.id);
@@ -1869,7 +1939,11 @@ function AssignmentsTab({
     setNewDueDateLocal(
       assignment.due_date ? toDateTimeLocalValue(new Date(assignment.due_date)) : ""
     );
+    setNewAllowsZip(Boolean(assignment.allows_zip));
+    setNewExpectedFilename(assignment.expected_filename ?? "");
+    setNewCompileCommand(assignment.compile_command ?? "");
     setCreateError("");
+    setError("");
     setShowCreateModal(true);
   }
 
@@ -1880,22 +1954,49 @@ function AssignmentsTab({
 
   const getModuleName = (moduleId: number | null) => {
     if (moduleId === null) return "Unassigned";
-    const module = modules.find((m) => m.id === moduleId);
-    return module?.title || "Unknown Module";
+    const moduleRow = modules.find((m) => m.id === moduleId);
+    return moduleRow?.title || "Unknown Module";
   };
+
+  async function deleteAssignmentConfirmed() {
+    if (!confirmDeleteAssignment) return;
+    setIsDeletingAssignment(true);
+    setError("");
+    try {
+      await courseStaff.deleteAssignment(course.id, confirmDeleteAssignment.id);
+      await onRefreshAssignments();
+    } catch (err) {
+      reportError("Failed to delete assignment", err);
+      setError("Failed to delete assignment");
+    } finally {
+      setIsDeletingAssignment(false);
+      setConfirmDeleteAssignment(null);
+    }
+  }
 
   async function createAssignment() {
     const title = newTitle.trim();
     if (!title) return;
     setIsCreating(true);
     setCreateError("");
+    setError("");
     try {
+      const expectedFilename = newExpectedFilename.trim();
+      const compileCommand = newCompileCommand.trim();
+      if (newAllowsZip && expectedFilename && compileCommand) {
+        setCreateError("Choose either expected filename or compile command (not both).");
+        return;
+      }
+
       const payload = {
         title,
         description: newDescription.trim() ? newDescription.trim() : null,
         module_id: newModuleId,
         due_date: newDueDateLocal ? new Date(newDueDateLocal).toISOString() : null,
         max_points: newMaxPoints,
+        allows_zip: newAllowsZip,
+        expected_filename: newAllowsZip ? (expectedFilename || null) : null,
+        compile_command: newAllowsZip ? (compileCommand || null) : null,
       };
       if (editingAssignmentId !== null) {
         await courseStaff.updateAssignment(course.id, editingAssignmentId, payload);
@@ -1927,6 +2028,12 @@ function AssignmentsTab({
           <span>Create Assignment</span>
         </button>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 text-sm text-[var(--secondary)]">
+          {error}
+        </div>
+      )}
 
       <AnimatePresence>
         {showCreateModal && (
@@ -2039,6 +2146,66 @@ function AssignmentsTab({
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
                   </div>
+
+                  <div className="md:col-span-2">
+                    <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                      <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
+                        <input
+                          type="checkbox"
+                          checked={newAllowsZip}
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            setNewAllowsZip(next);
+                            if (!next) {
+                              setNewExpectedFilename("");
+                              setNewCompileCommand("");
+                            }
+                          }}
+                          className="w-4 h-4"
+                        />
+                        Allow ZIP submissions
+                      </label>
+
+                      {newAllowsZip ? (
+                        <div className="mt-4 grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                              Expected filename (optional)
+                            </label>
+                            <input
+                              value={newExpectedFilename}
+                              onChange={(e) => setNewExpectedFilename(e.target.value)}
+                              placeholder="e.g., solution.c"
+                              disabled={Boolean(newCompileCommand.trim())}
+                              className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                              If set, we grade that file from the ZIP.
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                              Compile command (optional)
+                            </label>
+                            <input
+                              value={newCompileCommand}
+                              onChange={(e) => setNewCompileCommand(e.target.value)}
+                              placeholder="e.g., gcc main.c utils.c"
+                              disabled={Boolean(newExpectedFilename.trim())}
+                              className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                              Use for multi-file projects (gcc/g++ only; -o is ignored).
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <p className="mt-3 text-xs text-[var(--muted-foreground)]">
+                        ZIP rules: flat structure (no folders), max 50 files, max 10MB uncompressed.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -2119,6 +2286,14 @@ function AssignmentsTab({
                     <span className="text-xs text-[var(--muted-foreground)]">
                       {assignment.max_points} pts
                     </span>
+                    <Link
+                      href={`/staff/courses/${course.id}/assignments/${assignment.id}`}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] transition-colors"
+                      title="Manage test cases"
+                    >
+                      <Beaker className="w-3.5 h-3.5" />
+                      Tests
+                    </Link>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2131,15 +2306,7 @@ function AssignmentsTab({
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={async () => {
-                      if (!confirm(`Delete \"${assignment.title}\"?`)) return;
-                      try {
-                        await courseStaff.deleteAssignment(course.id, assignment.id);
-                        await onRefreshAssignments();
-                      } catch {
-                        // ignore
-                      }
-                    }}
+                    onClick={() => setConfirmDeleteAssignment(assignment)}
                     className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                     aria-label="Delete assignment"
                     title="Delete assignment"
@@ -2152,6 +2319,17 @@ function AssignmentsTab({
           })}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmDeleteAssignment !== null}
+        onClose={() => setConfirmDeleteAssignment(null)}
+        onConfirm={() => void deleteAssignmentConfirmed()}
+        title={confirmDeleteAssignment ? `Delete \"${confirmDeleteAssignment.title}\"?` : "Delete assignment?"}
+        description="This cannot be undone. Continue?"
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        isLoading={isDeletingAssignment}
+      />
     </div>
   );
 }
@@ -2161,9 +2339,17 @@ interface ModulesTabProps {
   course: Course;
   modules: Module[];
   onRefreshModules: () => Promise<void>;
+  openCreateOnMount?: boolean;
+  onConsumedOpenCreate?: () => void;
 }
 
-function ModulesTab({ course, modules, onRefreshModules }: ModulesTabProps) {
+function ModulesTab({
+  course,
+  modules,
+  onRefreshModules,
+  openCreateOnMount = false,
+  onConsumedOpenCreate,
+}: ModulesTabProps) {
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -2187,6 +2373,12 @@ function ModulesTab({ course, modules, onRefreshModules }: ModulesTabProps) {
     setNewPosition(nextPosition);
     setCreateError("");
   }, [showCreateModal, nextPosition]);
+
+  useEffect(() => {
+    if (!openCreateOnMount) return;
+    setShowCreateModal(true);
+    onConsumedOpenCreate?.();
+  }, [onConsumedOpenCreate, openCreateOnMount]);
 
   async function createModule() {
     const title = newTitle.trim();
@@ -2386,6 +2578,10 @@ function ModuleCard(
   const [moduleEditError, setModuleEditError] = useState("");
   const [isMovingModule, setIsMovingModule] = useState(false);
   const [movingResourceId, setMovingResourceId] = useState<number | null>(null);
+  const [showDeleteModuleConfirm, setShowDeleteModuleConfirm] = useState(false);
+  const [confirmDeleteResourceId, setConfirmDeleteResourceId] = useState<number | null>(null);
+  const [isDeletingModule, setIsDeletingModule] = useState(false);
+  const [isDeletingResource, setIsDeletingResource] = useState(false);
 
   useEffect(() => {
     setEditTitle(module.title);
@@ -2433,10 +2629,12 @@ function ModuleCard(
     }
   }
 
-  async function deleteModule() {
-    if (!confirm(`Delete \"${module.title}\"? This removes module content ordering (resources and assignments remain).`)) {
-      return;
-    }
+  function requestDeleteModule() {
+    setShowDeleteModuleConfirm(true);
+  }
+
+  async function deleteModuleConfirmed() {
+    setIsDeletingModule(true);
     setModuleEditError("");
     try {
       await courseStaff.deleteModule(courseId, module.id);
@@ -2444,6 +2642,9 @@ function ModuleCard(
     } catch (err) {
       if (err instanceof ApiError) setModuleEditError(err.detail);
       else setModuleEditError("Failed to delete module");
+    } finally {
+      setIsDeletingModule(false);
+      setShowDeleteModuleConfirm(false);
     }
   }
 
@@ -2459,7 +2660,7 @@ function ModuleCard(
         prev.map((r) => (r.id === resource.id ? updated : r))
       );
     } catch (err) {
-      console.error("Failed to toggle publish:", err);
+      reportError("Failed to toggle publish", err);
     }
   }
 
@@ -2485,19 +2686,27 @@ function ModuleCard(
           .sort((x, y) => x.position - y.position)
       );
     } catch (err) {
-      console.error("Failed to reorder resource:", err);
+      reportError("Failed to reorder resource", err);
     } finally {
       setMovingResourceId(null);
     }
   }
 
-  async function handleDeleteResource(resourceId: number) {
-    if (!confirm("Are you sure you want to delete this resource?")) return;     
+  function requestDeleteResource(resourceId: number) {
+    setConfirmDeleteResourceId(resourceId);
+  }
+
+  async function deleteResourceConfirmed() {
+    if (confirmDeleteResourceId === null) return;
+    setIsDeletingResource(true);
     try {
-      await courseStaff.deleteModuleResource(courseId, module.id, resourceId);  
-      setResources((prev) => prev.filter((r) => r.id !== resourceId));
+      await courseStaff.deleteModuleResource(courseId, module.id, confirmDeleteResourceId);
+      setResources((prev) => prev.filter((r) => r.id !== confirmDeleteResourceId));
     } catch (err) {
-      console.error("Failed to delete resource:", err);
+      reportError("Failed to delete resource", err);
+    } finally {
+      setIsDeletingResource(false);
+      setConfirmDeleteResourceId(null);
     }
   }
 
@@ -2517,7 +2726,7 @@ function ModuleCard(
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Failed to download:", err);
+      reportError("Failed to download resource", err);
     }
   }
 
@@ -2528,7 +2737,13 @@ function ModuleCard(
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  const deleteResourceTitle = useMemo(() => {
+    if (confirmDeleteResourceId === null) return null;
+    return resources.find((r) => r.id === confirmDeleteResourceId)?.title ?? null;
+  }, [confirmDeleteResourceId, resources]);
+
   return (
+    <>
     <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
       {/* Module Header */}
       <div
@@ -2598,7 +2813,7 @@ function ModuleCard(
           <button
             onClick={(e) => {
               e.stopPropagation();
-              deleteModule();
+              requestDeleteModule();
             }}
             className="p-2 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
           >
@@ -2839,7 +3054,7 @@ function ModuleCard(
 
                       {/* Delete */}
                       <button
-                        onClick={() => handleDeleteResource(resource.id)}
+                        onClick={() => requestDeleteResource(resource.id)}
                         className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
                         title="Delete"
                       >
@@ -2880,6 +3095,29 @@ function ModuleCard(
         />
       )}
     </div>
+
+    <ConfirmModal
+      isOpen={showDeleteModuleConfirm}
+      onClose={() => setShowDeleteModuleConfirm(false)}
+      onConfirm={() => void deleteModuleConfirmed()}
+      title={`Delete \"${module.title}\"?`}
+      description="This removes module content ordering (resources and assignments remain). Continue?"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      isLoading={isDeletingModule}
+    />
+
+    <ConfirmModal
+      isOpen={confirmDeleteResourceId !== null}
+      onClose={() => setConfirmDeleteResourceId(null)}
+      onConfirm={() => void deleteResourceConfirmed()}
+      title={deleteResourceTitle ? `Delete \"${deleteResourceTitle}\"?` : "Delete resource?"}
+      description="This cannot be undone. Continue?"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      isLoading={isDeletingResource}
+    />
+    </>
   );
 }
 

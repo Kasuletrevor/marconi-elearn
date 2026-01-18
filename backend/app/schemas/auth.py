@@ -6,7 +6,7 @@ from app.models.organization_membership import OrgRole
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class AcceptInviteRequest(BaseModel):

@@ -7,11 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   GraduationCap,
   BookOpen,
-  Users,
   FileText,
   FolderOpen,
   AlertTriangle,
-  Settings,
   LogOut,
   Menu,
   X,
@@ -22,6 +20,7 @@ import {
 import { NotificationBell } from "@/components/NotificationBell";
 import { auth, ApiError, type User as UserType, type Course, courseStaff } from "@/lib/api";
 import { useAuthStore, getRedirectPath, isStaff } from "@/lib/store";
+import { reportError } from "@/lib/reportError";
 
 interface StaffLayoutProps {
   children: React.ReactNode;
@@ -195,7 +194,7 @@ function SidebarContent({
         const data = await courseStaff.listCourses();
         setCourses(data);
       } catch (err) {
-        console.error("Failed to fetch staff courses", err);
+        reportError("Failed to fetch staff courses", err);
       } finally {
         setIsLoadingCourses(false);
       }

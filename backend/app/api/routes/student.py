@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.course_permissions import require_course_student_or_staff
+from app.core.config import settings
 from app.crud.assignments import get_assignment
 from app.crud.assignment_extensions import (
     get_assignment_extension,
@@ -35,25 +37,45 @@ from app.db.deps import get_db
 from app.integrations.jobe import JOBE_OUTCOME_OK
 from app.models.course import Course
 from app.models.submission_test_result import SubmissionTestResult
+from app.models.test_case import TestCase
 from app.models.user import User
 from app.schemas.assignment import AssignmentOut
 from app.schemas.course import CourseOut
 from app.schemas.module import ModuleOut
 from app.schemas.self_enroll import CourseSelfEnrollRequest
+from app.schemas.student_submission_tests import StudentSubmissionTestsOut, StudentVisibleTestResultOut
 from app.schemas.student_submissions import StudentSubmissionItem
-from app.schemas.submission import SubmissionOut, SubmissionStudentOut      
+from app.schemas.submission import SubmissionOut, SubmissionStudentOut
 from app.worker.enqueue import enqueue_grading
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/student", dependencies=[Depends(get_current_user)])
 
-_ALLOWED_EXTENSIONS = {".c", ".cpp", ".h", ".hpp", ".zip"}
+_ALLOWED_EXTENSIONS = {".c", ".cpp", ".zip"}
 _MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
 def _uploads_root() -> Path:
-    root = Path(__file__).resolve().parents[3] / "var" / "uploads"
+    root = Path(settings.uploads_dir).expanduser()
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+async def _read_upload_limited(file: UploadFile, *, max_bytes: int) -> bytes:
+    buf = bytearray()
+    chunk_size = 1024 * 1024
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        buf.extend(chunk)
+        if len(buf) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="File too large",
+            )
+    return bytes(buf)
 
 
 async def _error_kind_by_submission_id(
@@ -272,12 +294,13 @@ async def submit_assignment(
     ext = Path(file.filename).suffix.lower()
     if ext not in _ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
-
-    data = await file.read()
-    if len(data) > _MAX_UPLOAD_BYTES:
+    if ext == ".zip" and not bool(getattr(assignment, "allows_zip", False)):
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This assignment does not accept ZIP submissions",
         )
+
+    data = await _read_upload_limited(file, max_bytes=_MAX_UPLOAD_BYTES)
 
     dest = _uploads_root() / f"{uuid4().hex}{ext}"
     dest.write_bytes(data)
@@ -303,12 +326,17 @@ async def submit_assignment(
         )
     except Exception:
         # Best-effort only: never block submission creation on notifications.
-        pass
+        logger.exception(
+            "Failed to send staff submission notification. course_id=%s assignment_id=%s submission_id=%s",
+            course_id,
+            assignment_id,
+            submission.id,
+        )
     # Fire-and-forget: enqueue background grading if Redis is configured.
     try:
         await enqueue_grading(submission_id=submission.id)
     except Exception:
-        pass
+        logger.exception("Failed to enqueue grading job. submission_id=%s", submission.id)
     return submission
 
 
@@ -404,5 +432,66 @@ async def download_my_submission(
     return FileResponse(
         path=storage_path,
         filename=row.submission.file_name,
-        media_type=row.submission.content_type or "application/octet-stream",
+        media_type=row.submission.content_type or "application/octet-stream",   
+    )
+
+
+@router.get(
+    "/courses/{course_id}/assignments/{assignment_id}/submissions/{submission_id}/tests",
+    response_model=StudentSubmissionTestsOut,
+)
+async def my_submission_tests(
+    course_id: int,
+    assignment_id: int,
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> StudentSubmissionTestsOut:
+    await require_course_student_or_staff(course_id, current_user, db)
+
+    row = await get_student_submission_row(db, user_id=current_user.id, submission_id=submission_id)
+    if row is None or row.course.id != course_id or row.assignment.id != assignment_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+
+    compile_output_result = await db.execute(
+        select(SubmissionTestResult.compile_output)
+        .where(
+            SubmissionTestResult.submission_id == submission_id,
+            SubmissionTestResult.compile_output != "",
+        )
+        .limit(1)
+    )
+    compile_output = compile_output_result.scalar_one_or_none() or ""
+
+    result = await db.execute(
+        select(SubmissionTestResult, TestCase)
+        .join(TestCase, TestCase.id == SubmissionTestResult.test_case_id)
+        .where(
+            SubmissionTestResult.submission_id == submission_id,
+            TestCase.is_hidden.is_(False),
+        )
+        .order_by(TestCase.position.asc(), TestCase.id.asc())
+    )
+    tests: list[StudentVisibleTestResultOut] = []
+    for test_result, test_case in result.all():
+        tests.append(
+            StudentVisibleTestResultOut(
+                test_case_id=test_case.id,
+                name=test_case.name,
+                position=test_case.position,
+                points=test_case.points,
+                passed=test_result.passed,
+                outcome=test_result.outcome,
+                stdin=test_case.stdin,
+                expected_stdout=test_case.expected_stdout,
+                expected_stderr=test_case.expected_stderr,
+                stdout=test_result.stdout,
+                stderr=test_result.stderr,
+            )
+        )
+
+    return StudentSubmissionTestsOut(
+        submission_id=submission_id,
+        compile_output=compile_output,
+        tests=tests,
     )

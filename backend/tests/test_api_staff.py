@@ -75,7 +75,7 @@ async def test_staff_endpoints_allow_course_staff(client):
 
     # Staff can list org members for dropdowns (without org-admin access)
     r = await client.get(f"/api/v1/orgs/{org_id}/memberships")
-    assert r.status_code == 403
+    assert r.status_code == 200
 
     r = await client.get(f"/api/v1/staff/courses/{course_id}/org-members")      
     assert r.status_code == 200

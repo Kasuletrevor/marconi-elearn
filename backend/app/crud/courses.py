@@ -1,6 +1,7 @@
 import secrets
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.course import Course
@@ -15,12 +16,10 @@ def _make_self_enroll_code(length: int = 8) -> str:
 
 
 async def generate_unique_self_enroll_code(db: AsyncSession) -> str:
-    for _ in range(25):
-        code = _make_self_enroll_code()
-        result = await db.execute(select(Course.id).where(Course.self_enroll_code == code))
-        if result.scalar_one_or_none() is None:
-            return code
-    raise RuntimeError("Failed to generate unique self-enroll code")
+    # NOTE: Uniqueness is ultimately enforced by DB constraint; this function
+    # only generates candidate codes.
+    _ = db  # reserved for future pre-checks
+    return _make_self_enroll_code()
 
 
 async def create_course(
@@ -117,7 +116,16 @@ async def set_course_self_enroll(
         course.self_enroll_enabled = enabled
 
     if regenerate_code or (course.self_enroll_enabled and not course.self_enroll_code):
-        course.self_enroll_code = await generate_unique_self_enroll_code(db)
+        for _ in range(25):
+            course.self_enroll_code = await generate_unique_self_enroll_code(db)
+            try:
+                await db.commit()
+                await db.refresh(course)
+                return course
+            except IntegrityError:
+                await db.rollback()
+                continue
+        raise RuntimeError("Failed to generate unique self-enroll code")
 
     await db.commit()
     await db.refresh(course)

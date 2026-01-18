@@ -16,6 +16,9 @@ async def create_assignment(
     due_date: datetime | None,
     max_points: int,
     late_policy: dict | None = None,
+    allows_zip: bool = False,
+    expected_filename: str | None = None,
+    compile_command: str | None = None,
 ) -> Assignment:
     assignment = Assignment(
         course_id=course_id,
@@ -25,6 +28,9 @@ async def create_assignment(
         due_date=due_date,
         max_points=max_points,
         late_policy=late_policy,
+        allows_zip=bool(allows_zip),
+        expected_filename=expected_filename.strip() if expected_filename else None,
+        compile_command=compile_command.strip() if compile_command else None,
     )
     db.add(assignment)
     await db.commit()
@@ -65,6 +71,9 @@ async def update_assignment(
     due_date: datetime | None,
     max_points: int | None,
     late_policy: dict | None,
+    allows_zip: bool | None = None,
+    expected_filename: str | None = None,
+    compile_command: str | None = None,
 ) -> Assignment:
     if title is not None:
         assignment.title = title.strip()
@@ -78,6 +87,12 @@ async def update_assignment(
         assignment.max_points = max_points
     if late_policy is not None:
         assignment.late_policy = late_policy
+    if allows_zip is not None:
+        assignment.allows_zip = bool(allows_zip)
+    if expected_filename is not None:
+        assignment.expected_filename = expected_filename.strip() or None
+    if compile_command is not None:
+        assignment.compile_command = compile_command.strip() or None
     await db.commit()
     await db.refresh(assignment)
     return assignment

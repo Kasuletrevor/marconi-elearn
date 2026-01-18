@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -28,6 +29,8 @@ from app.schemas.auth import (
     MeResponse,
     OrgRoleItem,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
 
@@ -190,7 +193,12 @@ async def accept_invite(
             metadata={"course_id": invite.course_id, "email": user.email},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event for invite acceptance. invite_id=%s course_id=%s user_id=%s",
+            invite.id,
+            invite.course_id,
+            user.id,
+        )
 
     token, _ = await create_session(db, user_id=user.id)
     response.set_cookie(

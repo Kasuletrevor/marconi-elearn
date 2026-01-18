@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -12,6 +13,8 @@ from app.crud.courses import get_course
 from app.crud.invites import create_course_student_invites, parse_roster_from_csv_bytes
 from app.db.deps import get_db
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/orgs/{org_id}/courses/{course_id}/invites",
@@ -59,7 +62,12 @@ async def import_roster_csv(
             },
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event course_roster.imported. org_id=%s course_id=%s actor_user_id=%s",
+            org_id,
+            course_id,
+            _current_user.id,
+        )
 
     # For now, return tokens for manual distribution in dev. Production will email links.
     invite_links = [f"/invite/{t}" for t in tokens]

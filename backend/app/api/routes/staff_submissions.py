@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -32,9 +33,14 @@ from app.schemas.staff_submissions import (
     StaffSubmissionsBulkRequest,
     StaffSubmissionsBulkResult,
     StaffSubmissionsPage,
+    ZipContentsOut,
+    ZipEntryOut,
 )
 from app.schemas.submission import SubmissionOut
 from app.worker.enqueue import enqueue_grading
+from app.worker.zip_extract import ZipExtractionError, list_zip_contents
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/staff/submissions", dependencies=[Depends(get_current_user)])
 
@@ -154,7 +160,11 @@ async def bulk_update_submissions(
             metadata={"count": len(rows), "action": payload.action.value},
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event submissions.bulk_updated. actor_user_id=%s submission_ids=%s",
+            current_user.id,
+            payload.submission_ids,
+        )
 
     if target_status == SubmissionStatus.graded:
         for r in rows:
@@ -207,6 +217,30 @@ async def get_submission_detail(
     return StaffSubmissionDetail(**item.model_dump(), content_type=row.submission.content_type, size_bytes=row.submission.size_bytes)
 
 
+@router.get("/{submission_id}/zip-contents", response_model=ZipContentsOut)
+async def get_submission_zip_contents(
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> ZipContentsOut:
+    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+
+    storage_path = Path(row.submission.storage_path)
+    if storage_path.suffix.lower() != ".zip":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Submission is not a ZIP file")
+
+    try:
+        entries = list_zip_contents(storage_path)
+    except ZipExtractionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    files = [ZipEntryOut(name=e.name, size=e.size) for e in entries]
+    total_size = sum(e.size for e in entries)
+    return ZipContentsOut(files=files, total_size=total_size, file_count=len(entries))
+
+
 @router.patch("/{submission_id}", response_model=SubmissionOut)
 async def update_submission(
     submission_id: int,
@@ -253,7 +287,11 @@ async def update_submission(
             },
         )
     except Exception:
-        pass
+        logger.exception(
+            "Failed to write audit event submission.updated. actor_user_id=%s submission_id=%s",
+            current_user.id,
+            submission.id,
+        )
 
     if prior_status != SubmissionStatus.graded and submission.status == SubmissionStatus.graded:
         link = f"/dashboard/courses/{row.course.id}/assignments/{row.assignment.id}"
@@ -321,7 +359,7 @@ async def regrade_submission(
     try:
         await enqueue_grading(submission_id=submission_id)
     except Exception:
-        pass
+        logger.exception("Failed to enqueue grading job. submission_id=%s", submission_id)
 
     await db.refresh(submission)
     return submission

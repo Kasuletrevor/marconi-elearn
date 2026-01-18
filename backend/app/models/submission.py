@@ -2,7 +2,7 @@ from datetime import datetime
 
 import enum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -17,6 +17,11 @@ class SubmissionStatus(str, enum.Enum):
 
 class Submission(Base):
     __tablename__ = "submissions"
+    __table_args__ = (
+        Index("ix_submissions_assignment_id_user_id", "assignment_id", "user_id"),
+        Index("ix_submissions_user_id_id", "user_id", "id"),
+        Index("ix_submissions_status_created_at", "status", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id", ondelete="CASCADE"), index=True)

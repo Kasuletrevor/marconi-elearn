@@ -7,17 +7,14 @@ import { ArrowLeft, Loader2, Users } from "lucide-react";
 import { student, ApiError } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
-
-const PROGRAMMES = ["BELE", "BSCE", "BBIO", "BSTE"] as const;
+import { PROGRAMMES, type Programme } from "@/lib/programmes";
 
 export default function JoinCoursePage() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [fullName, setFullName] = useState("");
   const [studentNumber, setStudentNumber] = useState("");
-  const [programme, setProgramme] = useState<(typeof PROGRAMMES)[number] | "">(
-    ""
-  );
+  const [programme, setProgramme] = useState<Programme | "">("");
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
 
@@ -120,7 +117,10 @@ export default function JoinCoursePage() {
             </label>
             <select
               value={programme}
-              onChange={(e) => setProgramme(e.target.value as any)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setProgramme(value ? (value as Programme) : "");
+              }}
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             >
               <option value="">Select programme...</option>

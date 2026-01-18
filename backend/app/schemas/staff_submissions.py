@@ -67,3 +67,14 @@ class StaffSubmissionsBulkResult(BaseModel):
 
 class StaffNextSubmissionOut(BaseModel):
     submission_id: int | None
+
+
+class ZipEntryOut(BaseModel):
+    name: str
+    size: int
+
+
+class ZipContentsOut(BaseModel):
+    files: list[ZipEntryOut]
+    total_size: int
+    file_count: int
