@@ -69,6 +69,9 @@ export interface Assignment {
   max_points: number;
   module_id: number | null;
   late_policy?: LatePolicy | null;
+  allows_zip: boolean;
+  expected_filename: string | null;
+  compile_command: string | null;
 }
 
 export interface Submission {
@@ -184,6 +187,9 @@ export interface AssignmentCreate {
   module_id?: number | null;
   due_date?: string | null;
   max_points?: number;
+  allows_zip?: boolean;
+  expected_filename?: string | null;
+  compile_command?: string | null;
 }
 
 export interface AssignmentUpdate {
@@ -192,6 +198,9 @@ export interface AssignmentUpdate {
   module_id?: number | null;
   due_date?: string | null;
   max_points?: number | null;
+  allows_zip?: boolean | null;
+  expected_filename?: string | null;
+  compile_command?: string | null;
 }
 
 export interface CourseMembership {
@@ -275,6 +284,17 @@ export interface StaffSubmissionQueueItem {
   status: "pending" | "grading" | "graded" | "error";
   score: number | null;
   feedback: string | null;
+}
+
+export interface ZipEntry {
+  name: string;
+  size: number;
+}
+
+export interface ZipContents {
+  files: ZipEntry[];
+  total_size: number;
+  file_count: number;
 }
 
 export interface StaffSubmissionDetail extends StaffSubmissionQueueItem {
@@ -1431,6 +1451,14 @@ export const staffSubmissions = {
       throw new ApiError(res.status, detail);
     }
     return res.blob();
+  },
+
+  async zipContents(submissionId: number): Promise<ZipContents> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/submissions/${submissionId}/zip-contents`,
+      { credentials: "include" }
+    );
+    return handleResponse<ZipContents>(res);
   },
 };
 
