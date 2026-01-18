@@ -98,6 +98,10 @@ function formatDuration(seconds: number | null | undefined): string {
   return `${days}d ${remHours}h`;
 }
 
+function firstLine(text: string): string {
+  return text.trim().split(/\r?\n/)[0] ?? "";
+}
+
 export default function AssignmentDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -528,6 +532,8 @@ export default function AssignmentDetailPage() {
                     submission={submission}
                     isLatest={index === 0}
                     maxPoints={assignment.max_points}
+                    attemptNumber={submissions.length - index}
+                    totalAttempts={submissions.length}
                   />
                 ))}
               </div>
@@ -543,22 +549,52 @@ interface SubmissionCardProps {
   submission: Submission;
   isLatest: boolean;
   maxPoints: number;
+  attemptNumber: number;
+  totalAttempts: number;
 }
 
-function SubmissionCard({ submission, isLatest, maxPoints }: SubmissionCardProps) {
+function SubmissionCard({
+  submission,
+  isLatest,
+  maxPoints,
+  attemptNumber,
+  totalAttempts,
+}: SubmissionCardProps) {
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const config = statusConfig[submission.status];
   const StatusIcon = config.icon;
   const submittedAt = new Date(submission.submitted_at);
-  const fileName = submission.file_path.split("/").pop() || "submission"; 
-  const kindLabel: Record<
+  const fileName =
+    submission.file_name ||
+    submission.file_path.split("/").pop() ||
+    "submission";
+  const kindMeta: Record<
     NonNullable<Submission["error_kind"]>,
-    { label: string; className: string }
+    { label: string; className: string; hint: string }
   > = {
-    compile_error: { label: "Compile", className: "bg-[var(--destructive)]/10 text-[var(--destructive)]" },
-    runtime_error: { label: "Runtime", className: "bg-[var(--destructive)]/10 text-[var(--destructive)]" },
-    infra_error: { label: "Infra", className: "bg-amber-500/10 text-amber-700" },
-    internal_error: { label: "Error", className: "bg-[var(--secondary)]/10 text-[var(--secondary)]" },
+    compile_error: {
+      label: "Compile error",
+      className: "bg-[var(--destructive)]/10 text-[var(--destructive)]",
+      hint: "Fix compilation errors and resubmit.",
+    },
+    runtime_error: {
+      label: "Runtime error",
+      className: "bg-[var(--destructive)]/10 text-[var(--destructive)]",
+      hint: "Your program crashed/timed out. Check edge cases and resubmit.",
+    },
+    infra_error: {
+      label: "Infra issue",
+      className: "bg-amber-500/10 text-amber-700",
+      hint: "Platform issue. Retry later or contact course staff.",
+    },
+    internal_error: {
+      label: "System error",
+      className: "bg-[var(--secondary)]/10 text-[var(--secondary)]",
+      hint: "Unexpected error. Retry; if it persists contact course staff.",
+    },
   };
+
+  const submissionKind = submission.error_kind ? kindMeta[submission.error_kind] : null;
 
   return (
     <div
@@ -575,6 +611,9 @@ function SubmissionCard({ submission, isLatest, maxPoints }: SubmissionCardProps
           </div>
           <span className={`text-sm font-medium ${config.color}`}>
             {config.label}
+          </span>
+          <span className="text-xs text-[var(--muted-foreground)] whitespace-nowrap">
+            Attempt {attemptNumber} of {totalAttempts}
           </span>
         </div>
         {isLatest && (
@@ -596,16 +635,23 @@ function SubmissionCard({ submission, isLatest, maxPoints }: SubmissionCardProps
         </p>
       </div>
 
-      {submission.error_kind && (
-        <div className="flex items-center gap-2 mb-2">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${kindLabel[submission.error_kind].className}`}>
-            {kindLabel[submission.error_kind].label}
-          </span>
-          {submission.feedback ? (
-            <span className="text-[11px] text-[var(--muted-foreground)] truncate">
-              {submission.feedback}
+      {submissionKind && (
+        <div className="mb-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${submissionKind.className}`}
+            >
+              {submissionKind.label}
             </span>
-          ) : null}
+            {submission.feedback ? (
+              <span className="text-[11px] text-[var(--muted-foreground)] truncate">
+                {firstLine(submission.feedback)}
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[11px] text-[var(--muted-foreground)] mt-1">
+            {submissionKind.hint}
+          </p>
         </div>
       )}
 
@@ -637,13 +683,24 @@ function SubmissionCard({ submission, isLatest, maxPoints }: SubmissionCardProps
 
       {submission.feedback && (
         <div className="mt-3 pt-2 border-t border-[var(--border)]">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)] mb-1">
-            <MessageSquare className="w-3 h-3" />
-            <span>Feedback</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
+              <MessageSquare className="w-3 h-3" />
+              <span>Details</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsDetailsOpen((v) => !v)}
+              className="text-xs text-[var(--primary)] hover:underline"
+            >
+              {isDetailsOpen ? "Hide" : "View"}
+            </button>
           </div>
-          <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap">
-            {submission.feedback}
-          </p>
+          {isDetailsOpen && (
+            <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap mt-2">
+              {submission.feedback}
+            </p>
+          )}
         </div>
       )}
     </div>
