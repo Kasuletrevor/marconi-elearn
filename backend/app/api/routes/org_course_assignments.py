@@ -49,6 +49,9 @@ async def create_assignment_in_course(
         due_date=payload.due_date,
         max_points=payload.max_points,
         late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
+        allows_zip=payload.allows_zip,
+        expected_filename=payload.expected_filename,
+        compile_command=payload.compile_command,
     )
 
 
@@ -100,6 +103,9 @@ async def update_assignment_in_course(
         due_date=payload.due_date,
         max_points=payload.max_points,
         late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
+        allows_zip=payload.allows_zip,
+        expected_filename=payload.expected_filename,
+        compile_command=payload.compile_command,
     )
 
 
