@@ -9,7 +9,6 @@ import {
   BookOpen,
   FileText,
   FolderOpen,
-  AlertTriangle,
   LogOut,
   Menu,
   X,
@@ -208,7 +207,6 @@ function SidebarContent({
   const mainLinks = [
     { href: "/staff", label: "Overview", icon: BookOpen },
     { href: "/staff/submissions", label: "Submissions Queue", icon: FileText },
-    { href: "/staff/at-risk", label: "At-Risk Students", icon: AlertTriangle },
   ];
 
   return (
