@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   BookOpen,
   Filter,
@@ -18,11 +17,6 @@ import { courseStaff, staffSubmissions, type Course, type StaffSubmissionQueueIt
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 14 },
-  visible: { opacity: 1, y: 0 },
-};
 
 const statusBadge: Record<
   StaffSubmissionQueueItem["status"],
@@ -42,13 +36,10 @@ export default function StaffSubmissionsQueuePage() {
   const [selectedCourseId, setSelectedCourseId] = useState<number | "all">("all");
   const [selectedStatus, setSelectedStatus] = useState<StaffSubmissionQueueItem["status"] | "all">("pending");
   const [offset, setOffset] = useState(0);
-  const [limit, setLimit] = useState(25);
+  const limit = 25;
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isNavigatingNext, setIsNavigatingNext] = useState(false);
-  const [isBulkWorking, setIsBulkWorking] = useState(false);
   const [error, setError] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [nextId, setNextId] = useState<number | null>(null);
 
   type CourseOption = { id: number | "all"; title: string; code: string };
@@ -59,54 +50,12 @@ export default function StaffSubmissionsQueuePage() {
     return options;
   }, [courses]);
 
-  const selectedCount = selectedIds.size;
-  const allOnPageSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
   const canGoPrev = offset > 0;
   const canGoNext = offset + items.length < total;
 
-  function resetPaging() {
+  const resetPaging = useCallback(() => {
     setOffset(0);
-    setSelectedIds(new Set());
-  }
-
-  function toggleSelect(id: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAllOnPage() {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (allOnPageSelected) {
-        for (const item of items) next.delete(item.id);
-      } else {
-        for (const item of items) next.add(item.id);
-      }
-      return next;
-    });
-  }
-
-  async function runBulk(action: "mark_pending" | "mark_grading" | "mark_graded") {
-    if (selectedIds.size === 0) return;
-    setIsBulkWorking(true);
-    try {
-      await staffSubmissions.bulkUpdate({
-        submission_ids: Array.from(selectedIds),
-        action,
-      });
-      setSelectedIds(new Set());
-      await fetchData(true);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.detail);
-      else setError("Bulk update failed");
-    } finally {
-      setIsBulkWorking(false);
-    }
-  }
+  }, []);
 
   function goNextUngraded() {
     if (nextId) {
@@ -114,10 +63,11 @@ export default function StaffSubmissionsQueuePage() {
     }
   }
 
-  async function fetchData(refresh = false) {
+  const fetchData = useCallback(async (refresh = false) => {
     try {
       setError("");
-      refresh ? setIsRefreshing(true) : setIsLoading(true);
+      if (refresh) setIsRefreshing(true);
+      else setIsLoading(true);
 
       const [coursesData, page, nextSub] = await Promise.all([
         courseStaff.listCourses(),
@@ -141,18 +91,17 @@ export default function StaffSubmissionsQueuePage() {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load submissions");
     } finally {
-      refresh ? setIsRefreshing(false) : setIsLoading(false);
+      if (refresh) setIsRefreshing(false);
+      else setIsLoading(false);
     }
-  }
+  }, [limit, offset, selectedCourseId, selectedStatus]);
 
   useEffect(() => {
-    fetchData(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCourseId, selectedStatus, offset, limit]);
+    void fetchData(false);
+  }, [fetchData]);
 
   useEffect(() => {
     resetPaging();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourseId, selectedStatus]);
 
   return (
@@ -239,55 +188,15 @@ export default function StaffSubmissionsQueuePage() {
             description="Try selecting a different course or status."
           />
         ) : (
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
             <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--background)]">
               <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-xs text-[var(--muted-foreground)] select-none cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={allOnPageSelected}
-                    onChange={toggleSelectAllOnPage}
-                    className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
-                  />
-                  Select page
-                </label>
                 <span className="text-xs text-[var(--muted-foreground)] font-mono">
                   {total === 0 ? "0" : `${offset + 1}–${offset + items.length}`} of {total}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedCount > 0 && (
-                  <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
-                    <span className="text-xs text-[var(--muted-foreground)] font-medium">{selectedCount} selected</span>
-                    <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm">
-                      <button
-                        onClick={() => runBulk("mark_grading")}
-                        disabled={isBulkWorking}
-                        className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide"
-                      >
-                        Grading
-                      </button>
-                      <div className="w-px h-6 bg-[var(--border)]" />
-                      <button
-                        onClick={() => runBulk("mark_graded")}
-                        disabled={isBulkWorking}
-                        className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide"
-                      >
-                        Graded
-                      </button>
-                      <div className="w-px h-6 bg-[var(--border)]" />
-                      <button
-                        onClick={() => runBulk("mark_pending")}
-                        disabled={isBulkWorking}
-                        className="px-3 py-1.5 text-[10px] font-medium hover:bg-[var(--background)] disabled:opacity-60 transition-colors uppercase tracking-wide"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setOffset((o) => Math.max(0, o - limit))}
@@ -316,18 +225,7 @@ export default function StaffSubmissionsQueuePage() {
                   onClick={() => router.push(`/staff/submissions/${s.id}`)}
                   className="group grid grid-cols-12 gap-4 px-5 py-4 hover:bg-[var(--background)] transition-colors cursor-pointer items-center"
                 >
-                  <div className="col-span-1 flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(s.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleSelect(s.id)}
-                      className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] cursor-pointer"
-                      aria-label={`Select submission ${s.id}`}
-                    />
-                  </div>
-
-                  <div className="col-span-4 min-w-0">
+                  <div className="col-span-5 min-w-0">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/10 flex items-center justify-center shrink-0 group-hover:bg-[var(--primary)]/10 transition-colors">
                         <FileText className="w-5 h-5 text-[var(--primary)]" />
