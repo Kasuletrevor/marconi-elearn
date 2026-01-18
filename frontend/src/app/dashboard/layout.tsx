@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -14,213 +14,15 @@ import {
   X,
   ChevronRight,
   User,
-  Bell,
-  Check,
   Code,
 } from "lucide-react";
-import { auth, notifications, ApiError, type User as UserType, type Notification } from "@/lib/api";
+import { NotificationBell } from "@/components/NotificationBell";
+import { auth, ApiError, type User as UserType } from "@/lib/api";
 import { useAuthStore, getRedirectPath } from "@/lib/store";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
-
-/* ============================================
-   NOTIFICATION BELL COMPONENT
-   ============================================ */
-
-function NotificationBell({ enabled, align = "right" }: { enabled: boolean; align?: "left" | "right" }) {
-  const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
-  const [notificationList, setNotificationList] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDisabled, setIsDisabled] = useState(false);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
-
-  // Fetch notifications on mount and periodically
-  useEffect(() => {
-    if (!enabled || isDisabled) return;
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // refresh every minute
-    return () => clearInterval(interval);
-  }, [enabled, isDisabled]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  async function fetchNotifications() {
-    try {
-      const [all, unread] = await Promise.all([
-        notifications.list({ limit: 10 }),
-        notifications.list({ unread_only: true, limit: 50 }),
-      ]);
-      setNotificationList(all);
-      setUnreadCount(unread.length);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setIsDisabled(true);
-        setNotificationList([]);
-        setUnreadCount(0);
-        return;
-      }
-      console.error("Failed to fetch notifications:", err);
-    }
-  }
-
-  async function handleNotificationClick(notification: Notification) {
-    setIsLoading(true);
-    try {
-      if (notification.read_at === null) {
-        const updated = await notifications.markRead(notification.id);
-        setNotificationList((prev) => prev.map((n) => (n.id === notification.id ? updated : n)));
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      }
-      if (notification.link_url) {
-        setIsOpen(false);
-        router.push(notification.link_url);
-      }
-    } catch (err) {
-      console.error("Failed to mark notification as read:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  function getNotificationIcon(kind: Notification["kind"]) {
-    switch (kind) {
-      case "submission_graded":
-        return <Check className="w-4 h-4 text-emerald-600" />;
-      default:
-        return <Bell className="w-4 h-4 text-[var(--muted-foreground)]" />;
-    }
-  }
-
-  function formatTimeAgo(dateString: string) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  }
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Bell Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)] rounded-lg transition-colors"
-        aria-label="Notifications"
-      >
-        <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[var(--secondary)] text-white text-xs font-medium rounded-full flex items-center justify-center"
-          >
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </motion.span>
-        )}
-      </button>
-
-      {/* Dropdown */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className={`absolute ${align === "left" ? "left-0" : "right-0"} mt-2 w-80 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden z-50`}
-          >
-            {/* Header */}
-            <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--background)]">
-              <div className="flex items-center justify-between">
-                <h3 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
-                  Notifications
-                </h3>
-                {unreadCount > 0 && (
-                  <span className="text-xs text-[var(--muted-foreground)]">
-                    {unreadCount} unread
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Notification List */}
-            <div className="max-h-80 overflow-y-auto">
-              {notificationList.length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <Bell className="w-8 h-8 mx-auto text-[var(--muted-foreground)] opacity-50 mb-2" />
-                  <p className="text-sm text-[var(--muted-foreground)]">
-                    No notifications yet
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-[var(--border)]">
-                  {notificationList.map((notification) => (
-                    <motion.button
-                      key={notification.id}
-                      onClick={() => handleNotificationClick(notification)}
-                      disabled={isLoading}
-                      whileHover={{ backgroundColor: "var(--background)" }}
-                      className={`w-full px-4 py-3 text-left transition-colors ${notification.read_at === null ? "bg-[var(--primary)]/5" : ""
-                        } disabled:opacity-50`}
-                    >
-                      <div className="flex gap-3">
-                        <div className="flex-shrink-0 mt-0.5">
-                          {getNotificationIcon(notification.kind)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p
-                              className={`text-sm truncate ${notification.read_at === null
-                                ? "font-semibold text-[var(--foreground)]"
-                                : "font-medium text-[var(--foreground)]"
-                                }`}
-                            >
-                              {notification.title}
-                            </p>
-                            {notification.read_at === null && (
-                              <span className="flex-shrink-0 w-2 h-2 mt-1.5 bg-[var(--primary)] rounded-full" />
-                            )}
-                          </div>
-                          <p className="text-xs text-[var(--muted-foreground)] line-clamp-2 mt-0.5">
-                            {notification.body || ""}
-                          </p>
-                          <p className="text-xs text-[var(--muted-foreground)] mt-1 opacity-70">
-                            {formatTimeAgo(notification.created_at)}
-                          </p>
-                        </div>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 const sidebarLinks = [
   { href: "/dashboard", label: "My Courses", icon: BookOpen },
   { href: "/playground", label: "Playground", icon: Code },
@@ -236,10 +38,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     viewAsStudent,
     setUser,
     enterStudentView,
-    exitStudentView,
     logout: logoutStore,
     isLoading,
-    setLoading,
   } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
