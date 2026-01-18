@@ -192,7 +192,7 @@ export default function PlaygroundPage() {
               output
             ) : (
               <span className="text-white/30 italic">
-                Hit "Run" to see output...
+                Hit &quot;Run&quot; to see output...
               </span>
             )}
           </div>
