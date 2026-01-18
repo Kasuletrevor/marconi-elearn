@@ -33,9 +33,12 @@ from app.schemas.staff_submissions import (
     StaffSubmissionsBulkRequest,
     StaffSubmissionsBulkResult,
     StaffSubmissionsPage,
+    ZipContentsOut,
+    ZipEntryOut,
 )
 from app.schemas.submission import SubmissionOut
 from app.worker.enqueue import enqueue_grading
+from app.worker.zip_extract import ZipExtractionError, list_zip_contents
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +215,30 @@ async def get_submission_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     item = _to_queue_item(row)
     return StaffSubmissionDetail(**item.model_dump(), content_type=row.submission.content_type, size_bytes=row.submission.size_bytes)
+
+
+@router.get("/{submission_id}/zip-contents", response_model=ZipContentsOut)
+async def get_submission_zip_contents(
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> ZipContentsOut:
+    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+
+    storage_path = Path(row.submission.storage_path)
+    if storage_path.suffix.lower() != ".zip":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Submission is not a ZIP file")
+
+    try:
+        entries = list_zip_contents(storage_path)
+    except ZipExtractionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    files = [ZipEntryOut(name=e.name, size=e.size) for e in entries]
+    total_size = sum(e.size for e in entries)
+    return ZipContentsOut(files=files, total_size=total_size, file_count=len(entries))
 
 
 @router.patch("/{submission_id}", response_model=SubmissionOut)
