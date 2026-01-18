@@ -99,6 +99,8 @@ export default function StaffCoursePage() {
     useState(false);
   const [openCreateModuleFromQuickAction, setOpenCreateModuleFromQuickAction] =
     useState(false);
+  const [openImportRosterFromQuickAction, setOpenImportRosterFromQuickAction] =
+    useState(false);
 
   const role = getCourseRole(user, courseId);
   const canEditCourseSettings = role === "owner" || role === "co_lecturer";     
@@ -257,6 +259,7 @@ export default function StaffCoursePage() {
                   break;
                 case "import_roster":
                   setActiveTab("roster");
+                  setOpenImportRosterFromQuickAction(true);
                   break;
                 case "add_module":
                   setActiveTab("modules");
@@ -274,9 +277,11 @@ export default function StaffCoursePage() {
             course={course}
             memberships={memberships}
             onRefresh={async () => {
-              const data = await courseStaff.listMemberships(courseId);
+              const data = await courseStaff.listMemberships(courseId);    
               setMemberships(data);
             }}
+            focusImportCsvOnMount={openImportRosterFromQuickAction}
+            onConsumedFocusImportCsv={() => setOpenImportRosterFromQuickAction(false)}
           />
         )}
         {activeTab === "assignments" && (
@@ -764,6 +769,7 @@ function OverviewTab({
           </h3>
           <div className="grid gap-3">
             <button
+              type="button"
               onClick={() => onQuickAction("create_assignment")}
               className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
             >
@@ -775,6 +781,7 @@ function OverviewTab({
               </span>
             </button>
             <button
+              type="button"
               onClick={() => onQuickAction("import_roster")}
               className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
             >
@@ -786,6 +793,7 @@ function OverviewTab({
               </span>
             </button>
             <button
+              type="button"
               onClick={() => onQuickAction("add_module")}
               className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
             >
@@ -1245,9 +1253,17 @@ interface RosterTabProps {
   course: Course;
   memberships: CourseMembership[];
   onRefresh: () => Promise<void>;
+  focusImportCsvOnMount?: boolean;
+  onConsumedFocusImportCsv?: () => void;
 }
 
-function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {        
+function RosterTab({
+  course,
+  memberships,
+  onRefresh,
+  focusImportCsvOnMount = false,
+  onConsumedFocusImportCsv,
+}: RosterTabProps) {
   const [orgMembers, setOrgMembers] = useState<OrgMembership[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);    
@@ -1271,6 +1287,9 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
   const [studentNumber, setStudentNumber] = useState("");
   const [studentProgramme, setStudentProgramme] = useState<Programme | "">("");
 
+  const enrollStudentsRef = useRef<HTMLDivElement>(null);
+  const importCsvButtonRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     async function loadOrgMembers() {
       setIsLoadingOrg(true);
@@ -1285,6 +1304,15 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
     }
     loadOrgMembers();
   }, [course.id]);
+
+  useEffect(() => {
+    if (!focusImportCsvOnMount) return;
+    // Browsers may block opening a file picker without a direct user gesture,
+    // so we scroll + focus the Import CSV button instead.
+    enrollStudentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    importCsvButtonRef.current?.focus();
+    onConsumedFocusImportCsv?.();
+  }, [focusImportCsvOnMount, onConsumedFocusImportCsv]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1687,7 +1715,10 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
       )}
 
       {/* Enroll Students */}
-      <div className="order-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+      <div
+        ref={enrollStudentsRef}
+        className="order-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5"
+      >
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="font-medium text-[var(--foreground)] mb-1">Enroll students</h3>
@@ -1703,6 +1734,7 @@ function RosterTab({ course, memberships, onRefresh }: RosterTabProps) {
             onChange={handleCsvUpload}
           />
           <button
+            ref={importCsvButtonRef}
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isAddingStudent}
