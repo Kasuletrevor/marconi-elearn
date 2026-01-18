@@ -18,8 +18,8 @@
 | Priority | Issue | Location |
 |----------|-------|----------|
 | High | Silent exception swallowing (23+ places) | Multiple route files - audit events, notifications, grading silently fail |
-| High | Missing session expiration | `app/models/session.py` - sessions never expire |
-| Medium | ZIP file upload accepted but not graded | `app/worker/grading.py:52-59` - returns hard-coded error |
+| High | Session expiration (fixed) | `app/models/session.py` + `app/api/deps/auth.py` - sessions now expire and expired sessions are rejected |
+| Medium | ZIP upload grading (fixed) | `app/worker/grading.py` + `app/worker/zip_extract.py` - ZIP submissions are extracted and graded (with safety checks) |
 | Medium | Race condition in self-enroll code generation | `app/crud/courses.py:17-23` - uniqueness check not atomic |
 | Medium | Superadmin bypass missing in course permissions | `app/api/deps/course_permissions.py` - no `is_superadmin` check |
 | Medium | File uploaded to memory before size check | `app/api/routes/student.py:276-283` |
@@ -81,6 +81,5 @@
 - Accessibility: replace `confirm()` delete confirmations with accessible modal components.
 - Form validation: tighten validation consistently across remaining forms (length limits, required fields, better inline errors).
 - Hooks hygiene: remove remaining `eslint-disable-next-line react-hooks/exhaustive-deps` suppressions by fixing dependencies properly.
-
 
 
