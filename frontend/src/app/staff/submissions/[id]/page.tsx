@@ -17,7 +17,13 @@ import {
   Calendar,
   AlertCircle,
 } from "lucide-react";
-import { staffSubmissions, type StaffSubmissionDetail, type StaffSubmissionUpdate, ApiError } from "@/lib/api";
+import {
+  staffSubmissions,
+  type StaffSubmissionDetail,
+  type StaffSubmissionUpdate,
+  type ZipContents,
+  ApiError,
+} from "@/lib/api";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 14 },
@@ -39,9 +45,22 @@ export default function StaffSubmissionDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [isNavigatingNext, setIsNavigatingNext] = useState(false);
+  const [zipOpen, setZipOpen] = useState(false);
+  const [zipContents, setZipContents] = useState<ZipContents | null>(null);
+  const [zipContentsError, setZipContentsError] = useState("");
+  const [isZipContentsLoading, setIsZipContentsLoading] = useState(false);
 
   const maxPoints = data?.max_points ?? 0;
   const submittedAt = useMemo(() => (data ? new Date(data.submitted_at) : null), [data]);
+  const isZip = Boolean(data?.file_name?.toLowerCase().endsWith(".zip"));
+
+  function formatBytes(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+  }
 
   useEffect(() => {
     async function fetchDetail() {
@@ -82,6 +101,26 @@ export default function StaffSubmissionDetailPage() {
     } catch (err) {
       if (err instanceof ApiError) setSaveError(err.detail);
       else setSaveError("Download failed");
+    }
+  }
+
+  async function toggleZipContents() {
+    if (!data) return;
+    if (!isZip) return;
+    const next = !zipOpen;
+    setZipOpen(next);
+    setZipContentsError("");
+    if (!next || zipContents) return;
+
+    setIsZipContentsLoading(true);
+    try {
+      const contents = await staffSubmissions.zipContents(data.id);
+      setZipContents(contents);
+    } catch (err) {
+      if (err instanceof ApiError) setZipContentsError(err.detail);
+      else setZipContentsError("Failed to load ZIP contents");
+    } finally {
+      setIsZipContentsLoading(false);
     }
   }
 
@@ -196,7 +235,7 @@ export default function StaffSubmissionDetailPage() {
                   {data.assignment_title}
                 </h1>
                 <p className="text-sm text-[var(--muted-foreground)] truncate">
-                  {data.course_code} — {data.course_title}
+                  {data.course_code} - {data.course_title}
                 </p>
               </div>
             </div>
@@ -286,7 +325,7 @@ export default function StaffSubmissionDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-                  Score (0–{maxPoints})
+                  Score (0-{maxPoints})
                 </label>
                 <input
                   value={score}
@@ -363,17 +402,69 @@ export default function StaffSubmissionDetailPage() {
               </div>
               <div className="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
                 <p className="text-xs text-[var(--muted-foreground)] mb-1">Content Type</p>
-                <p className="text-[var(--foreground)]">{data.content_type || "—"}</p>
+                <p className="text-[var(--foreground)]">{data.content_type || "-"}</p>
               </div>
               <div className="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
                 <p className="text-xs text-[var(--muted-foreground)] mb-1">Course</p>
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-[var(--muted-foreground)]" />
                   <p className="text-[var(--foreground)] truncate">
-                    {data.course_code} — {data.course_title}
+                    {data.course_code} - {data.course_title}
                   </p>
                 </div>
               </div>
+
+              {isZip ? (
+                <div className="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-[var(--muted-foreground)] mb-1">ZIP contents</p>
+                      <p className="text-[var(--foreground)] text-sm">
+                        {zipContents
+                          ? `${zipContents.file_count} files, ${formatBytes(zipContents.total_size)} total`
+                          : "View files inside the ZIP"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={toggleZipContents}
+                      className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] transition-colors text-xs"
+                    >
+                      {zipOpen ? "Hide" : "Show"}
+                    </button>
+                  </div>
+
+                  {zipOpen ? (
+                    <div className="mt-3">
+                      {isZipContentsLoading ? (
+                        <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading ZIP contents...
+                        </div>
+                      ) : zipContentsError ? (
+                        <p className="text-xs text-[var(--destructive)]">{zipContentsError}</p>
+                      ) : zipContents ? (
+                        <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card)]">
+                          <div className="divide-y divide-[var(--border)]">
+                            {zipContents.files.map((f) => (
+                              <div key={f.name} className="flex items-center justify-between gap-3 px-3 py-2">
+                                <div className="min-w-0 flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-[var(--muted-foreground)] shrink-0" />
+                                  <span className="text-sm text-[var(--foreground)] truncate">{f.name}</span>
+                                </div>
+                                <span className="text-xs text-[var(--muted-foreground)] shrink-0">
+                                  {formatBytes(f.size)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[var(--muted-foreground)]">No files found.</p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </motion.div>
@@ -381,4 +472,3 @@ export default function StaffSubmissionDetailPage() {
     </div>
   );
 }
-
