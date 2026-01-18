@@ -144,6 +144,10 @@ export interface OrganizationCreate {
   name: string;
 }
 
+export interface OrganizationUpdate {
+  name: string;
+}
+
 export interface CourseCreateInOrg {
   code: string;
   title: string;
@@ -422,14 +426,31 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
     throw new ApiError(response.status, detail);
   }
-  
+
   // Handle 204 No Content
   if (response.status === 204) {
     return undefined as T;
   }
-  
+
   return response.json();
 }
+
+/* ============================================
+   HEALTH ENDPOINTS
+   ============================================ */
+
+export interface HealthResponse {
+  status: string;
+}
+
+export const health = {
+  async get(): Promise<HealthResponse> {
+    const res = await fetch(`${API_BASE}/api/v1/health`, {
+      credentials: "include",
+    });
+    return handleResponse<HealthResponse>(res);
+  },
+};
 
 /* ============================================
    AUTH ENDPOINTS
@@ -686,9 +707,26 @@ export const orgs = {
     return handleResponse<Organization[]>(res);
   },
 
+  async get(orgId: number): Promise<Organization> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}`, {
+      credentials: "include",
+    });
+    return handleResponse<Organization>(res);
+  },
+
   async create(data: OrganizationCreate): Promise<Organization> {
     const res = await fetch(`${API_BASE}/api/v1/orgs`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Organization>(res);
+  },
+
+  async update(orgId: number, data: OrganizationUpdate): Promise<Organization> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify(data),
