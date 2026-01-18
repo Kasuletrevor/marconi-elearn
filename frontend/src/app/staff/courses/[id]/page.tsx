@@ -820,7 +820,11 @@ function OverviewTab({
           ) : (
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl divide-y divide-[var(--border)] overflow-hidden">
               {upcomingAssignments.map((assignment) => (
-                <div key={assignment.id} className="p-4 flex items-center gap-4 hover:bg-[var(--background)] transition-colors">
+                <Link
+                  key={assignment.id}
+                  href={`/staff/courses/${course.id}/assignments/${assignment.id}`}
+                  className="p-4 flex items-center gap-4 hover:bg-[var(--background)] transition-colors"
+                >
                   <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
                     <Clock className="w-5 h-5 text-amber-600" />
                   </div>
@@ -829,7 +833,8 @@ function OverviewTab({
                       {assignment.title}
                     </p>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Due {new Date(assignment.due_date!).toLocaleDateString("en-US", {
+                      Due{" "}
+                      {new Date(assignment.due_date!).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
                         hour: "numeric",
@@ -838,7 +843,7 @@ function OverviewTab({
                     </p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)]" />
-                </div>
+                </Link>
               ))}
             </div>
           )}
