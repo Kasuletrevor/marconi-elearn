@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/student", dependencies=[Depends(get_current_user)])
 
-_ALLOWED_EXTENSIONS = {".c", ".cpp"}
+_ALLOWED_EXTENSIONS = {".c", ".cpp", ".zip"}
 _MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
@@ -290,13 +290,13 @@ async def submit_assignment(
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename")
     ext = Path(file.filename).suffix.lower()
-    if ext == ".zip":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="ZIP submissions are not supported yet. Upload a .c or .cpp file.",
-        )
     if ext not in _ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
+    if ext == ".zip" and not bool(getattr(assignment, "allows_zip", False)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This assignment does not accept ZIP submissions",
+        )
 
     data = await _read_upload_limited(file, max_bytes=_MAX_UPLOAD_BYTES)
 
