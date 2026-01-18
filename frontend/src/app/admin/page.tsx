@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -279,7 +279,7 @@ export default function AdminDashboardPage() {
   );
 }
 
-function QuickActionLink({ href, title, description, icon: Icon }: { href: string; title: string; description: string; icon: any }) {
+function QuickActionLink({ href, title, description, icon: Icon }: { href: string; title: string; description: string; icon: ComponentType<{ className?: string }> }) {
   return (
     <Link
       href={href}
