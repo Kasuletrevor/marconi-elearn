@@ -79,6 +79,7 @@ export interface Submission {
   assignment_id: number;
   user_id: number;
   file_path: string;
+  file_name?: string | null;
   submitted_at: string;
   score: number | null;
   feedback: string | null;
