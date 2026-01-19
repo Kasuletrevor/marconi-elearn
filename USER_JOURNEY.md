@@ -56,8 +56,9 @@ Org admin:
 Course staff:
 - `/staff` - staff dashboard (courses you teach)
 - `/staff/courses/[id]` - course management (tabs: overview, submissions, roster, assignments, modules)
-- `/staff/submissions` - submissions queue (filters + pagination + bulk actions)
-- `/staff/submissions/[id]` - submission detail + grading form
+- `/staff/courses/[id]/assignments/[assignmentId]` - assignment test case builder (configure autograding)
+- `/staff/submissions` - submissions queue (filters + pagination + next-ungraded)
+- `/staff/submissions/[id]` - submission detail (autograde results + manual override + regrade)
 
 Student:
 - `/dashboard` - student dashboard (courses + upcoming assignments)
@@ -279,7 +280,7 @@ Goal: manage content and grade submissions for the courses you teach.
     - `GET /api/v1/staff/courses/{course_id}/missing-submissions`
     - `GET /api/v1/staff/courses/{course_id}/missing-submissions/{assignment_id}`
 
-4) Grade submissions (queue + bulk + next ungraded)
+4) Grade submissions (queue + next ungraded)
 
 Queue page:
 - Route: `/staff/submissions`
@@ -287,23 +288,25 @@ Queue page:
   - `course` filter
   - `status` filter
   - pagination (offset/limit)
-  - bulk action (mark_pending | mark_grading | mark_graded)
+  - "Next ungraded" action
 - API:
   - `GET /api/v1/staff/courses` (course filter options)
   - `GET /api/v1/staff/submissions/page?course_id=...&status_filter=...&offset=...&limit=...`
-  - `POST /api/v1/staff/submissions/bulk`
   - `GET /api/v1/staff/submissions/next?course_id=...&status_filter=...`
 
 Submission detail page:
 - Route: `/staff/submissions/[id]`
 - UI fields:
-  - `status`
+  - autograde results (per-test pass/fail + compile output)
+  - manual override (score + feedback)
   - `score`
   - `feedback`
 - API:
   - `GET /api/v1/staff/submissions/{submission_id}`
   - `PATCH /api/v1/staff/submissions/{submission_id}`
   - `GET /api/v1/staff/submissions/{submission_id}/download`
+  - `GET /api/v1/staff/submissions/{submission_id}/tests`
+  - `POST /api/v1/staff/submissions/{submission_id}/regrade`
 
 ## Student Journey (Learning + Submitting)
 
@@ -336,11 +339,14 @@ Goal: enroll via invite, access course content, submit assignments, track histor
 4) Submit and track history for an assignment
 - Route: `/dashboard/courses/[id]/assignments/[assignmentId]`
 - UI fields:
-  - file upload (allowed extensions: `.c`, `.cpp`, `.h`, `.hpp`, `.zip`)
+  - file upload (allowed extensions: `.c`, `.cpp`, optional `.zip` when enabled on assignment)
+  - submission history (attempts, score, late penalty, error kind)
+  - autograder results (visible tests only; hidden tests never shown)
 - API:
   - `GET /api/v1/student/courses/{course_id}/assignments`
   - `GET /api/v1/student/courses/{course_id}/assignments/{assignment_id}/submissions` (your submission history)
   - `POST /api/v1/student/courses/{course_id}/assignments/{assignment_id}/submissions` (multipart file upload)
+  - `GET /api/v1/student/courses/{course_id}/assignments/{assignment_id}/submissions/{submission_id}/tests` (visible tests only)
 
 5) Global submission history (across assignments)
 - Route: `/dashboard/submissions`

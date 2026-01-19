@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   BookOpen,
   Filter,
@@ -30,6 +30,8 @@ const statusBadge: Record<
 
 export default function StaffSubmissionsQueuePage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [courses, setCourses] = useState<Course[]>([]);
   const [items, setItems] = useState<StaffSubmissionQueueItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -41,6 +43,7 @@ export default function StaffSubmissionsQueuePage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [nextId, setNextId] = useState<number | null>(null);
+  const [hasHydratedFiltersFromQuery, setHasHydratedFiltersFromQuery] = useState(false);
 
   type CourseOption = { id: number | "all"; title: string; code: string };
 
@@ -63,6 +66,30 @@ export default function StaffSubmissionsQueuePage() {
     }
   }
 
+  useEffect(() => {
+    const qsStatus = searchParams.get("status");
+    const qsCourseId = searchParams.get("course_id");
+
+    const allowed: Array<StaffSubmissionQueueItem["status"] | "all"> = [
+      "pending",
+      "grading",
+      "graded",
+      "error",
+      "all",
+    ];
+
+    if (qsStatus && allowed.includes(qsStatus as any)) {
+      setSelectedStatus(qsStatus as any);
+    }
+    if (qsCourseId && qsCourseId !== "all") {
+      const n = Number(qsCourseId);
+      if (Number.isFinite(n) && n > 0) setSelectedCourseId(n);
+    }
+
+    setHasHydratedFiltersFromQuery(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchData = useCallback(async (refresh = false) => {
     try {
       setError("");
@@ -84,6 +111,9 @@ export default function StaffSubmissionsQueuePage() {
       ]);
 
       setCourses(coursesData);
+      if (selectedCourseId !== "all" && !coursesData.some((c) => c.id === selectedCourseId)) {
+        setSelectedCourseId("all");
+      }
       setItems(page.items);
       setTotal(page.total);
       setNextId(nextSub.submission_id);
@@ -103,6 +133,26 @@ export default function StaffSubmissionsQueuePage() {
   useEffect(() => {
     resetPaging();
   }, [selectedCourseId, selectedStatus]);
+
+  useEffect(() => {
+    if (!hasHydratedFiltersFromQuery) return;
+    const next = new URLSearchParams();
+    if (selectedStatus !== "pending") next.set("status", selectedStatus);
+    if (selectedCourseId !== "all") next.set("course_id", String(selectedCourseId));
+    const qs = next.toString();
+    const nextUrl = qs ? `${pathname}?${qs}` : pathname;
+    if (typeof window !== "undefined") {
+      const currentUrl = window.location.pathname + window.location.search;
+      if (currentUrl === nextUrl) return;
+    }
+    router.replace(nextUrl);
+  }, [
+    hasHydratedFiltersFromQuery,
+    pathname,
+    router,
+    selectedCourseId,
+    selectedStatus,
+  ]);
 
   return (
     <div className="max-w-6xl mx-auto">
