@@ -115,9 +115,8 @@ export default function CourseDetailPage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <Loader2 className="w-10 h-10 text-[var(--primary)] animate-spin" />
-        <span className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--muted-foreground)]">Loading_Course_Data...</span>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
       </div>
     );
   }
@@ -128,23 +127,23 @@ export default function CourseDetailPage() {
       <div className="max-w-4xl mx-auto">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] mb-6 transition-colors font-[family-name:var(--font-mono)] text-xs uppercase tracking-wider"
+          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Return_To_Index</span>
+          <span>Back to courses</span>
         </button>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-8 bg-[var(--secondary)]/5 border-l-4 border-[var(--secondary)] rounded-sm"
+          className="p-6 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-2xl text-center"
         >
-          <div className="font-[family-name:var(--font-mono)] text-xs font-bold text-[var(--secondary)] uppercase mb-2">Access_Error</div>
-          <p className="text-[var(--secondary)] opacity-80 mb-4">{error}</p>
+          <AlertCircle className="w-8 h-8 text-[var(--secondary)] mx-auto mb-3" />
+          <p className="text-[var(--secondary)]">{error}</p>
           <Link
             href="/dashboard"
-            className="inline-block px-4 py-2 bg-[var(--secondary)]/10 text-[var(--secondary)] font-bold uppercase text-xs rounded-sm hover:bg-[var(--secondary)]/20 transition-colors"
+            className="inline-block mt-4 text-[var(--primary)] hover:underline"
           >
-            Reset_Console
+            Go to dashboard
           </Link>
         </motion.div>
       </div>
@@ -154,15 +153,15 @@ export default function CourseDetailPage() {
   if (!course) return null;
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       {/* Back button */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] mb-8 transition-colors font-[family-name:var(--font-mono)] text-xs uppercase tracking-wider group"
+          className="inline-flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-6 transition-colors"
         >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          <span>Return_To_Index</span>
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to courses</span>
         </Link>
       </motion.div>
 
@@ -170,47 +169,44 @@ export default function CourseDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-12 border-b border-[var(--border)] pb-8"
+        className="mb-8"
       >
-        <div className="flex items-start gap-6 mb-6">
-          <div className="w-16 h-16 border border-[var(--border)] bg-white flex items-center justify-center rounded-sm shrink-0 shadow-sm">
-            <BookOpen className="w-8 h-8 text-[var(--primary)]" />
+        <div className="flex items-start gap-4 mb-4">
+          <div className="w-14 h-14 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+            <BookOpen className="w-7 h-7 text-[var(--primary)]" />
           </div>
-          <div className="flex-1 min-w-0 pt-1">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="inline-block px-2 py-0.5 text-[10px] font-bold font-[family-name:var(--font-mono)] bg-[var(--primary)]/10 text-[var(--primary)] rounded-sm uppercase tracking-[0.2em] border border-[var(--primary)]/20">
-                {course.code}
-              </span>
-              <span className="h-px flex-1 bg-[var(--border)] max-w-[100px]" />
-            </div>
-            <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl font-bold text-[var(--foreground)] leading-tight">
+          <div className="flex-1 min-w-0">
+            <span className="inline-block px-2 py-1 text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] rounded-md mb-2">
+              {course.code}
+            </span>
+            <h1 className="font-[family-name:var(--font-display)] text-2xl md:text-3xl font-bold text-[var(--foreground)]">
               {course.title}
             </h1>
           </div>
         </div>
 
         {course.description && (
-          <p className="text-[var(--muted-foreground)] mb-6 text-lg font-light italic pl-2 border-l-2 border-[var(--primary)]/20 max-w-3xl">
+          <p className="text-[var(--muted-foreground)] mb-4">
             {course.description}
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-6 text-xs text-[var(--muted-foreground)] font-[family-name:var(--font-mono)] uppercase tracking-wider">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--muted-foreground)]">
           {course.semester && course.year && (
-            <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] px-3 py-1.5 rounded-sm">
-              <Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4" />
               <span>
-                {course.semester} // {course.year}
+                {course.semester}, {course.year}
               </span>
             </div>
           )}
-          <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] px-3 py-1.5 rounded-sm">
-            <FolderOpen className="w-3.5 h-3.5 text-[var(--primary)]" />
-            <span>Modules: {modules.length.toString().padStart(2, '0')}</span>
+          <div className="flex items-center gap-1.5">
+            <FolderOpen className="w-4 h-4" />
+            <span>{modules.length} modules</span>
           </div>
-          <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] px-3 py-1.5 rounded-sm">
-            <FileText className="w-3.5 h-3.5 text-[var(--primary)]" />
-            <span>Assignments: {assignments.length.toString().padStart(2, '0')}</span>
+          <div className="flex items-center gap-1.5">
+            <FileText className="w-4 h-4" />
+            <span>{assignments.length} assignments</span>
           </div>
         </div>
       </motion.div>
@@ -220,14 +216,15 @@ export default function CourseDetailPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center py-20 bg-white border border-[var(--border)] rounded-sm border-dashed"
+          className="text-center py-16 bg-[var(--card)] border border-[var(--border)] rounded-2xl"
         >
-          <FolderOpen className="w-12 h-12 text-[var(--muted-foreground)]/40 mx-auto mb-4" />
-          <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)] mb-2">
-            File Empty
+          <FolderOpen className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
+          <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mb-2">
+            No content yet
           </h2>
-          <p className="text-[var(--muted-foreground)] max-w-md mx-auto font-light text-sm italic">
-            Instructor has not yet deposited course materials into the archive.
+          <p className="text-[var(--muted-foreground)] max-w-md mx-auto">
+            Your instructor hasn&apos;t added any modules or assignments to this
+            course yet. Check back later!
           </p>
         </motion.div>
       )}
@@ -237,15 +234,15 @@ export default function CourseDetailPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white border border-[var(--border)] rounded-sm overflow-hidden"
+          className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden"
         >
-          <div className="p-4 bg-[var(--background)]/50 border-b border-[var(--border)] flex justify-between items-center">
-            <h2 className="font-[family-name:var(--font-mono)] font-bold text-[var(--foreground)] uppercase tracking-widest text-xs">
-              Direct Assignment Listings
+          <div className="p-4 bg-[var(--background)] border-b border-[var(--border)]">
+            <h2 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
+              Assignments
             </h2>
-            <div className="text-[10px] font-[family-name:var(--font-mono)] text-[var(--muted-foreground)] uppercase">
-              Uncategorized_Items
-            </div>
+            <p className="text-xs text-[var(--muted-foreground)] mt-1">
+              This course hasn&apos;t organized modules yet — assignments are listed here.
+            </p>
           </div>
           <div className="divide-y divide-[var(--border)]">
             {assignments.map((assignment) => (
@@ -261,7 +258,7 @@ export default function CourseDetailPage() {
           variants={staggerContainer}
           initial="hidden"
           animate="visible"
-          className="space-y-8"
+          className="space-y-6"
         >
           {modulesWithAssignments.map((module) => (
             <ModuleCard key={module.id} module={module} courseId={courseId} />
@@ -270,10 +267,10 @@ export default function CourseDetailPage() {
           {/* Unassigned assignments (fallback) */}
           {unassignedAssignments.length > 0 && (
             <motion.div variants={fadeInUp}>
-              <div className="bg-white border border-[var(--border)] rounded-sm overflow-hidden">
-                <div className="p-4 bg-[var(--background)]/50 border-b border-[var(--border)]">
-                  <h2 className="font-[family-name:var(--font-mono)] font-bold text-[var(--foreground)] uppercase tracking-widest text-xs">
-                    Supplemental Assignments
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+                <div className="p-4 bg-[var(--background)] border-b border-[var(--border)]">
+                  <h2 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
+                    Other Assignments
                   </h2>
                 </div>
                 <div className="divide-y divide-[var(--border)]">
@@ -361,33 +358,34 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
 
   return (
     <motion.div variants={fadeInUp}>
-      <div className="bg-white border border-[var(--border)] rounded-sm overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
         {/* Module Header */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full p-5 flex items-start gap-5 bg-[var(--background)]/30 border-b border-[var(--border)] hover:bg-[var(--background)] transition-colors text-left group"
+          className="w-full p-4 flex items-center gap-3 bg-[var(--background)] border-b border-[var(--border)] hover:bg-[var(--card)] transition-colors text-left"
         >
-          <div className="w-10 h-10 border border-[var(--border)] bg-white flex items-center justify-center shrink-0 rounded-sm group-hover:border-[var(--primary)] transition-colors">
-            <span className="font-[family-name:var(--font-mono)] text-sm font-bold text-[var(--primary)]">
-              {module.position.toString().padStart(2, '0')}
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+            <span className="text-sm font-semibold text-[var(--primary)]">
+              {module.position}
             </span>
           </div>
-          <div className="flex-1 min-w-0 pt-1">
-            <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
+          <div className="flex-1 min-w-0">
+            <h2 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
               {module.title}
             </h2>
             {module.description && (
-              <p className="text-sm text-[var(--muted-foreground)] truncate mt-1 font-light italic">
+              <p className="text-sm text-[var(--muted-foreground)] truncate">
                 {module.description}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <span className="text-[10px] font-bold font-[family-name:var(--font-mono)] uppercase tracking-wider text-[var(--muted-foreground)] bg-white border border-[var(--border)] px-2 py-1 rounded-sm">
-              {module.assignments.length} Item{module.assignments.length !== 1 ? "s" : ""}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--muted-foreground)] bg-[var(--background)] px-2 py-1 rounded-md">
+              {module.assignments.length} assignment
+              {module.assignments.length !== 1 ? "s" : ""}
             </span>
             <ChevronRight
-              className={`w-5 h-5 text-[var(--muted-foreground)] transition-transform duration-300 ${
+              className={`w-5 h-5 text-[var(--muted-foreground)] transition-transform ${
                 isExpanded ? "rotate-90" : ""
               }`}
             />
@@ -399,25 +397,25 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
           <div>
             {/* Resources Section */}
             {isLoadingResources && (
-              <div className="p-4 flex items-center justify-center border-b border-[var(--border)]">
-                <Loader2 className="w-4 h-4 text-[var(--primary)] animate-spin" />
+              <div className="p-4 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 text-[var(--primary)] animate-spin" />
               </div>
             )}
 
             {!isLoadingResources && resources.length > 0 && (
-              <div className="p-5 bg-[var(--primary)]/[0.02] border-b border-[var(--border)]">
-                <h3 className="text-[10px] font-bold font-[family-name:var(--font-mono)] text-[var(--muted-foreground)] uppercase tracking-widest mb-4">
-                  Supplemental_Resources
+              <div className="p-4 bg-[var(--primary)]/[0.02] border-b border-[var(--border)]">
+                <h3 className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide mb-3">
+                  Resources
                 </h3>
-                <div className="grid gap-3">
+                <div className="grid gap-2">
                   {resources.map((resource) => (
                     <div
                       key={resource.id}
-                      className="flex items-center gap-4 p-3 bg-white border border-[var(--border)] rounded-sm hover:border-[var(--primary)]/50 transition-colors group"
+                      className="flex items-center gap-3 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)]/30 transition-colors"
                     >
-                      <div className="w-8 h-8 rounded-sm bg-[var(--background)] border border-[var(--border)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--primary)]/5 transition-colors">
+                      <div className="w-9 h-9 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
                         {resource.kind === "link" ? (
-                          <LinkIcon className="w-3.5 h-3.5 text-[var(--primary)]" />
+                          <LinkIcon className="w-4 h-4 text-[var(--primary)]" />
                         ) : (
                           <span className="text-[var(--primary)]">
                             {getFileIcon(resource.content_type)}
@@ -425,12 +423,12 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--foreground)] truncate group-hover:text-[var(--primary)] transition-colors">
+                        <p className="text-sm font-medium text-[var(--foreground)] truncate">
                           {resource.title}
                         </p>
                         {resource.kind === "file" && resource.size_bytes != null && (
-                          <p className="text-[10px] font-[family-name:var(--font-mono)] text-[var(--muted-foreground)] uppercase mt-0.5">
-                            SIZE: {formatFileSize(resource.size_bytes)}
+                          <p className="text-xs text-[var(--muted-foreground)]">
+                            {formatFileSize(resource.size_bytes)}
                           </p>
                         )}
                       </div>
@@ -439,18 +437,18 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
                           href={resource.url || "#"}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold font-[family-name:var(--font-mono)] uppercase tracking-wider text-[var(--primary)] bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 rounded-sm border border-[var(--primary)]/10 transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-lg transition-colors"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <ExternalLink className="w-3 h-3" />
-                          Access
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Open
                         </a>
                       ) : (
                         <button
                           onClick={() => handleDownload(resource)}
-                          className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold font-[family-name:var(--font-mono)] uppercase tracking-wider text-[var(--primary)] bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 rounded-sm border border-[var(--primary)]/10 transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-lg transition-colors"
                         >
-                          <Download className="w-3 h-3" />
+                          <Download className="w-3.5 h-3.5" />
                           Download
                         </button>
                       )}
@@ -461,23 +459,23 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
             )}
 
             {/* Assignments List */}
-            <div className="divide-y divide-[var(--border)] border-t border-[var(--border)] -mt-px">
+            <div className="divide-y divide-[var(--border)]">
               {!isLoadingResources && !hasContent && (
-                <div className="p-8 text-center text-[var(--muted-foreground)] text-sm italic font-light">
-                  [ No content logged for this module ]
+                <div className="p-6 text-center text-[var(--muted-foreground)] text-sm">
+                  No content in this module yet
                 </div>
               )}
               {module.assignments.length === 0 && resources.length > 0 && (
-                <div className="p-4 text-center text-[var(--muted-foreground)] text-xs font-[family-name:var(--font-mono)] uppercase tracking-wider">
-                  No_Assignments_Pending
+                <div className="p-4 text-center text-[var(--muted-foreground)] text-sm">
+                  No assignments in this module
                 </div>
               )}
               {module.assignments.length > 0 && (
                 <>
                   {resources.length > 0 && (
-                    <div className="px-5 pt-5 pb-2">
-                       <h3 className="text-[10px] font-bold font-[family-name:var(--font-mono)] text-[var(--muted-foreground)] uppercase tracking-widest">
-                        Required_Deliverables
+                    <div className="px-4 pt-4 pb-2">
+                      <h3 className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide">
+                        Assignments
                       </h3>
                     </div>
                   )}
@@ -515,17 +513,15 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
   return (
     <Link
       href={`/dashboard/courses/${courseId}/assignments/${assignment.id}`}
-      className="group flex items-center gap-5 p-5 hover:bg-[var(--background)]/30 transition-colors relative"
+      className="group flex items-center gap-4 p-4 hover:bg-[var(--background)] transition-colors"
     >
-       <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-transparent group-hover:bg-[var(--primary)] transition-all" />
-      
       <div
-        className={`w-10 h-10 border border-[var(--border)] rounded-sm flex items-center justify-center shrink-0 transition-colors ${
+        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
           isPastDue
-            ? "bg-[var(--secondary)]/10 border-[var(--secondary)]/30"
+            ? "bg-[var(--secondary)]/10"
             : isUpcoming
-            ? "bg-amber-500/10 border-amber-500/30"
-            : "bg-white group-hover:border-[var(--primary)]"
+            ? "bg-amber-500/10"
+            : "bg-[var(--primary)]/10"
         }`}
       >
         <FileText
@@ -540,13 +536,13 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <h3 className="font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors text-lg font-[family-name:var(--font-display)]">
+        <h3 className="font-medium text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
           {assignment.title}
         </h3>
-        <div className="flex items-center gap-4 mt-1">
+        <div className="flex items-center gap-3 mt-1">
           {dueDate && (
             <span
-              className={`flex items-center gap-1.5 text-[10px] font-bold font-[family-name:var(--font-mono)] uppercase tracking-wider ${
+              className={`flex items-center gap-1 text-xs ${
                 isPastDue
                   ? "text-[var(--secondary)]"
                   : isUpcoming
@@ -555,7 +551,7 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
               }`}
             >
               <Clock className="w-3 h-3" />
-              {isPastDue ? "STATUS: PAST_DUE // " : "DUE_DATE: "}
+              {isPastDue ? "Past due: " : "Due: "}
               {dueDate.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -564,13 +560,13 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
               })}
             </span>
           )}
-          <span className="text-[10px] font-bold font-[family-name:var(--font-mono)] text-[var(--muted-foreground)] uppercase tracking-wider">
-            VAL: {assignment.max_points}PTS
+          <span className="text-xs text-[var(--muted-foreground)]">
+            {assignment.max_points} pts
           </span>
         </div>
       </div>
 
-      <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all opacity-50 group-hover:opacity-100" />
+      <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
     </Link>
   );
 }

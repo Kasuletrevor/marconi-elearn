@@ -98,33 +98,29 @@ export default function DashboardPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6"
+        className="mb-8 flex items-start justify-between gap-4"
       >
         <div>
-          <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--primary)] uppercase tracking-[0.3em] mb-3">
-            Institutional_Console // Student_View
-          </div>
-          <h1 className="font-[family-name:var(--font-display)] text-5xl font-bold text-[var(--foreground)] mb-2">
-            Academic Dashboard
+          <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)] mb-2">
+            Dashboard
           </h1>
-          <p className="text-[var(--muted-foreground)] font-light italic">
-            Authorized session for [Student Archive]. Unified course management interface.
+          <p className="text-[var(--muted-foreground)]">
+            Welcome back! Here&apos;s what&apos;s happening with your courses.
           </p>
         </div>
         <Link
           href="/dashboard/join"
-          className="inline-flex items-center gap-3 px-6 py-3 bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-all rounded-sm font-bold uppercase tracking-widest text-xs border border-[var(--primary)] shadow-lg shadow-[var(--primary)]/10"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors text-sm"
         >
           <Users className="w-4 h-4" />
-          Enroll_New_Course
+          Join course
         </Link>
       </motion.div>
 
       {/* Loading State */}
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <Loader2 className="w-10 h-10 text-[var(--primary)] animate-spin" />
-          <span className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--muted-foreground)]">Retrieving_Records...</span>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
         </div>
       )}
 
@@ -133,10 +129,9 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="p-8 bg-[var(--secondary)]/5 border-l-4 border-[var(--secondary)] rounded-sm"
+          className="p-6 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-2xl text-center"
         >
-          <div className="font-[family-name:var(--font-mono)] text-xs font-bold text-[var(--secondary)] uppercase mb-2">System_Error</div>
-          <p className="text-[var(--secondary)] opacity-80">{error}</p>
+          <p className="text-[var(--secondary)]">{error}</p>
         </motion.div>
       )}
 
@@ -145,59 +140,54 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center py-24 border border-[var(--border)] border-dashed bg-white/50"
+          className="text-center py-20"
         >
-          <div className="w-20 h-20 mx-auto mb-8 border border-[var(--border)] bg-white flex items-center justify-center rounded-sm rotate-6 transition-transform hover:rotate-0">
-            <FolderOpen className="w-10 h-10 text-[var(--muted-foreground)]" />
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-[var(--card)] border border-[var(--border)] flex items-center justify-center">
+            <FolderOpen className="w-8 h-8 text-[var(--muted-foreground)]" />
           </div>
-          <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--foreground)] mb-3">
-            Null Records Found
+          <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)] mb-2">
+            No courses yet
           </h2>
-          <p className="text-[var(--muted-foreground)] max-w-sm mx-auto text-sm italic font-light">
-            No active course enrollments detected for this session. Please verify invite links or contact the department.
+          <p className="text-[var(--muted-foreground)] max-w-md mx-auto">
+            You haven&apos;t been enrolled in any courses yet. Check your email
+            for an invite link from your lecturer.
           </p>
         </motion.div>
       )}
 
       {/* Dashboard Content */}
       {!isLoading && !error && courses.length > 0 && (
-        <div className="space-y-16">
+        <div className="space-y-8">
           {/* Upcoming Assignments Section */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <div className="flex items-end justify-between mb-8 border-b border-[var(--border)] pb-4">
-              <div>
-                 <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--secondary)] uppercase tracking-widest mb-1 font-bold">
-                  Attention_Required
-                </div>
-                <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)]">
-                  Assignment Ledger
-                </h2>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
+                Upcoming Assignments
+              </h2>
               {upcomingAssignments.length > 0 && (
-                <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-tighter">
-                  Showing_{upcomingAssignments.length}_Pending_Items
-                </div>
+                <span className="text-sm text-[var(--muted-foreground)]">
+                  Next {upcomingAssignments.length} due
+                </span>
               )}
             </div>
 
             {isLoadingAssignments ? (
-              <div className="p-12 bg-white/50 border border-[var(--border)] rounded-sm flex flex-col items-center justify-center gap-4">
+              <div className="p-8 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex items-center justify-center">
                 <Loader2 className="w-6 h-6 text-[var(--primary)] animate-spin" />
-                <span className="font-[family-name:var(--font-mono)] text-[8px] uppercase tracking-widest text-[var(--muted-foreground)]">Compiling_Assignments...</span>
               </div>
             ) : upcomingAssignments.length === 0 ? (
-              <div className="p-10 bg-white/50 border border-[var(--border)] rounded-sm text-center border-dashed">
-                <Clock className="w-8 h-8 text-[var(--muted-foreground)] mx-auto mb-4 opacity-40" />
-                <p className="text-[var(--muted-foreground)] font-light italic">
-                  All academic deliverables completed. No pending items in ledger.
+              <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-center">
+                <Clock className="w-8 h-8 text-[var(--muted-foreground)] mx-auto mb-3" />
+                <p className="text-[var(--muted-foreground)]">
+                  No upcoming assignments. You&apos;re all caught up!
                 </p>
               </div>
             ) : (
-              <div className="bg-white border border-[var(--border)] rounded-sm overflow-hidden shadow-sm">
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden divide-y divide-[var(--border)]">
                 {upcomingAssignments.map((assignment) => (
                   <UpcomingAssignmentRow
                     key={`${assignment.course.id}-${assignment.id}`}
@@ -214,25 +204,20 @@ export default function DashboardPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="flex items-end justify-between mb-10 border-b border-[var(--border)] pb-4">
-              <div>
-                <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--primary)] uppercase tracking-widest mb-1 font-bold">
-                  Enrolled_Curriculum
-                </div>
-                <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--foreground)]">
-                  Course Catalog
-                </h2>
-              </div>
-              <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-tighter">
-                TOTAL_RECORDS: {courses.length}
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
+                My Courses
+              </h2>
+              <span className="text-sm text-[var(--muted-foreground)]">
+                {courses.length} enrolled
+              </span>
             </div>
 
             <motion.div
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
+              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
             >
               {courses.map((course) => (
                 <CourseCard key={course.id} course={course} />
@@ -262,42 +247,47 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
   return (
     <Link
       href={`/dashboard/courses/${assignment.course.id}/assignments/${assignment.id}`}
-      className="group flex items-center gap-6 p-5 hover:bg-white transition-all border-b border-[var(--border)] last:border-0 relative overflow-hidden"
+      className="group flex items-center gap-4 p-4 hover:bg-[var(--background)] transition-colors"
     >
-      {/* Ledger marker */}
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-[var(--primary)] transition-all" />
-
-      <div className="flex flex-col items-center justify-center shrink-0 w-16 h-16 border border-[var(--border)] bg-[var(--background)] group-hover:bg-white transition-colors relative">
-        <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-tighter mb-1">DUE</div>
-        <div className={`font-bold text-lg leading-none ${isUrgent ? "text-[var(--secondary)]" : "text-[var(--foreground)]"}`}>
-          {dueDate ? dueDate.getDate() : "??"}
-        </div>
-        <div className="font-[family-name:var(--font-mono)] text-[8px] text-[var(--muted-foreground)] uppercase">
-          {dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short' }) : "---"}
-        </div>
+      <div
+        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+          isUrgent
+            ? "bg-[var(--secondary)]/10"
+            : isSoon
+            ? "bg-amber-500/10"
+            : "bg-[var(--primary)]/10"
+        }`}
+      >
+        <FileText
+          className={`w-5 h-5 ${
+            isUrgent
+              ? "text-[var(--secondary)]"
+              : isSoon
+              ? "text-amber-600"
+              : "text-[var(--primary)]"
+          }`}
+        />
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="font-[family-name:var(--font-mono)] text-[10px] font-bold text-[var(--primary)] border border-[var(--primary)]/20 px-1.5 py-0.5 rounded-sm uppercase tracking-wider bg-[var(--primary)]/5">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 px-1.5 py-0.5 rounded">
             {assignment.course.code}
           </span>
           {isUrgent && (
-             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-sm">
-                <AlertCircle className="w-3 h-3 text-[var(--secondary)]" />
-                <span className="font-[family-name:var(--font-mono)] text-[9px] font-bold text-[var(--secondary)] uppercase tracking-widest animate-pulse">
-                  PRIORITY_RED
-                </span>
-             </div>
+            <span className="text-xs font-medium text-[var(--secondary)] bg-[var(--secondary)]/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              Due soon
+            </span>
           )}
         </div>
-        <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors truncate">
+        <h3 className="font-medium text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors truncate">
           {assignment.title}
         </h3>
-        <div className="flex items-center gap-4 mt-2">
+        <div className="flex items-center gap-3 mt-1">
           {dueDate && (
             <span
-              className={`font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-wider flex items-center gap-1.5 ${
+              className={`flex items-center gap-1 text-xs ${
                 isUrgent
                   ? "text-[var(--secondary)]"
                   : isSoon
@@ -306,23 +296,27 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
               }`}
             >
               <Clock className="w-3 h-3" />
-              {dueDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              {dueDate.toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
               {daysUntilDue !== null && daysUntilDue <= 7 && (
-                <span className="ml-1 opacity-60">
-                  // {daysUntilDue === 0 ? "ST_NOW" : daysUntilDue === 1 ? "ST_TOMORROW" : `ST_IN_${daysUntilDue}_DAYS`}
+                <span className="ml-1">
+                  ({daysUntilDue === 0 ? "Today" : daysUntilDue === 1 ? "Tomorrow" : `${daysUntilDue} days`})
                 </span>
               )}
             </span>
           )}
-          <span className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider">
-            MAX_VAL: {assignment.max_points}PTS
+          <span className="text-xs text-[var(--muted-foreground)]">
+            {assignment.max_points} pts
           </span>
         </div>
       </div>
 
-      <div className="flex flex-col items-end gap-2">
-         <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
-      </div>
+      <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all shrink-0" />
     </Link>
   );
 }
@@ -336,63 +330,41 @@ function CourseCard({ course }: CourseCardProps) {
     <motion.div variants={fadeInUp}>
       <Link
         href={`/dashboard/courses/${course.id}`}
-        className="group relative block p-8 bg-white border border-[var(--border)] rounded-sm hover:border-[var(--primary)] hover:shadow-2xl hover:shadow-[var(--primary)]/10 transition-all duration-500 overflow-hidden"
+        className="group block p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl hover:border-[var(--primary)]/30 hover:shadow-lg hover:shadow-[var(--primary)]/5 transition-all duration-300"
       >
-        {/* Archival Metadata Labels */}
-        <div className="absolute top-0 right-0 p-3 font-[family-name:var(--font-mono)] text-[8px] text-[var(--primary)]/20 uppercase tracking-tighter select-none transition-colors group-hover:text-[var(--primary)]/60">
-          INDEX_REF: {course.code.replace(/\s+/g, '_')}
-        </div>
-        <div className="absolute bottom-0 left-0 p-3 font-[family-name:var(--font-mono)] text-[8px] text-[var(--primary)]/20 uppercase tracking-tighter select-none">
-          SECURE_FILE // M-26
-        </div>
-
-        {/* Header Decoration */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="w-12 h-12 border border-[var(--border)] bg-[var(--background)] flex items-center justify-center rounded-sm transition-transform group-hover:rotate-6">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
             <BookOpen className="w-6 h-6 text-[var(--primary)]" />
           </div>
-          <div className="flex flex-col items-end">
-            <div className="h-px w-8 bg-[var(--border)] mb-1" />
-            <div className="h-px w-4 bg-[var(--border)]" />
-          </div>
+          <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
         </div>
 
         {/* Course Info */}
-        <div className="mb-8">
-          <span className="inline-block px-2 py-0.5 text-[10px] font-bold font-[family-name:var(--font-mono)] border border-[var(--primary)]/20 text-[var(--primary)] rounded-sm mb-4 uppercase tracking-[0.2em] bg-[var(--primary)]/5">
+        <div className="mb-4">
+          <span className="inline-block px-2 py-1 text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] rounded-md mb-2">
             {course.code}
           </span>
-          <h3 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--foreground)] leading-tight group-hover:text-[var(--primary)] transition-colors">
+          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] leading-tight group-hover:text-[var(--primary)] transition-colors">
             {course.title}
           </h3>
           {course.description && (
-            <p className="text-sm text-[var(--muted-foreground)] mt-4 line-clamp-2 italic font-light leading-relaxed">
+            <p className="text-sm text-[var(--muted-foreground)] mt-2 line-clamp-2">
               {course.description}
             </p>
           )}
         </div>
 
-        {/* Meta Footer */}
-        <div className="flex items-center justify-between pt-6 border-t border-[var(--border)] border-dashed">
+        {/* Meta */}
+        <div className="flex items-center gap-4 pt-4 border-t border-[var(--border)]">
           {course.semester && course.year && (
-            <div className="flex items-center gap-2 text-[10px] font-bold font-[family-name:var(--font-mono)] text-[var(--muted-foreground)] uppercase tracking-widest">
-              <Calendar className="w-3.5 h-3.5 text-[var(--primary)]/60" />
+            <div className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">
+              <Calendar className="w-4 h-4" />
               <span>
-                {course.semester} // {course.year}
+                {course.semester}, {course.year}
               </span>
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-[10px] font-bold font-[family-name:var(--font-mono)] text-[var(--primary)] uppercase">
-            <span>VIEW_FILE</span>
-            <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </div>
-
-        {/* Stamp Effect (Visual) */}
-        <div className="absolute -bottom-10 -right-10 w-32 h-32 opacity-[0.02] rotate-12 transition-opacity group-hover:opacity-[0.05]">
-          <div className="border-4 border-[var(--primary)] p-2 rounded-full text-center">
-            <div className="font-bold text-xl uppercase">ACTIVE</div>
-          </div>
         </div>
       </Link>
     </motion.div>
