@@ -21,6 +21,8 @@ import {
   Beaker,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
+  Download,
 } from "lucide-react";
 import {
   student,
@@ -105,6 +107,9 @@ function formatDuration(seconds: number | null | undefined): string {
 function firstLine(text: string): string {
   return text.trim().split(/\r?\n/)[0] ?? "";
 }
+
+// Capture "now" once at module load to keep render output pure/deterministic.
+const NOW_MS = Date.now();
 
 export default function AssignmentDetailPage() {
   const params = useParams();
@@ -209,7 +214,7 @@ export default function AssignmentDetailPage() {
     const isValid = allowedExtensions.some((ext) => fileName.endsWith(ext));
 
     if (!isValid) {
-      setUploadError(`Please upload ${allowsZip ? "a .c, .cpp, or .zip" : "a .c or .cpp"} file`);
+      setUploadError(`Please upload ${allowsZip ? ".c, .cpp, or .zip" : ".c or .cpp"} file`);
       return;
     }
 
@@ -254,8 +259,9 @@ export default function AssignmentDetailPage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <Loader2 className="w-10 h-10 text-[var(--primary)] animate-spin" />
+        <span className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--muted-foreground)]">Fetching_Assignment_Details...</span>
       </div>
     );
   }
@@ -266,23 +272,23 @@ export default function AssignmentDetailPage() {
       <div className="max-w-4xl mx-auto">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-6 transition-colors"
+          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] mb-6 transition-colors font-[family-name:var(--font-mono)] text-xs uppercase tracking-wider"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back</span>
+          <span>Return_To_Course</span>
         </button>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-6 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-2xl text-center"
+          className="p-8 bg-[var(--secondary)]/5 border-l-4 border-[var(--secondary)] rounded-sm"
         >
-          <AlertCircle className="w-8 h-8 text-[var(--secondary)] mx-auto mb-3" />
-          <p className="text-[var(--secondary)]">{error}</p>
+          <div className="font-[family-name:var(--font-mono)] text-xs font-bold text-[var(--secondary)] uppercase mb-2">Access_Denied</div>
+          <p className="text-[var(--secondary)] opacity-80 mb-4">{error}</p>
           <Link
             href="/dashboard"
-            className="inline-block mt-4 text-[var(--primary)] hover:underline"
+            className="inline-block px-4 py-2 bg-[var(--secondary)]/10 text-[var(--secondary)] font-bold uppercase text-xs rounded-sm hover:bg-[var(--secondary)]/20 transition-colors"
           >
-            Go to dashboard
+            Go_To_Dashboard
           </Link>
         </motion.div>
       </div>
@@ -298,21 +304,21 @@ export default function AssignmentDetailPage() {
   const latePolicy = resolveLatePolicy(course, assignment);
   const latePolicySummary =
     !dueDate
-      ? "No due date set."
+      ? "No deadline set."
       : latePolicy
-      ? `Late policy: ${latePolicy.grace_minutes} min grace, ${latePolicy.percent_per_day}% per day, max ${latePolicy.max_percent}%.`
-      : "Late policy: not configured (no penalties).";
+      ? `${latePolicy.percent_per_day}% penalty per day after ${latePolicy.grace_minutes}m grace.`
+      : "No late penalties configured.";
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       {/* Back button */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <Link
           href={`/dashboard/courses/${courseId}`}
-          className="inline-flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-6 transition-colors"
+          className="inline-flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] mb-8 transition-colors font-[family-name:var(--font-mono)] text-xs uppercase tracking-wider group"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to {course.code}</span>
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>Return_To_{course.code.replace(/\s+/g, '_')}</span>
         </Link>
       </motion.div>
 
@@ -320,43 +326,47 @@ export default function AssignmentDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-12 border-b border-[var(--border)] pb-8"
       >
-        <div className="flex items-start gap-4 mb-4">
+        <div className="flex items-start gap-6 mb-6">
           <div
-            className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
-              isPastDue ? "bg-[var(--secondary)]/10" : "bg-[var(--primary)]/10"
+            className={`w-16 h-16 border flex items-center justify-center shrink-0 rounded-sm shadow-sm ${ 
+              isPastDue ? "bg-[var(--secondary)]/5 border-[var(--secondary)]/30" : "bg-white border-[var(--border)]"
             }`}
           >
             <FileText
-              className={`w-7 h-7 ${
+              className={`w-8 h-8 ${ 
                 isPastDue ? "text-[var(--secondary)]" : "text-[var(--primary)]"
               }`}
             />
           </div>
-          <div className="flex-1 min-w-0">
-            <span className="inline-block px-2 py-1 text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] rounded-md mb-2">
-              {course.code}
-            </span>
-            <h1 className="font-[family-name:var(--font-display)] text-2xl md:text-3xl font-bold text-[var(--foreground)]">
+          <div className="flex-1 min-w-0 pt-1">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="inline-block px-2 py-0.5 text-[10px] font-bold font-[family-name:var(--font-mono)] bg-[var(--primary)]/10 text-[var(--primary)] rounded-sm uppercase tracking-[0.2em] border border-[var(--primary)]/20">
+                Assignment_Brief
+              </span>
+              <span className="h-px flex-1 bg-[var(--border)] max-w-[100px]" />
+            </div>
+            <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl font-bold text-[var(--foreground)] leading-tight">
               {assignment.title}
             </h1>
           </div>
         </div>
 
         {/* Meta info */}
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-6 text-xs font-[family-name:var(--font-mono)] uppercase tracking-wider">
           {dueDate && (
             <div
-              className={`flex items-center gap-1.5 ${
-                isPastDue ? "text-[var(--secondary)]" : "text-[var(--muted-foreground)]"
+              className={`flex items-center gap-2 px-3 py-1.5 border rounded-sm ${ 
+                isPastDue 
+                  ? "bg-[var(--secondary)]/5 border-[var(--secondary)]/30 text-[var(--secondary)]" 
+                  : "bg-[var(--background)] border-[var(--border)] text-[var(--muted-foreground)]"
               }`}
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="w-3.5 h-3.5" />
               <span>
-                {isPastDue ? "Past due: " : "Due: "}
+                {isPastDue ? "EXPIRED: " : "DEADLINE: "}
                 {dueDate.toLocaleDateString("en-US", {
-                  weekday: "short",
                   month: "short",
                   day: "numeric",
                   hour: "numeric",
@@ -365,171 +375,203 @@ export default function AssignmentDetailPage() {
               </span>
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
-            <Award className="w-4 h-4" />
-            <span>{assignment.max_points} points</span>
+          <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] px-3 py-1.5 rounded-sm text-[var(--muted-foreground)]">
+            <Award className="w-3.5 h-3.5 text-[var(--primary)]" />
+            <span>VALUE: {assignment.max_points}PTS</span>
           </div>
           {hasGradedSubmission && (
-            <div className="flex items-center gap-1.5 text-[var(--success)]">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Graded</span>
+            <div className="flex items-center gap-2 bg-[var(--success)]/5 border border-[var(--success)]/30 px-3 py-1.5 rounded-sm text-[var(--success)]">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>STATUS: GRADED</span>
             </div>
           )}
         </div>
 
-        <p className="mt-3 text-xs text-[var(--muted-foreground)]">
-          {latePolicySummary} You can resubmit unlimited times; the latest submission counts.
-        </p>
+        <div className="mt-6 flex items-start gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] mt-1.5" />
+          <p className="text-xs text-[var(--muted-foreground)] italic font-light">
+            {latePolicySummary} Multiple submissions allowed; latest file will be archived for grading.
+          </p>
+        </div>
       </motion.div>
 
       <motion.div
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="grid lg:grid-cols-5 gap-6"
+        className="grid lg:grid-cols-[1fr,350px] gap-10"
       >
         {/* Left column - Description & Instructions */}
-        <motion.div variants={fadeInUp} className="lg:col-span-3 space-y-6">
+        <motion.div variants={fadeInUp} className="space-y-10">
           {/* Description */}
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6">
-            <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mb-4">
-              Instructions
-            </h2>
-            {assignment.description ? (
-              <div className="prose prose-sm max-w-none text-[var(--muted-foreground)]">
-                <p className="whitespace-pre-wrap">{assignment.description}</p>
+          <section>
+            <div className="flex items-center gap-4 mb-6">
+              <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--foreground)]">
+                Instructions
+              </h2>
+              <div className="h-px flex-1 bg-[var(--border)]" />
+            </div>
+            <div className="bg-white border border-[var(--border)] rounded-sm p-8 shadow-sm relative overflow-hidden">
+               {/* Decorative stamp-like marker */}
+               <div className="absolute top-0 right-0 p-3 font-[family-name:var(--font-mono)] text-[8px] text-[var(--primary)]/20 uppercase tracking-tighter select-none">
+                REF_SPEC_A{assignment.id}
               </div>
-            ) : (
-              <p className="text-[var(--muted-foreground)] italic">
-                No instructions provided.
-              </p>
-            )}
-          </div>
 
-          {/* File Upload */}
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6">
-            <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mb-4">
-              Submit Your Work
-            </h2>
-
-            {/* Drag and drop zone */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-                isDragging
-                  ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                  : selectedFile
-                  ? "border-[var(--success)] bg-[var(--success)]/5"
-                  : "border-[var(--border)] hover:border-[var(--primary)]/50"
-              }`}
-            >
-              {selectedFile ? (
-                <div className="flex items-center justify-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[var(--success)]/10 flex items-center justify-center">
-                    <File className="w-5 h-5 text-[var(--success)]" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-[var(--foreground)]">
-                      {selectedFile.name}
-                    </p>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      {(selectedFile.size / 1024).toFixed(1)} KB
-                    </p>
-                  </div>
-                  <button
-                    onClick={clearFile}
-                    className="ml-2 p-1 rounded-full hover:bg-[var(--background)] transition-colors"
-                  >
-                    <X className="w-4 h-4 text-[var(--muted-foreground)]" />
-                  </button>
+              {assignment.description ? (
+                <div className="prose prose-sm max-w-none text-[var(--foreground)] leading-relaxed font-light">
+                  <p className="whitespace-pre-wrap">{assignment.description}</p>
                 </div>
               ) : (
-                <>
-                  <Upload className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
-                  <p className="text-[var(--foreground)] font-medium mb-1">
-                    Drag and drop your file here
-                  </p>
-                  <p className="text-sm text-[var(--muted-foreground)] mb-4">
-                    or click to browse
-                  </p>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Accepts {allowsZip ? ".c, .cpp, .zip" : ".c, .cpp"} (max 5MB)
-                    {allowsZip ? " • ZIP must be flat (no folders)" : ""}
-                    {allowsZip && expectedZipFile ? ` • ZIP must include: ${expectedZipFile}` : ""}
-                  </p>
-                  </>
-                )}
-              <input
-                type="file"
-                accept={acceptAttr}
-                onChange={handleFileSelect}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-            </div>
-
-            {/* Upload error */}
-            {uploadError && (
-              <div className="mt-3 flex items-center gap-2 text-sm text-[var(--destructive)]">
-                <AlertCircle className="w-4 h-4" />
-                <span>{uploadError}</span>
-              </div>
-            )}
-
-            {/* Submit button */}
-            <button
-              onClick={handleSubmit}
-              disabled={!selectedFile || isUploading}
-              className={`mt-4 w-full py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
-                selectedFile && !isUploading
-                  ? "bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]"
-                  : "bg-[var(--muted)] text-[var(--muted-foreground)] cursor-not-allowed"
-              }`}
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Uploading...</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  <span>Submit Assignment</span>
-                </>
-              )}
-            </button>
-
-            {latestSubmission?.late_penalty_percent !== undefined &&
-              latestSubmission?.late_penalty_percent !== null &&
-              latestSubmission.late_penalty_percent > 0 && (
-                <p className="mt-3 text-xs text-[var(--muted-foreground)] text-center">
-                  Latest submission late penalty: {latestSubmission.late_penalty_percent}% (late by{" "}
-                  {formatDuration(latestSubmission.late_seconds)}).
+                <p className="text-[var(--muted-foreground)] italic font-light">
+                  No specific instructions were provided for this assignment.
                 </p>
               )}
-          </div>
+            </div>
+          </section>
+
+          {/* File Upload */}
+          <section>
+            <div className="flex items-center gap-4 mb-6">
+              <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--foreground)]">
+                Submit Your Work
+              </h2>
+              <div className="h-px flex-1 bg-[var(--border)]" />
+            </div>
+            
+            <div className="bg-white border border-[var(--border)] rounded-sm p-8 shadow-sm">
+              {/* Drag and drop zone */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`relative border border-dashed rounded-sm p-10 text-center transition-all duration-300 ${ 
+                  isDragging
+                    ? "border-[var(--primary)] bg-[var(--primary)]/5"
+                    : selectedFile
+                    ? "border-[var(--success)] bg-[var(--success)]/5"
+                    : "border-[var(--border)] hover:border-[var(--primary)]/40 hover:bg-[var(--background)]/30"
+                }`}
+              >
+                {selectedFile ? (
+                  <div className="flex flex-col items-center justify-center gap-4">
+                    <div className="w-16 h-16 border border-[var(--success)]/30 bg-[var(--success)]/5 flex items-center justify-center rounded-sm">
+                      <File className="w-8 h-8 text-[var(--success)]" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-bold text-[var(--foreground)] font-[family-name:var(--font-display)] text-lg">
+                        {selectedFile.name}
+                      </p>
+                      <p className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase mt-1">
+                        SIZE: {(selectedFile.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <button
+                      onClick={clearFile}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold font-[family-name:var(--font-mono)] uppercase tracking-wider text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-sm transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Discard_File
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 border border-[var(--border)] bg-[var(--background)] flex items-center justify-center rounded-sm mx-auto mb-6">
+                      <Upload className="w-8 h-8 text-[var(--muted-foreground)]/60" />
+                    </div>
+                    <p className="text-[var(--foreground)] font-bold text-lg mb-2 font-[family-name:var(--font-display)]">
+                      Ready to submit?
+                    </p>
+                    <p className="text-sm text-[var(--muted-foreground)] mb-6 font-light italic">
+                      Drag your solution file here or click to browse.
+                    </p>
+                    <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-[0.2em] space-y-1">
+                      <p>Format: {allowsZip ? ".C, .CPP, .ZIP" : ".C, .CPP"}</p>
+                      <p>Max_Limit: 5MB</p>
+                      {allowsZip && expectedZipFile && <p>Include_In_Zip: {expectedZipFile}</p>}
+                    </div>
+                    </>
+                  )}
+                <input
+                  type="file"
+                  accept={acceptAttr}
+                  onChange={handleFileSelect}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={isUploading}
+                />
+              </div>
+
+              {/* Upload error */}
+              {uploadError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 p-4 bg-[var(--secondary)]/5 border-l-2 border-[var(--secondary)] flex items-center gap-3"
+                >
+                  <AlertCircle className="w-4 h-4 text-[var(--secondary)]" />
+                  <span className="text-xs font-bold font-[family-name:var(--font-mono)] text-[var(--secondary)] uppercase">{uploadError}</span>
+                </motion.div>
+              )}
+
+              {/* Submit button */}
+              <button
+                onClick={handleSubmit}
+                disabled={!selectedFile || isUploading}
+                className={`mt-8 w-full py-4 px-6 rounded-sm font-bold uppercase tracking-[0.2em] text-sm transition-all flex items-center justify-center gap-3 border shadow-sm ${ 
+                  selectedFile && !isUploading
+                    ? "bg-[var(--primary)] text-white border-[var(--primary)] hover:bg-[var(--primary-hover)] shadow-lg shadow-[var(--primary)]/10"
+                    : "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] cursor-not-allowed"
+                }`}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Uploading_Data...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Send_To_Archive</span>
+                  </>
+                )}
+              </button>
+
+              {latestSubmission?.late_penalty_percent !== undefined &&
+                latestSubmission?.late_penalty_percent !== null &&
+                latestSubmission.late_penalty_percent > 0 && (
+                  <div className="mt-6 p-3 bg-amber-500/5 border border-amber-500/20 rounded-sm text-center">
+                    <p className="font-[family-name:var(--font-mono)] text-[10px] text-amber-700 uppercase tracking-wider">
+                      Late_Penalty: -{latestSubmission.late_penalty_percent}% // T_OFFSET: {formatDuration(latestSubmission.late_seconds)}
+                    </p>
+                  </div>
+                )}
+            </div>
+          </section>
         </motion.div>
 
         {/* Right column - Submissions */}
-        <motion.div variants={fadeInUp} className="lg:col-span-2">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6">
-            <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mb-4">
-              Your Submissions
+        <motion.div variants={fadeInUp}>
+          <div className="flex items-center gap-4 mb-6">
+            <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--foreground)]">
+              History
             </h2>
+            <div className="h-px flex-1 bg-[var(--border)]" />
+          </div>
+
+          <div className="bg-white border border-[var(--border)] rounded-sm p-6 shadow-sm">
+            <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-widest mb-6 border-b border-[var(--border)] pb-2 flex justify-between">
+              <span>Submission_Log</span>
+              <span>Count: {submissions.length}</span>
+            </div>
 
             {submissions.length === 0 ? (
-              <div className="text-center py-8">
-                <FileText className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
-                <p className="text-[var(--muted-foreground)]">
-                  No submissions yet
-                </p>
-                <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                  Upload a file to get started
+              <div className="text-center py-12 border border-dashed border-[var(--border)] rounded-sm">
+                <FileText className="w-10 h-10 text-[var(--muted-foreground)]/30 mx-auto mb-4" />
+                <p className="text-[var(--muted-foreground)] font-light italic text-sm">
+                  No records found in current log.
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {submissions.map((submission, index) => (
                   <SubmissionCard
                     key={submission.id}
@@ -588,24 +630,24 @@ function SubmissionCard({
     { label: string; className: string; hint: string }
   > = {
     compile_error: {
-      label: "Compile error",
-      className: "bg-[var(--destructive)]/10 text-[var(--destructive)]",
-      hint: "Fix compilation errors and resubmit.",
+      label: "COMPILE_ERROR",
+      className: "bg-[var(--destructive)]/5 text-[var(--destructive)] border-[var(--destructive)]/20",
+      hint: "Code failed to compile. Review output below.",
     },
     runtime_error: {
-      label: "Runtime error",
-      className: "bg-[var(--destructive)]/10 text-[var(--destructive)]",
-      hint: "Your program crashed/timed out. Check edge cases and resubmit.",
+      label: "RUNTIME_ERROR",
+      className: "bg-[var(--destructive)]/5 text-[var(--destructive)] border-[var(--destructive)]/20",
+      hint: "Program crashed or exceeded limits.",
     },
     infra_error: {
-      label: "Infra issue",
-      className: "bg-amber-500/10 text-amber-700",
-      hint: "Platform issue. Retry later or contact course staff.",
+      label: "INFRA_ERROR",
+      className: "bg-amber-500/5 text-amber-700 border-amber-500/20",
+      hint: "Temporary system issue. Please retry.",
     },
     internal_error: {
-      label: "System error",
-      className: "bg-[var(--secondary)]/10 text-[var(--secondary)]",
-      hint: "Unexpected error. Retry; if it persists contact course staff.",
+      label: "INTERNAL_ERROR",
+      className: "bg-[var(--secondary)]/5 text-[var(--secondary)] border-[var(--secondary)]/20",
+      hint: "Unexpected system behavior encountered.",
     },
   };
 
@@ -626,14 +668,14 @@ function SubmissionCard({
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 404) {
-          setTestsError("No test results available yet.");
+          setTestsError("Detailed results are not available for this record.");
         } else if (err.status === 401) {
-          setTestsError("Not authenticated.");
+          setTestsError("Access denied. Please re-authenticate.");
         } else {
-          setTestsError(err.detail || "Failed to load tests.");
+          setTestsError(err.detail || "Error loading archival data.");
         }
       } else {
-        setTestsError("Failed to load tests.");
+        setTestsError("Network error while retrieving results.");
       }
     } finally {
       setIsTestsLoading(false);
@@ -650,83 +692,87 @@ function SubmissionCard({
 
   return (
     <div
-      className={`p-4 rounded-xl border transition-all ${
+      className={`p-5 rounded-sm border transition-all relative overflow-hidden ${ 
         isLatest
-          ? "border-[var(--primary)]/30 bg-[var(--background)]"
-          : "border-[var(--border)] bg-[var(--card)]"
+          ? "border-[var(--primary)] shadow-md bg-white"
+          : "border-[var(--border)] bg-[var(--background)]/30"
       }`}
     >
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className={`w-6 h-6 rounded-full ${config.bgColor} flex items-center justify-center shrink-0`}>
+      {/* Visual indicator for latest */}
+      {isLatest && (
+        <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)]" />
+      )}
+
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex items-center gap-2">
             <StatusIcon className={`w-3.5 h-3.5 ${config.color}`} />
+            <span className={`font-[family-name:var(--font-mono)] text-[10px] font-bold uppercase tracking-wider ${config.color}`}>
+              {config.label.replace(/\s+/g, '_')}
+            </span>
           </div>
-          <span className={`text-sm font-medium ${config.color}`}>
-            {config.label}
-          </span>
-          <span className="text-xs text-[var(--muted-foreground)] whitespace-nowrap">
-            Attempt {attemptNumber} of {totalAttempts}
+          <span className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase tracking-tighter">
+            ENTRY #{attemptNumber.toString().padStart(2, '0')} // ARCHIVE_00{attemptNumber}
           </span>
         </div>
         {isLatest && (
-          <span className="text-xs bg-[var(--primary)]/10 text-[var(--primary)] px-2 py-0.5 rounded-full shrink-0">
-            Latest
-          </span>
+          <div className="font-[family-name:var(--font-mono)] text-[8px] border border-[var(--primary)]/30 text-[var(--primary)] px-1.5 py-0.5 rounded-sm uppercase tracking-[0.2em] font-bold bg-[var(--primary)]/5">
+            LATEST
+          </div>
         )}
       </div>
 
-      <div className="text-xs text-[var(--muted-foreground)] mb-2">       
-        <p className="truncate">{fileName}</p>
-        <p>
-          {submittedAt.toLocaleDateString("en-US", {
+      <div className="space-y-1 mb-4">       
+        <p className="text-xs font-bold text-[var(--foreground)] truncate font-[family-name:var(--font-mono)]">
+          {fileName}
+        </p>
+        <p className="text-[10px] text-[var(--muted-foreground)] font-[family-name:var(--font-mono)] uppercase">
+          STAMP: {submittedAt.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
-            hour: "numeric",
+          })} {submittedAt.toLocaleTimeString("en-US", {
+            hour: "2-digit",
             minute: "2-digit",
+            hour12: false
           })}
         </p>
       </div>
 
       {submissionKind && (
-        <div className="mb-2">
-          <div className="flex items-center gap-2">
+        <div className="mb-4">
+          <div className="flex flex-col gap-2">
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${submissionKind.className}`}
+              className={`inline-block px-2 py-1 border rounded-sm text-[9px] font-bold uppercase tracking-widest ${submissionKind.className}`}
             >
               {submissionKind.label}
             </span>
-            {submission.feedback ? (
-              <span className="text-[11px] text-[var(--muted-foreground)] truncate">
-                {firstLine(submission.feedback)}
-              </span>
-            ) : null}
+            <p className="text-[11px] text-[var(--muted-foreground)] italic font-light">
+              {submissionKind.hint}
+            </p>
           </div>
-          <p className="text-[11px] text-[var(--muted-foreground)] mt-1">
-            {submissionKind.hint}
-          </p>
         </div>
       )}
 
       {submission.late_penalty_percent !== undefined &&
         submission.late_penalty_percent !== null &&
         submission.late_penalty_percent > 0 && (
-          <div className="text-[11px] text-[var(--muted-foreground)] mb-2">
-            Late penalty: {submission.late_penalty_percent}% (late by {formatDuration(submission.late_seconds)}).
+          <div className="text-[10px] font-[family-name:var(--font-mono)] text-[var(--secondary)] uppercase tracking-tighter mb-4 italic">
+            DEDUCTION: -{submission.late_penalty_percent}% // T_LATE: {formatDuration(submission.late_seconds)}
           </div>
         )}
 
       {submission.status === "graded" && submission.score !== null && (   
-        <div className="pt-2 border-t border-[var(--border)]">
-          <div className="flex items-center justify-between mb-1">        
-            <span className="text-xs text-[var(--muted-foreground)]">Score</span>
-            <span className="font-semibold text-[var(--foreground)]">     
-              {submission.score} / {maxPoints}
+        <div className="pt-4 border-t border-[var(--border)] border-dashed">
+          <div className="flex items-end justify-between mb-2">        
+            <span className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-widest font-bold">VAL_OUTPUT</span>
+            <span className="font-[family-name:var(--font-display)] font-bold text-2xl text-[var(--foreground)] leading-none">     
+              {submission.score}<span className="text-sm text-[var(--muted-foreground)] ml-1">/ {maxPoints}</span>
             </span>
           </div>
           {/* Score bar */}
-          <div className="h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+          <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
             <div
-              className="h-full bg-[var(--success)] rounded-full transition-all"
+              className="h-full bg-[var(--primary)] transition-all duration-700"
               style={{ width: `${(submission.score / maxPoints) * 100}%` }}
             />
           </div>
@@ -734,43 +780,43 @@ function SubmissionCard({
       )}
 
       {submission.feedback && (
-        <div className="mt-3 pt-2 border-t border-[var(--border)]">
+        <div className="mt-4 pt-4 border-t border-[var(--border)] border-dashed">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
-              <MessageSquare className="w-3 h-3" />
-              <span>Details</span>
+            <div className="flex items-center gap-2 font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-widest font-bold">
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>OFFICIAL_REMARKS</span>
             </div>
             <button
               type="button"
               onClick={() => setIsDetailsOpen((v) => !v)}
-              className="text-xs text-[var(--primary)] hover:underline"
+              className="text-[10px] font-bold font-[family-name:var(--font-mono)] uppercase text-[var(--primary)] hover:underline"
             >
-              {isDetailsOpen ? "Hide" : "View"}
+              [{isDetailsOpen ? "CLOSE" : "OPEN"}]
             </button>
           </div>
           {isDetailsOpen && (
-            <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap mt-2">
-              {submission.feedback}
-            </p>
+            <div className="mt-3 p-3 bg-white border border-[var(--border)] rounded-sm">
+              <p className="text-xs text-[var(--foreground)] whitespace-pre-wrap leading-relaxed font-light italic">
+                {submission.feedback}
+              </p>
+            </div>
           )}
         </div>
       )}
 
-      <div className="mt-3 pt-2 border-t border-[var(--border)]">
+      <div className="mt-4 pt-2 border-t border-[var(--border)] border-dashed">
         <button
           type="button"
           onClick={toggleTests}
           disabled={!canShowTests}
-          className={`w-full flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${
-            canShowTests ? "hover:bg-[var(--muted)]/40" : "opacity-60 cursor-not-allowed"
+          className={`w-full flex items-center justify-between rounded-sm px-2 py-2 transition-all ${ 
+            canShowTests ? "hover:bg-white border border-transparent hover:border-[var(--border)]" : "opacity-40 cursor-not-allowed"
           }`}
         >
-          <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+          <div className="flex items-center gap-2 font-[family-name:var(--font-mono)] text-[10px] text-[var(--muted-foreground)] uppercase tracking-widest font-bold">
             <Beaker className="w-3.5 h-3.5" />
-            <span>Autograder tests</span>
-            {!canShowTests ? (
-              <span className="text-[11px] text-[var(--muted-foreground)]">(available after grading)</span>
-            ) : null}
+            <span>AUTOGRADE_REPORT</span>
+            {!canShowTests && <span className="opacity-50 font-normal ml-2">// [QUEUEING]</span>}
           </div>
           {isTestsOpen ? (
             <ChevronUp className="w-4 h-4 text-[var(--muted-foreground)]" />
@@ -780,35 +826,38 @@ function SubmissionCard({
         </button>
 
         {isTestsOpen && (
-          <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
-            <p className="text-[11px] text-[var(--muted-foreground)]">
-              You’ll see results for <span className="font-medium">visible</span> tests only. Hidden tests aren’t shown.
+          <div className="mt-4 space-y-4">
+            <p className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase tracking-tighter italic">
+              * Showing archival results for visible test vectors. Hidden vectors are withheld for integrity.
             </p>
 
             {isTestsLoading ? (
-              <div className="flex items-center gap-2 mt-3 text-xs text-[var(--muted-foreground)]">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Loading tests…</span>
+              <div className="flex flex-col items-center py-6 gap-3">
+                <Loader2 className="w-5 h-5 text-[var(--primary)] animate-spin" />
+                <span className="font-[family-name:var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--muted-foreground)]">Processing_Results...</span>
               </div>
             ) : testsError ? (
-              <div className="mt-3 text-xs bg-[var(--destructive)]/10 text-[var(--destructive)] px-3 py-2 rounded-lg">
-                {testsError}
+              <div className="p-3 bg-[var(--secondary)]/5 border border-[var(--secondary)]/20 text-[var(--secondary)] font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-wider rounded-sm">
+                ERROR: {testsError}
               </div>
             ) : (
               <>
                 {testsData?.compile_output ? (
-                  <div className="mt-3">
-                    <div className="text-[11px] text-[var(--muted-foreground)] mb-1">Compile output</div>
-                    <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                  <div className="mt-4">
+                    <div className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase tracking-widest mb-2 font-bold flex items-center gap-2">
+                       <div className="w-1 h-1 bg-[var(--primary)] rounded-full" />
+                       COMPILER_STD_OUT
+                    </div>
+                    <pre className="text-[10px] font-[family-name:var(--font-mono)] whitespace-pre-wrap bg-[var(--background)]/80 rounded-sm p-4 border border-[var(--border)] overflow-x-auto text-[var(--foreground)] leading-tight">
                       {testsData.compile_output}
                     </pre>
                   </div>
                 ) : null}
 
-                <div className="mt-3 space-y-2">
+                <div className="mt-6 space-y-3">
                   {(testsData?.tests ?? []).length === 0 ? (
-                    <div className="text-xs text-[var(--muted-foreground)]">
-                      No visible tests to display for this submission.
+                    <div className="text-[10px] font-[family-name:var(--font-mono)] text-[var(--muted-foreground)] uppercase italic py-4 border border-dashed border-[var(--border)] rounded-sm text-center">
+                      NULL_VECTOR_OUTPUT
                     </div>
                   ) : (
                     (testsData?.tests ?? []).map((t) => {
@@ -816,30 +865,34 @@ function SubmissionCard({
                       return (
                         <div
                           key={t.test_case_id}
-                          className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
+                          className={`rounded-sm border transition-all ${ 
+                            isExpanded ? "border-[var(--border)] bg-white shadow-sm" : "border-[var(--border)] bg-[var(--background)]/50"
+                          }`}
                         >
-                          <div className="flex items-start justify-between gap-3">
+                          <div className="p-3 flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-[var(--foreground)] truncate">
+                              <div className="flex items-center gap-3">
+                                <h4 className="text-sm font-bold text-[var(--foreground)] truncate font-[family-name:var(--font-display)]">
                                   {t.name}
+                                </h4>
+                                <span className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase border border-[var(--border)] px-1.5 py-0.5 rounded-sm">
+                                  {t.points.toString().padStart(2, '0')}PTS
                                 </span>
-                                <span className="text-[11px] text-[var(--muted-foreground)]">{t.points} pts</span>
                               </div>
-                              <div className="text-[11px] text-[var(--muted-foreground)]">
-                                Test #{t.position}
+                              <div className="font-[family-name:var(--font-mono)] text-[8px] text-[var(--muted-foreground)] uppercase tracking-tighter mt-1">
+                                VEC_POS: #{t.position.toString().padStart(3, '0')}
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-3 shrink-0 pt-1">
                               <span
-                                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                                className={`font-[family-name:var(--font-mono)] text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-widest ${ 
                                   t.passed
-                                    ? "bg-[var(--success)]/10 text-[var(--success)]"
-                                    : "bg-[var(--destructive)]/10 text-[var(--destructive)]"
+                                    ? "bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20"
+                                    : "bg-[var(--secondary)]/10 text-[var(--secondary)] border border-[var(--secondary)]/20"
                                 }`}
                               >
-                                {t.passed ? "Pass" : "Fail"}
+                                {t.passed ? "PASS" : "FAIL"}
                               </span>
                               <button
                                 type="button"
@@ -848,56 +901,54 @@ function SubmissionCard({
                                     prev === t.test_case_id ? null : t.test_case_id
                                   )
                                 }
-                                className="text-[11px] text-[var(--primary)] hover:underline"
+                                className="font-[family-name:var(--font-mono)] text-[10px] font-bold uppercase text-[var(--primary)] hover:underline"
                               >
-                                {isExpanded ? "Hide" : "View"}
+                                {isExpanded ? "[LESS]" : "[MORE]"}
                               </button>
                             </div>
                           </div>
 
                           {isExpanded && (
-                            <div className="mt-2 grid gap-2">
+                            <div className="px-3 pb-3 pt-1 space-y-4 border-t border-[var(--border)] border-dashed mt-2">
                               {t.stdin ? (
                                 <div>
-                                  <div className="text-[11px] text-[var(--muted-foreground)] mb-1">stdin</div>
-                                  <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                  <div className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase mb-2 font-bold">INPUT_VECTOR</div>
+                                  <pre className="text-[10px] font-[family-name:var(--font-mono)] whitespace-pre-wrap bg-[var(--background)] rounded-sm p-3 border border-[var(--border)] overflow-x-auto text-[var(--foreground)] leading-tight">
                                     {t.stdin}
                                   </pre>
                                 </div>
                               ) : null}
 
-                              <div className="grid md:grid-cols-2 gap-2">
+                              <div className="grid md:grid-cols-2 gap-4">
                                 <div>
-                                  <div className="text-[11px] text-[var(--muted-foreground)] mb-1">
-                                    Expected stdout
-                                  </div>
-                                  <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                  <div className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase mb-2 font-bold">EXPECTED_STD_OUT</div>
+                                  <pre className="text-[10px] font-[family-name:var(--font-mono)] whitespace-pre-wrap bg-[var(--background)] rounded-sm p-3 border border-[var(--border)] overflow-x-auto text-[var(--foreground)] leading-tight">
                                     {t.expected_stdout || "∅"}
                                   </pre>
                                 </div>
                                 <div>
-                                  <div className="text-[11px] text-[var(--muted-foreground)] mb-1">Your stdout</div>
-                                  <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                  <div className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase mb-2 font-bold">ACTUAL_STD_OUT</div>
+                                  <pre className={`text-[10px] font-[family-name:var(--font-mono)] whitespace-pre-wrap rounded-sm p-3 border overflow-x-auto leading-tight ${ 
+                                    t.passed ? "bg-[var(--success)]/5 border-[var(--success)]/20" : "bg-[var(--secondary)]/5 border-[var(--secondary)]/20"
+                                  }`}>
                                     {t.stdout || "∅"}
                                   </pre>
                                 </div>
                               </div>
 
                               {(t.expected_stderr || t.stderr) && (
-                                <div className="grid md:grid-cols-2 gap-2">
+                                <div className="grid md:grid-cols-2 gap-4">
                                   <div>
-                                    <div className="text-[11px] text-[var(--muted-foreground)] mb-1">
-                                      Expected stderr
-                                    </div>
-                                    <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                    <div className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase mb-2 font-bold">EXPECTED_STD_ERR</div>
+                                    <pre className="text-[10px] font-[family-name:var(--font-mono)] whitespace-pre-wrap bg-[var(--background)] rounded-sm p-3 border border-[var(--border)] overflow-x-auto text-[var(--foreground)] leading-tight">
                                       {t.expected_stderr || "∅"}
                                     </pre>
                                   </div>
                                   <div>
-                                    <div className="text-[11px] text-[var(--muted-foreground)] mb-1">
-                                      Your stderr
-                                    </div>
-                                    <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
+                                    <div className="font-[family-name:var(--font-mono)] text-[9px] text-[var(--muted-foreground)] uppercase mb-2 font-bold">ACTUAL_STD_ERR</div>
+                                    <pre className={`text-[10px] font-[family-name:var(--font-mono)] whitespace-pre-wrap rounded-sm p-3 border overflow-x-auto leading-tight ${ 
+                                      t.passed ? "bg-white" : "bg-[var(--secondary)]/5 border-[var(--secondary)]/20 text-[var(--secondary)]"
+                                    }`}>
                                       {t.stderr || "∅"}
                                     </pre>
                                   </div>
