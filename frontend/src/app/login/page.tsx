@@ -68,9 +68,9 @@ export default function LoginPage() {
         {/* Archival Stamp */}
         <div className="absolute top-10 right-10 opacity-20 rotate-90 origin-top-right">
            <div className="border border-white p-2 font-[family-name:var(--font-mono)] text-[10px] text-white uppercase tracking-widest">
-            Restricted Access
+            Makerere University
             <br />
-            Auth_Level_1
+            System_Access
           </div>
         </div>
 
@@ -87,27 +87,29 @@ export default function LoginPage() {
             <div className="h-px w-20 bg-white/30 mb-8" />
             
             <h1 className="font-[family-name:var(--font-display)] text-5xl font-bold text-white leading-tight mb-6">
-              Authorized <br /> Personnel <br /> Only.
+              Academic <br /> Portal <br /> Access.
             </h1>
 
             <p className="text-white/60 text-lg max-w-sm font-light">
-              System access is monitored and logged. Ensure credentials are kept secure at all times.
+              Welcome, Scholars & Staff.
+              <br />
+              Log in to manage courses, submit assignments, and review academic progress.
             </p>
           </motion.div>
 
           <div className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest">
-            SYS_ID: MARCONI-2026-AUTH
+            SYS_ID: MARCONI-2026-EDU
           </div>
         </div>
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 relative">
-        {/* Technical Corner Markers */}
-        <div className="absolute top-6 left-6 w-4 h-4 border-t border-l border-[var(--primary)]/30" />
-        <div className="absolute top-6 right-6 w-4 h-4 border-t border-r border-[var(--primary)]/30" />
-        <div className="absolute bottom-6 left-6 w-4 h-4 border-b border-l border-[var(--primary)]/30" />
-        <div className="absolute bottom-6 right-6 w-4 h-4 border-b border-r border-[var(--primary)]/30" />
+      <div className="flex-1 flex items-center justify-center px-6 py-12 relative bg-[var(--background)]">
+        {/* Technical Corner Markers (visible on all screens) */}
+        <div className="absolute top-4 left-4 lg:top-6 lg:left-6 w-4 h-4 border-t border-l border-[var(--primary)]/30" />
+        <div className="absolute top-4 right-4 lg:top-6 lg:right-6 w-4 h-4 border-t border-r border-[var(--primary)]/30" />
+        <div className="absolute bottom-4 left-4 lg:bottom-6 lg:left-6 w-4 h-4 border-b border-l border-[var(--primary)]/30" />
+        <div className="absolute bottom-4 right-4 lg:bottom-6 lg:right-6 w-4 h-4 border-b border-r border-[var(--primary)]/30" />
 
         <motion.div
           variants={staggerContainer}
@@ -116,22 +118,28 @@ export default function LoginPage() {
           className="w-full max-w-sm"
         >
           {/* Mobile Logo */}
-          <motion.div variants={fadeInUp} className="lg:hidden mb-12 text-center">
+          <motion.div variants={fadeInUp} className="lg:hidden mb-10 text-center">
             <Link href="/" className="inline-flex items-center gap-3 group">
               <div className="w-10 h-10 bg-[var(--primary)] flex items-center justify-center rounded-sm transition-transform group-hover:rotate-6">
                 <GraduationCap className="w-5 h-5 text-white" />
               </div>
             </Link>
+            <div className="mt-4 font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--foreground)]">
+              Marconi.
+            </div>
           </motion.div>
 
           {/* Header */}
-          <motion.div variants={fadeInUp} className="mb-10">
+          <motion.div variants={fadeInUp} className="mb-8 lg:mb-10">
             <div className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--primary)] uppercase tracking-widest mb-3">
-              Authentication Protocol
+              Institutional Login
             </div>
-            <h2 className="font-[family-name:var(--font-display)] text-4xl font-bold text-[var(--foreground)]">
+            <h2 className="font-[family-name:var(--font-display)] text-3xl lg:text-4xl font-bold text-[var(--foreground)]">
               Sign In
             </h2>
+            <p className="mt-2 text-[var(--muted-foreground)] text-sm">
+              Staff and Student unified access point.
+            </p>
           </motion.div>
 
           {/* Error Message */}
