@@ -2124,7 +2124,7 @@ function AssignmentsTab({
                       <option value="">Unassigned</option>
                       {modules
                         .slice()
-                        .sort((a, b) => a.position - b.position)
+                        .sort((a, b) => a.position - b.position || a.id - b.id)
                         .map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.position}. {m.title}
@@ -2389,14 +2389,13 @@ function ModulesTab({
   const [createError, setCreateError] = useState("");
 
   const orderedModules = useMemo(
-    () => [...modules].sort((a, b) => a.position - b.position),
+    () => [...modules].sort((a, b) => a.position - b.position || a.id - b.id),
     [modules]
   );
 
   const nextPosition = useMemo(() => {
-    if (modules.length === 0) return 1;
-    return Math.max(...modules.map((m) => m.position)) + 1;
-  }, [modules]);
+    return orderedModules.length + 1;
+  }, [orderedModules.length]);
 
   useEffect(() => {
     if (!showCreateModal) return;
@@ -2623,7 +2622,7 @@ function ModuleCard(
     setError("");
     try {
       const data = await courseStaff.listModuleResources(courseId, module.id);
-      setResources(data.sort((a, b) => a.position - b.position));
+      setResources(data.sort((a, b) => a.position - b.position || a.id - b.id));
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.detail);
@@ -3099,7 +3098,7 @@ function ModuleCard(
           moduleId={module.id}
           onClose={() => setShowAddModal(null)}
           onSuccess={(resource) => {
-            setResources((prev) => [...prev, resource].sort((a, b) => a.position - b.position));
+            setResources((prev) => [...prev, resource].sort((a, b) => a.position - b.position || a.id - b.id));
             setShowAddModal(null);
           }}
         />
@@ -3112,7 +3111,7 @@ function ModuleCard(
           moduleId={module.id}
           onClose={() => setShowAddModal(null)}
           onSuccess={(resource) => {
-            setResources((prev) => [...prev, resource].sort((a, b) => a.position - b.position));
+            setResources((prev) => [...prev, resource].sort((a, b) => a.position - b.position || a.id - b.id));
             setShowAddModal(null);
           }}
         />
