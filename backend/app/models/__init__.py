@@ -4,6 +4,8 @@ from app.models.invite_token import InviteToken
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.assignment import Assignment
+from app.models.assignment_autograde_test_case_snapshot import AssignmentAutogradeTestCaseSnapshot
+from app.models.assignment_autograde_version import AssignmentAutogradeVersion
 from app.models.assignment_extension import AssignmentExtension
 from app.models.audit_event import AuditEvent
 from app.models.module import Module
@@ -19,6 +21,8 @@ from app.models.user import User
 
 __all__ = [
     "Assignment",
+    "AssignmentAutogradeTestCaseSnapshot",
+    "AssignmentAutogradeVersion",
     "AssignmentExtension",
     "AuditEvent",
     "Course",

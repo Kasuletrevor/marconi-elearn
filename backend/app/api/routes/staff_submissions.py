@@ -21,6 +21,7 @@ from app.crud.staff_submissions import (
 from app.crud.submission_test_results import delete_submission_test_results, list_submission_test_results
 from app.db.deps import get_db
 from app.models.submission import SubmissionStatus
+from app.models.submission_test_result import SubmissionTestResult
 from app.models.user import User
 from app.models.notification import NotificationKind
 from app.schemas.submission_test_result import SubmissionTestResultOut
@@ -336,7 +337,16 @@ async def list_submission_tests(
     row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
-    return await list_submission_test_results(db, submission_id=submission_id)
+    # Prefer final-phase tests when available.
+    from sqlalchemy import select
+
+    has_final = await db.execute(
+        select(SubmissionTestResult.id)
+        .where(SubmissionTestResult.submission_id == submission_id, SubmissionTestResult.phase == "final")
+        .limit(1)
+    )
+    phase = "final" if has_final.scalar_one_or_none() is not None else "practice"
+    return await list_submission_test_results(db, submission_id=submission_id, phase=phase)
 
 
 @router.post("/{submission_id}/regrade", response_model=SubmissionOut)
@@ -350,14 +360,16 @@ async def regrade_submission(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
 
     submission = row.submission
+    # Prefer final regrade when the assignment has been finalized.
+    phase = "final" if row.assignment.final_autograde_enqueued_at is not None else "practice"
     submission.status = SubmissionStatus.pending
     submission.score = None
     submission.feedback = None
     await db.commit()
-    await delete_submission_test_results(db, submission_id=submission_id)
+    await delete_submission_test_results(db, submission_id=submission_id, phase=phase)
 
     try:
-        await enqueue_grading(submission_id=submission_id)
+        await enqueue_grading(submission_id=submission_id, phase=phase)
     except Exception:
         logger.exception("Failed to enqueue grading job. submission_id=%s", submission_id)
 

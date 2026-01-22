@@ -1895,6 +1895,9 @@ function AssignmentsTab({
   const [newModuleId, setNewModuleId] = useState<number | null>(null);
   const [newMaxPoints, setNewMaxPoints] = useState<number>(100);
   const [newDueDateLocal, setNewDueDateLocal] = useState("");
+  const [newAutogradeMode, setNewAutogradeMode] = useState<
+    "practice_only" | "final_only" | "hybrid"
+  >("practice_only");
   const [newAllowsZip, setNewAllowsZip] = useState(false);
   const [newExpectedFilename, setNewExpectedFilename] = useState("");
   const [newCompileCommand, setNewCompileCommand] = useState("");
@@ -1921,6 +1924,7 @@ function AssignmentsTab({
     setNewModuleId(modules[0]?.id ?? null);
     setNewMaxPoints(100);
     setNewDueDateLocal("");
+    setNewAutogradeMode("practice_only");
     setNewAllowsZip(false);
     setNewExpectedFilename("");
     setNewCompileCommand("");
@@ -1944,6 +1948,7 @@ function AssignmentsTab({
     setNewDueDateLocal(
       assignment.due_date ? toDateTimeLocalValue(new Date(assignment.due_date)) : ""
     );
+    setNewAutogradeMode(assignment.autograde_mode ?? "practice_only");
     setNewAllowsZip(Boolean(assignment.allows_zip));
     setNewExpectedFilename(assignment.expected_filename ?? "");
     setNewCompileCommand(assignment.compile_command ?? "");
@@ -1999,6 +2004,7 @@ function AssignmentsTab({
         module_id: newModuleId,
         due_date: newDueDateLocal ? new Date(newDueDateLocal).toISOString() : null,
         max_points: newMaxPoints,
+        autograde_mode: newAutogradeMode,
         allows_zip: newAllowsZip,
         expected_filename: newAllowsZip ? (expectedFilename || null) : null,
         compile_command: newAllowsZip ? (compileCommand || null) : null,
@@ -2150,6 +2156,26 @@ function AssignmentsTab({
                       onChange={(e) => setNewDueDateLocal(e.target.value)}
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                      Autograding mode
+                    </label>
+                    <select
+                      value={newAutogradeMode}
+                      onChange={(e) =>
+                        setNewAutogradeMode(e.target.value as "practice_only" | "final_only" | "hybrid")
+                      }
+                      className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    >
+                      <option value="practice_only">Practice only (grade on submit)</option>
+                      <option value="final_only">Final only (grade at deadline)</option>
+                      <option value="hybrid">Hybrid (practice on submit + final at deadline)</option>
+                    </select>
+                    <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                      Use hybrid for instant feedback + authoritative deadline grading.
+                    </p>
                   </div>
 
                   <div className="md:col-span-2">

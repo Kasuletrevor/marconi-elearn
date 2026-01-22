@@ -31,6 +31,18 @@ class Submission(Base):
     size_bytes: Mapped[int] = mapped_column(Integer)
     storage_path: Mapped[str] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    practice_autograde_version_id: Mapped[int | None] = mapped_column(
+        Integer,
+        index=True,
+        nullable=True,
+        default=None,
+    )
+    final_autograde_version_id: Mapped[int | None] = mapped_column(
+        Integer,
+        index=True,
+        nullable=True,
+        default=None,
+    )
     status: Mapped[SubmissionStatus] = mapped_column(
         Enum(SubmissionStatus, name="submission_status"),
         server_default=SubmissionStatus.pending.value,

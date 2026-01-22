@@ -100,9 +100,27 @@ async def upload_submission(
         content_type=file.content_type,
         size_bytes=len(data),
         storage_path=str(dest),
+        practice_autograde_version_id=assignment.active_autograde_version_id,
     )
+    autograde_mode = str(getattr(assignment, "autograde_mode", "practice_only") or "practice_only")
+    is_finalized = bool(getattr(assignment, "final_autograde_enqueued_at", None))
     try:
-        await enqueue_grading(submission_id=submission.id)
+        if autograde_mode == "practice_only":
+            await enqueue_grading(submission_id=submission.id, phase="practice")
+        elif autograde_mode == "hybrid":
+            if is_finalized and getattr(assignment, "final_autograde_version_id", None):
+                submission.final_autograde_version_id = assignment.final_autograde_version_id
+                await db.commit()
+                await enqueue_grading(submission_id=submission.id, phase="final")
+            else:
+                await enqueue_grading(submission_id=submission.id, phase="practice")
+        elif autograde_mode == "final_only":
+            if is_finalized and getattr(assignment, "final_autograde_version_id", None):
+                submission.final_autograde_version_id = assignment.final_autograde_version_id
+                await db.commit()
+                await enqueue_grading(submission_id=submission.id, phase="final")
+        else:
+            await enqueue_grading(submission_id=submission.id, phase="practice")
     except Exception:
         # Best-effort only.
         logger.exception("Failed to enqueue grading job. submission_id=%s", submission.id)

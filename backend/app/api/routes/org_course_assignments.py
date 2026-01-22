@@ -49,6 +49,7 @@ async def create_assignment_in_course(
         due_date=payload.due_date,
         max_points=payload.max_points,
         late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
+        autograde_mode=payload.autograde_mode,
         allows_zip=payload.allows_zip,
         expected_filename=payload.expected_filename,
         compile_command=payload.compile_command,
@@ -94,19 +95,23 @@ async def update_assignment_in_course(
     if assignment is None or assignment.course_id != course_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
     await _validate_module(db, course_id=course_id, module_id=payload.module_id)
-    return await update_assignment(
-        db,
-        assignment=assignment,
-        title=payload.title,
-        description=payload.description,
-        module_id=payload.module_id,
-        due_date=payload.due_date,
-        max_points=payload.max_points,
-        late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
-        allows_zip=payload.allows_zip,
-        expected_filename=payload.expected_filename,
-        compile_command=payload.compile_command,
-    )
+    try:
+        return await update_assignment(
+            db,
+            assignment=assignment,
+            title=payload.title,
+            description=payload.description,
+            module_id=payload.module_id,
+            due_date=payload.due_date,
+            max_points=payload.max_points,
+            late_policy=payload.late_policy.model_dump() if payload.late_policy is not None else None,
+            autograde_mode=payload.autograde_mode,
+            allows_zip=payload.allows_zip,
+            expected_filename=payload.expected_filename,
+            compile_command=payload.compile_command,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)

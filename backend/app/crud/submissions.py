@@ -13,6 +13,7 @@ async def create_submission(
     content_type: str | None,
     size_bytes: int,
     storage_path: str,
+    practice_autograde_version_id: int | None = None,
 ) -> Submission:
     submission = Submission(
         assignment_id=assignment_id,
@@ -21,6 +22,7 @@ async def create_submission(
         content_type=content_type,
         size_bytes=size_bytes,
         storage_path=storage_path,
+        practice_autograde_version_id=practice_autograde_version_id,
         status=SubmissionStatus.pending,
     )
     db.add(submission)

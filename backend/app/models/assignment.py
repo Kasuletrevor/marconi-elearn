@@ -1,10 +1,17 @@
 from datetime import datetime
+import enum
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+
+
+class AssignmentAutogradeMode(str, enum.Enum):
+    practice_only = "practice_only"
+    final_only = "final_only"
+    hybrid = "hybrid"
 
 
 class Assignment(Base):
@@ -18,6 +25,28 @@ class Assignment(Base):
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     max_points: Mapped[int] = mapped_column(Integer, default=100)
     late_policy: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    autograde_mode: Mapped[AssignmentAutogradeMode] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default=text("'practice_only'"),
+    )
+    active_autograde_version_id: Mapped[int | None] = mapped_column(
+        Integer,
+        index=True,
+        nullable=True,
+        default=None,
+    )
+    final_autograde_enqueued_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
+    final_autograde_version_id: Mapped[int | None] = mapped_column(
+        Integer,
+        index=True,
+        nullable=True,
+        default=None,
+    )
     allows_zip: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     expected_filename: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
     compile_command: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
