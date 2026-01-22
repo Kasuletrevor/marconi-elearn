@@ -113,22 +113,26 @@ When you push to the `main` branch, following happens automatically:
 
 ## Background Worker (Auto-grading)
 
-The backend includes a Taskiq worker for background auto-grading of C/C++ submissions against test cases.
+The backend includes background services for auto-grading C/C++ submissions against test cases:
+
+- **Taskiq worker**: executes queued grading jobs
+- **Deadline poller**: periodically checks assignment due dates and enqueues *final* autograding at the deadline
 
 ### Starting the Worker
 
-On your server, start the worker in a separate terminal:
+On your server, start the worker + deadline poller via Docker Compose:
 
 ```bash
 ssh deploy@your-server
 cd ~/marconi
-docker-compose exec -d backend python -m taskiq worker app.worker.broker:broker app.worker.tasks
+docker-compose up -d worker deadline-poller
 ```
 
-Or run it on the host with docker-compose exec in the foreground:
+To tail logs:
 
 ```bash
-docker-compose exec backend python -m taskiq worker app.worker.broker:broker app.worker.tasks
+docker-compose logs -f worker
+docker-compose logs -f deadline-poller
 ```
 
 ### Worker Requirements
@@ -137,13 +141,10 @@ docker-compose exec backend python -m taskiq worker app.worker.broker:broker app
 - When `REDIS_URL` is empty, submissions are stored but not auto-graded
 - Staff can manually regrade submissions via the API even without the worker
 
-### Monitoring the Worker
+### Deadline Poller Notes
 
-```bash
-ssh deploy@your-server
-cd ~/marconi
-docker-compose logs -f backend | grep taskiq
-```
+- Final autograding runs automatically at `assignment.due_date` (deadline poller enqueues the job; the worker executes it).
+- After an assignment has a final autograde, the autograding configuration is locked to preserve grading integrity.
 
 ### Manual Trigger
 
