@@ -137,9 +137,8 @@ function HeroSection() {
             variants={fadeInUp}
             className="max-w-2xl mx-auto text-lg md:text-xl text-[var(--muted-foreground)] mb-10 leading-relaxed"
           >
-            A modern learning platform built for programming courses. Distribute
-            assignments, collect C/C++ submissions, and deliver instant
-            AI-powered feedback at university scale.
+            A modern platform for programming courses—built for students who submit
+            code and staff who teach, manage rosters, and grade consistently at scale.
           </motion.p>
 
           {/* CTAs */}
@@ -151,14 +150,14 @@ function HeroSection() {
               href="/login"
               className="group flex items-center gap-2 px-6 py-3 bg-[var(--primary)] text-white font-bold rounded-lg hover:bg-[var(--primary-hover)] transition-all shadow-lg shadow-[var(--primary)]/20"
             >
-              Start Teaching
+              I’m a Student
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
-              href="#features"
+              href="/login"
               className="flex items-center gap-2 px-6 py-3 bg-[var(--card)] text-[var(--foreground)] font-bold rounded-lg border border-[var(--border)] hover:border-[var(--primary)]/30 transition-colors"
             >
-              Explore Features
+              I’m Course Staff
             </Link>
           </motion.div>
 
@@ -168,9 +167,9 @@ function HeroSection() {
             className="mt-20 grid grid-cols-3 gap-8 max-w-2xl mx-auto"
           >
             {[
-              { value: "220+", label: "Students per Course" },
-              { value: "< 10s", label: "Auto-Grade Speed" },
-              { value: "99.9%", label: "Uptime SLA" },
+              { value: "C/C++", label: "First-class submissions" },
+              { value: "Modules", label: "Organize course content" },
+              { value: "Test Cases", label: "Autograding you can trust" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="font-[family-name:var(--font-display)] text-3xl md:text-4xl font-bold text-[var(--primary)]">
@@ -194,42 +193,42 @@ function FeaturesSection() {
       icon: BookOpen,
       title: "Course Management",
       description:
-        "Organize your curriculum into modules. Upload resources, set deadlines, manage enrollments—all in one place.",
+        "Organize your curriculum into modules. Add resources, set deadlines, and keep everything in one place.",
       color: "var(--primary)",
     },
     {
       icon: Code2,
-      title: "Code Submissions",
+      title: "Student Submissions",
       description:
-        "Students upload C/C++ files or zipped projects. We compile, run, and grade against your hidden test cases.",
+        "Students submit C/C++ solutions and see clear results. Staff gets a clean history and a predictable grading flow.",
       color: "var(--secondary)",
     },
     {
       icon: Terminal,
       title: "Sandboxed Execution",
       description:
-        "Student code runs in isolated containers with strict time and memory limits. Safe, secure, scalable.",
+        "Run untrusted code in isolation with strict resource limits. Built to be safe, secure, and scalable.",
       color: "var(--primary)",
     },
     {
       icon: Sparkles,
-      title: "AI Code Review",
+      title: "Assignments + Test Cases",
       description:
-        "Optional GPT-4 powered feedback on code quality, style, and best practices. Budget-capped per organization.",
+        "Define grading rules once at the assignment level—then submissions follow the same rules every time.",
       color: "var(--secondary)",
     },
     {
       icon: Users,
       title: "Role-Based Access",
       description:
-        "Lecturers, co-lecturers, TAs, and students—each with precisely scoped permissions and audit trails.",
+        "Lecturers, co-lecturers, TAs, and students—each with scoped permissions and an audit trail.",
       color: "var(--primary)",
     },
     {
       icon: FileCode,
-      title: "Offline Support",
+      title: "Clear Feedback",
       description:
-        "Students can download assignments as PDF + starter code ZIP. Work offline, submit when ready.",
+        "Show the right level of detail: compile errors vs runtime errors vs infrastructure issues—without guesswork.",
       color: "var(--secondary)",
     },
   ];
@@ -318,7 +317,7 @@ function HowItWorksSection() {
       step: "04",
       title: "Instant Feedback",
       description:
-        "Auto-grading shows pass/fail per test case. Optional AI review provides detailed code quality feedback.",
+        "Auto-grading shows pass/fail per test case, plus actionable compile/runtime output when things go wrong.",
     },
   ];
 
@@ -443,17 +442,7 @@ function Footer() {
           {/* Links */}
           <div className="flex items-center gap-6 text-sm text-[var(--muted-foreground)]">
             <span>
-              A project of{" "}
-              <a
-                href="https://emergentai.ug"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--primary)] hover:underline"
-              >
-                EmergentAI
-              </a>{" "}
-              &{" "}
-              <a
+              Built at <a
                 href="https://cit.ac.ug"
                 target="_blank"
                 rel="noopener noreferrer"
