@@ -2,6 +2,7 @@ from datetime import datetime
 import re
 import shlex
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.schemas.late_policy import LatePolicy
@@ -67,6 +68,7 @@ class AssignmentCreate(BaseModel):
     due_date: datetime | None = None
     max_points: int = Field(default=100, ge=0, le=1_000_000)
     late_policy: LatePolicy | None = None
+    autograde_mode: Literal["practice_only", "final_only", "hybrid"] = "practice_only"
     allows_zip: bool = False
     expected_filename: str | None = Field(default=None)
     compile_command: str | None = Field(default=None)
@@ -91,6 +93,7 @@ class AssignmentUpdate(BaseModel):
     due_date: datetime | None = None
     max_points: int | None = Field(default=None, ge=0, le=1_000_000)
     late_policy: LatePolicy | None = None
+    autograde_mode: Literal["practice_only", "final_only", "hybrid"] | None = None
     allows_zip: bool | None = None
     expected_filename: str | None = Field(default=None)
     compile_command: str | None = Field(default=None)
@@ -124,6 +127,7 @@ class AssignmentOut(BaseModel):
     due_date: datetime | None
     max_points: int
     late_policy: dict | None
+    autograde_mode: str
     allows_zip: bool
     expected_filename: str | None
     compile_command: str | None

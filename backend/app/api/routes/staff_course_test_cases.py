@@ -61,17 +61,21 @@ async def create_assignment_test_case(
 ) -> TestCaseOut:
     await require_course_staff(course_id, current_user, db)
     await _require_course_and_assignment(db, course_id=course_id, assignment_id=assignment_id)
-    return await create_test_case(
-        db,
-        assignment_id=assignment_id,
-        name=payload.name,
-        position=payload.position,
-        points=payload.points,
-        is_hidden=payload.is_hidden,
-        stdin=payload.stdin,
-        expected_stdout=payload.expected_stdout,
-        expected_stderr=payload.expected_stderr,
-    )
+    try:
+        return await create_test_case(
+            db,
+            assignment_id=assignment_id,
+            name=payload.name,
+            position=payload.position,
+            points=payload.points,
+            is_hidden=payload.is_hidden,
+            stdin=payload.stdin,
+            expected_stdout=payload.expected_stdout,
+            expected_stderr=payload.expected_stderr,
+            created_by_user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.patch("/{test_case_id}", response_model=TestCaseOut)
@@ -88,17 +92,21 @@ async def update_assignment_test_case(
     test_case = await get_test_case(db, test_case_id=test_case_id)
     if test_case is None or test_case.assignment_id != assignment_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
-    return await update_test_case(
-        db,
-        test_case=test_case,
-        name=payload.name,
-        position=payload.position,
-        points=payload.points,
-        is_hidden=payload.is_hidden,
-        stdin=payload.stdin,
-        expected_stdout=payload.expected_stdout,
-        expected_stderr=payload.expected_stderr,
-    )
+    try:
+        return await update_test_case(
+            db,
+            test_case=test_case,
+            name=payload.name,
+            position=payload.position,
+            points=payload.points,
+            is_hidden=payload.is_hidden,
+            stdin=payload.stdin,
+            expected_stdout=payload.expected_stdout,
+            expected_stderr=payload.expected_stderr,
+            updated_by_user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.delete("/{test_case_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -114,6 +122,8 @@ async def delete_assignment_test_case(
     test_case = await get_test_case(db, test_case_id=test_case_id)
     if test_case is None or test_case.assignment_id != assignment_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
-    await delete_test_case(db, test_case=test_case)
+    try:
+        await delete_test_case(db, test_case=test_case, deleted_by_user_id=current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return None
-

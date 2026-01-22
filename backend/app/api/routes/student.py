@@ -36,6 +36,7 @@ from app.crud.student_views import list_course_assignments, list_course_modules,
 from app.db.deps import get_db
 from app.integrations.jobe import JOBE_OUTCOME_OK
 from app.models.course import Course
+from app.models.assignment_autograde_test_case_snapshot import AssignmentAutogradeTestCaseSnapshot
 from app.models.submission_test_result import SubmissionTestResult
 from app.models.test_case import TestCase
 from app.models.user import User
@@ -313,6 +314,7 @@ async def submit_assignment(
         content_type=file.content_type,
         size_bytes=len(data),
         storage_path=str(dest),
+        practice_autograde_version_id=assignment.active_autograde_version_id,
     )
     try:
         course = await db.get(Course, course_id)
@@ -333,8 +335,25 @@ async def submit_assignment(
             submission.id,
         )
     # Fire-and-forget: enqueue background grading if Redis is configured.
+    autograde_mode = str(getattr(assignment, "autograde_mode", "practice_only") or "practice_only")
+    is_finalized = bool(getattr(assignment, "final_autograde_enqueued_at", None))
     try:
-        await enqueue_grading(submission_id=submission.id)
+        if autograde_mode == "practice_only":
+            await enqueue_grading(submission_id=submission.id, phase="practice")
+        elif autograde_mode == "hybrid":
+            if is_finalized and getattr(assignment, "final_autograde_version_id", None):
+                submission.final_autograde_version_id = assignment.final_autograde_version_id
+                await db.commit()
+                await enqueue_grading(submission_id=submission.id, phase="final")
+            else:
+                await enqueue_grading(submission_id=submission.id, phase="practice")
+        elif autograde_mode == "final_only":
+            if is_finalized and getattr(assignment, "final_autograde_version_id", None):
+                submission.final_autograde_version_id = assignment.final_autograde_version_id
+                await db.commit()
+                await enqueue_grading(submission_id=submission.id, phase="final")
+        else:
+            await enqueue_grading(submission_id=submission.id, phase="practice")
     except Exception:
         logger.exception("Failed to enqueue grading job. submission_id=%s", submission.id)
     return submission
@@ -453,10 +472,37 @@ async def my_submission_tests(
     if row is None or row.course.id != course_id or row.assignment.id != assignment_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
 
+    # Prefer final-phase visible tests when available; otherwise show practice-phase visible tests.
+    has_final_result = await db.execute(
+        select(SubmissionTestResult.id)
+        .where(
+            SubmissionTestResult.submission_id == submission_id,
+            SubmissionTestResult.phase == "final",
+        )
+        .limit(1)
+    )
+    phase = "final" if has_final_result.scalar_one_or_none() is not None else "practice"
+
+    version_id = (
+        row.submission.final_autograde_version_id
+        if phase == "final"
+        else row.submission.practice_autograde_version_id
+    )
+    if version_id is None:
+        phase = "practice"
+        version_id = row.submission.practice_autograde_version_id
+    if version_id is None:
+        return StudentSubmissionTestsOut(
+            submission_id=submission_id,
+            compile_output="",
+            tests=[],
+        )
+
     compile_output_result = await db.execute(
         select(SubmissionTestResult.compile_output)
         .where(
             SubmissionTestResult.submission_id == submission_id,
+            SubmissionTestResult.phase == phase,
             SubmissionTestResult.compile_output != "",
         )
         .limit(1)
@@ -464,19 +510,27 @@ async def my_submission_tests(
     compile_output = compile_output_result.scalar_one_or_none() or ""
 
     result = await db.execute(
-        select(SubmissionTestResult, TestCase)
-        .join(TestCase, TestCase.id == SubmissionTestResult.test_case_id)
+        select(SubmissionTestResult, AssignmentAutogradeTestCaseSnapshot)
+        .join(
+            AssignmentAutogradeTestCaseSnapshot,
+            (AssignmentAutogradeTestCaseSnapshot.test_case_id == SubmissionTestResult.test_case_id)
+            & (AssignmentAutogradeTestCaseSnapshot.autograde_version_id == int(version_id)),
+        )
         .where(
             SubmissionTestResult.submission_id == submission_id,
-            TestCase.is_hidden.is_(False),
+            SubmissionTestResult.phase == phase,
+            AssignmentAutogradeTestCaseSnapshot.is_hidden.is_(False),
         )
-        .order_by(TestCase.position.asc(), TestCase.id.asc())
+        .order_by(
+            AssignmentAutogradeTestCaseSnapshot.position.asc(),
+            AssignmentAutogradeTestCaseSnapshot.id.asc(),
+        )
     )
     tests: list[StudentVisibleTestResultOut] = []
     for test_result, test_case in result.all():
         tests.append(
             StudentVisibleTestResultOut(
-                test_case_id=test_case.id,
+                test_case_id=test_case.test_case_id,
                 name=test_case.name,
                 position=test_case.position,
                 points=test_case.points,

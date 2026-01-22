@@ -11,28 +11,37 @@ async def replace_submission_test_results(
     *,
     submission_id: int,
     results: list[SubmissionTestResult],
+    phase: str | None = None,
+    commit: bool = True,
 ) -> None:
-    await db.execute(delete(SubmissionTestResult).where(SubmissionTestResult.submission_id == submission_id))
+    stmt = delete(SubmissionTestResult).where(SubmissionTestResult.submission_id == submission_id)
+    if phase is not None:
+        stmt = stmt.where(SubmissionTestResult.phase == phase)
+    await db.execute(stmt)
     for r in results:
         db.add(r)
-    await db.commit()
+    if commit:
+        await db.commit()
 
 
 async def list_submission_test_results(
     db: AsyncSession,
     *,
     submission_id: int,
+    phase: str | None = None,
 ) -> list[SubmissionTestResult]:
-    result = await db.execute(
-        select(SubmissionTestResult)
-        .where(SubmissionTestResult.submission_id == submission_id)
-        .order_by(SubmissionTestResult.id.asc())
-    )
+    stmt = select(SubmissionTestResult).where(SubmissionTestResult.submission_id == submission_id)
+    if phase is not None:
+        stmt = stmt.where(SubmissionTestResult.phase == phase)
+    result = await db.execute(stmt.order_by(SubmissionTestResult.id.asc()))
     return list(result.scalars().all())
 
 
-async def delete_submission_test_results(db: AsyncSession, *, submission_id: int) -> None:
-    await db.execute(
-        delete(SubmissionTestResult).where(SubmissionTestResult.submission_id == submission_id)
-    )
+async def delete_submission_test_results(
+    db: AsyncSession, *, submission_id: int, phase: str | None = None
+) -> None:
+    stmt = delete(SubmissionTestResult).where(SubmissionTestResult.submission_id == submission_id)
+    if phase is not None:
+        stmt = stmt.where(SubmissionTestResult.phase == phase)
+    await db.execute(stmt)
     await db.commit()

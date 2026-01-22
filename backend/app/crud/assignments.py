@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assignment import Assignment
+from app.crud.autograde_versions import create_autograde_version_snapshot
 
 
 async def create_assignment(
@@ -16,9 +17,11 @@ async def create_assignment(
     due_date: datetime | None,
     max_points: int,
     late_policy: dict | None = None,
+    autograde_mode: str = "practice_only",
     allows_zip: bool = False,
     expected_filename: str | None = None,
     compile_command: str | None = None,
+    created_by_user_id: int | None = None,
 ) -> Assignment:
     assignment = Assignment(
         course_id=course_id,
@@ -28,11 +31,21 @@ async def create_assignment(
         due_date=due_date,
         max_points=max_points,
         late_policy=late_policy,
+        autograde_mode=autograde_mode,
         allows_zip=bool(allows_zip),
         expected_filename=expected_filename.strip() if expected_filename else None,
         compile_command=compile_command.strip() if compile_command else None,
     )
     db.add(assignment)
+    await db.flush()
+
+    await create_autograde_version_snapshot(
+        db,
+        assignment=assignment,
+        created_by_user_id=created_by_user_id,
+        note="initial",
+    )
+
     await db.commit()
     await db.refresh(assignment)
     return assignment
@@ -71,10 +84,21 @@ async def update_assignment(
     due_date: datetime | None,
     max_points: int | None,
     late_policy: dict | None,
+    autograde_mode: str | None = None,
     allows_zip: bool | None = None,
     expected_filename: str | None = None,
     compile_command: str | None = None,
+    updated_by_user_id: int | None = None,
 ) -> Assignment:
+    if assignment.final_autograde_enqueued_at is not None:
+        # Locked after finalization to keep the deadline snapshot authoritative.
+        if any(
+            v is not None
+            for v in (due_date, max_points, late_policy, autograde_mode, allows_zip, expected_filename, compile_command)
+        ):
+            raise ValueError("Assignment autograde config is locked")
+
+    autograde_changed = False
     if title is not None:
         assignment.title = title.strip()
     if description is not None:
@@ -83,16 +107,34 @@ async def update_assignment(
         assignment.module_id = module_id
     if due_date is not None:
         assignment.due_date = due_date
+        autograde_changed = True
     if max_points is not None:
         assignment.max_points = max_points
+        autograde_changed = True
     if late_policy is not None:
         assignment.late_policy = late_policy
+        autograde_changed = True
+    if autograde_mode is not None:
+        assignment.autograde_mode = autograde_mode
+        autograde_changed = True
     if allows_zip is not None:
         assignment.allows_zip = bool(allows_zip)
+        autograde_changed = True
     if expected_filename is not None:
         assignment.expected_filename = expected_filename.strip() or None
+        autograde_changed = True
     if compile_command is not None:
         assignment.compile_command = compile_command.strip() or None
+        autograde_changed = True
+
+    if autograde_changed:
+        await create_autograde_version_snapshot(
+            db,
+            assignment=assignment,
+            created_by_user_id=updated_by_user_id,
+            note="assignment_update",
+        )
+
     await db.commit()
     await db.refresh(assignment)
     return assignment
