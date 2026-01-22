@@ -69,6 +69,7 @@ export interface Assignment {
   max_points: number;
   module_id: number | null;
   late_policy?: LatePolicy | null;
+  autograde_mode: "practice_only" | "final_only" | "hybrid";
   allows_zip: boolean;
   expected_filename: string | null;
   compile_command: string | null;
@@ -253,6 +254,7 @@ export interface AssignmentCreate {
   module_id?: number | null;
   due_date?: string | null;
   max_points?: number;
+  autograde_mode?: "practice_only" | "final_only" | "hybrid";
   allows_zip?: boolean;
   expected_filename?: string | null;
   compile_command?: string | null;
@@ -264,6 +266,7 @@ export interface AssignmentUpdate {
   module_id?: number | null;
   due_date?: string | null;
   max_points?: number | null;
+  autograde_mode?: "practice_only" | "final_only" | "hybrid" | null;
   allows_zip?: boolean | null;
   expected_filename?: string | null;
   compile_command?: string | null;
