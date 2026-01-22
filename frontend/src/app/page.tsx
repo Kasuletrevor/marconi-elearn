@@ -142,51 +142,54 @@ function HeroSection() {
             </Link>
           </motion.div>
 
-          {/* Code Visual */}
+          {/* Code Visualization */}
           <motion.div
             variants={scaleIn}
-            className="mt-16 relative mx-auto max-w-3xl"
+            className="mt-20 relative mx-auto max-w-2xl"
           >
-            <div className="bg-[#1E1E1E] rounded-2xl shadow-2xl overflow-hidden border border-[var(--border)] text-left relative group">
-              {/* Window Controls */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-[#252526] border-b border-[#333]">
-                <div className="w-3 h-3 rounded-full bg-[#FF5F56]" />
-                <div className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
-                <div className="w-3 h-3 rounded-full bg-[#27C93F]" />
-                <div className="ml-4 text-xs text-gray-400 font-mono flex items-center gap-2">
-                  <FileCode className="w-3 h-3" />
-                  student_submission.cpp
+            <div className="bg-[#1E1E1E] rounded-3xl shadow-2xl overflow-hidden border border-[var(--border)]/10 text-left relative">
+              {/* Window Bar */}
+              <div className="flex items-center justify-between px-6 py-4 bg-[#252526] border-b border-[#333]">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#FF5F56]" />
+                  <div className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
+                  <div className="w-3 h-3 rounded-full bg-[#27C93F]" />
+                </div>
+                <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest flex items-center gap-2">
+                  <Terminal className="w-3 h-3" />
+                  Execution_Session
                 </div>
               </div>
               
-              {/* Code Content */}
-              <div className="p-6 font-[family-name:var(--font-mono)] text-sm leading-relaxed overflow-x-auto">
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">1</span><span className="text-[#C586C0]">#include</span> <span className="text-[#CE9178]">&lt;iostream&gt;</span></div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">2</span><span className="text-[#C586C0]">#include</span> <span className="text-[#CE9178]">&lt;vector&gt;</span></div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">3</span></div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">4</span><span className="text-[#569CD6]">int</span> <span className="text-[#DCDCAA]">main</span>() {'{'}</div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">5</span>    std::vector&lt;<span className="text-[#569CD6]">int</span>&gt; grades = {'{'} <span className="text-[#B5CEA8]">95</span>, <span className="text-[#B5CEA8]">88</span>, <span className="text-[#B5CEA8]">92</span> {'}'};</div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">6</span>    </div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">7</span>    <span className="text-[#6A9955]">// Auto-grading output</span></div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">8</span>    std::cout &lt;&lt; <span className="text-[#CE9178]">"All tests passed!"</span> &lt;&lt; std::endl;</div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">9</span>    <span className="text-[#C586C0]">return</span> <span className="text-[#B5CEA8]">0</span>;</div>
-                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">10</span>{'}'}</div>
+              {/* Code Panel */}
+              <div className="p-8 font-[family-name:var(--font-mono)] text-sm leading-relaxed overflow-x-auto bg-[#1E1E1E]">
+                <div className="flex opacity-50"><span className="w-8 mr-4 text-right select-none">1</span><span className="text-[#C586C0]">#include</span> <span className="text-[#CE9178]">&lt;iostream&gt;</span></div>
+                <div className="flex"><span className="w-8 mr-4 text-right select-none text-gray-600">2</span><span className="text-[#569CD6]">int</span> <span className="text-[#DCDCAA]">main</span>() {'{'}</div>
+                <div className="flex"><span className="w-8 mr-4 text-right select-none text-gray-600">3</span>    <span className="text-[#4EC9B0]">Grade</span> session_result;</div>
+                <div className="flex"><span className="w-8 mr-4 text-right select-none text-gray-600">4</span>    </div>
+                <div className="flex"><span className="w-8 mr-4 text-right select-none text-gray-600">5</span>    <span className="text-[#6A9955]">// Evaluate student submission</span></div>
+                <div className="flex"><span className="w-8 mr-4 text-right select-none text-gray-600">6</span>    session_result.<span className="text-[#DCDCAA]">evaluate</span>(SUBMISSION_ID);</div>
+                <div className="flex animate-pulse"><span className="w-8 mr-4 text-right select-none text-[var(--primary)] font-bold">&gt;</span>    std::cout &lt;&lt; <span className="text-[#CE9178]">"Status: SUCCESS"</span> &lt;&lt; std::endl;</div>
+                <div className="flex"><span className="w-8 mr-4 text-right select-none text-gray-600">8</span>    <span className="text-[#C586C0]">return</span> <span className="text-[#B5CEA8]">0</span>;</div>
+                <div className="flex"><span className="w-8 mr-4 text-right select-none text-gray-600">9</span>{'}'}</div>
               </div>
 
-              {/* Terminal/Output Simulation */}
-              <div className="bg-[#1E1E1E] border-t border-[#333] p-4 font-[family-name:var(--font-mono)] text-xs">
-                <div className="flex items-center gap-2 text-gray-400 mb-2">
-                  <Terminal className="w-3 h-3" />
-                  <span>Output Terminal</span>
+              {/* Status Bar */}
+              <div className="bg-[var(--primary)] px-6 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-white/90 text-[10px] font-bold uppercase tracking-tighter">
+                    <div className="w-2 h-2 rounded-full bg-white animate-ping" />
+                    Live_Grading
+                  </div>
+                  <div className="h-3 w-px bg-white/20" />
+                  <div className="text-white/70 text-[10px] font-mono">Build: PASSED</div>
                 </div>
-                <div className="text-[#4EC9B0]">➜  g++ student_submission.cpp -o main && ./main</div>
-                <div className="text-gray-300 mt-1">All tests passed!</div>
-                <div className="text-[#4EC9B0] mt-2">➜  <span className="animate-pulse">_</span></div>
+                <div className="text-white/50 text-[10px] font-mono">100% Coverage</div>
               </div>
             </div>
             
-            {/* Decorative background blob behind code */}
-            <div className="absolute -inset-4 bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 rounded-3xl blur-2xl -z-10 opacity-50" />
+            {/* Soft decorative shadow */}
+            <div className="absolute -inset-10 bg-gradient-to-tr from-[var(--primary)]/10 via-transparent to-[var(--secondary)]/10 rounded-full blur-3xl -z-10" />
           </motion.div>
 
           {/* Stats */}
