@@ -122,14 +122,6 @@ function HeroSection() {
           animate="visible"
           className="text-center"
         >
-          {/* Badge */}
-          <motion.div variants={fadeInUp} className="mb-8">
-            <span className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-full text-sm text-[var(--muted-foreground)]">
-              <Sparkles className="w-4 h-4 text-[var(--secondary)]" />
-              AI-Powered Code Grading
-            </span>
-          </motion.div>
-
           {/* Headline */}
           <motion.h1
             variants={fadeInUp}
