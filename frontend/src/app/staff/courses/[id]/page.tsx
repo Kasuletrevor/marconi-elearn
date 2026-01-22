@@ -2532,20 +2532,12 @@ function ModulesTab({
               canMoveDown={idx < orderedModules.length - 1}
               onMoveUp={async () => {
                 if (idx <= 0) return;
-                const other = orderedModules[idx - 1];
-                await Promise.all([
-                  courseStaff.updateModule(course.id, module.id, { position: other.position }),
-                  courseStaff.updateModule(course.id, other.id, { position: module.position }),
-                ]);
+                await courseStaff.updateModule(course.id, module.id, { position: idx });
                 await onRefreshModules();
               }}
               onMoveDown={async () => {
                 if (idx >= orderedModules.length - 1) return;
-                const other = orderedModules[idx + 1];
-                await Promise.all([
-                  courseStaff.updateModule(course.id, module.id, { position: other.position }),
-                  courseStaff.updateModule(course.id, other.id, { position: module.position }),
-                ]);
+                await courseStaff.updateModule(course.id, module.id, { position: idx + 2 });
                 await onRefreshModules();
               }}
             />
