@@ -78,8 +78,11 @@ export default function StaffSubmissionsQueuePage() {
       "all",
     ];
 
-    if (qsStatus && allowed.includes(qsStatus as any)) {
-      setSelectedStatus(qsStatus as any);
+    const isAllowedStatus = (value: string): value is (typeof allowed)[number] =>
+      (allowed as readonly string[]).includes(value);
+
+    if (qsStatus && isAllowedStatus(qsStatus)) {
+      setSelectedStatus(qsStatus);
     }
     if (qsCourseId && qsCourseId !== "all") {
       const n = Number(qsCourseId);
