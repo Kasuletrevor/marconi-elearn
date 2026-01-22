@@ -54,6 +54,76 @@ services:
       - nginx-proxy-manager_npm-network
       - proxy_hostinger-network
 
+  worker:
+    image: ${DOCKER_IMAGE:-marconi-backend}:${DOCKER_TAG:-latest}
+    restart: always
+    container_name: marconi-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      jobe:
+        condition: service_healthy
+    command: ["python", "-m", "taskiq", "worker", "app.worker.broker:broker", "app.worker.tasks"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-marconi_session}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:-lax}
+      SUPERADMIN_EMAILS: ${SUPERADMIN_EMAILS}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      JOBE_BASE_URL: ${JOBE_BASE_URL:-http://jobe/jobe/index.php/restapi}
+      JOBE_TIMEOUT_SECONDS: ${JOBE_TIMEOUT_SECONDS:-20}
+      JOBE_ALLOWED_LANGUAGES: ${JOBE_ALLOWED_LANGUAGES:-c,cpp}
+    volumes:
+      - uploads:/app/backend/var/uploads
+    networks:
+      - marconi-network
+      - nginx-proxy-manager_npm-network
+      - proxy_hostinger-network
+
+  deadline-poller:
+    image: ${DOCKER_IMAGE:-marconi-backend}:${DOCKER_TAG:-latest}
+    restart: always
+    container_name: marconi-deadline-poller
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      jobe:
+        condition: service_healthy
+    command: ["python", "-m", "app.worker.deadline_poller"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-marconi_session}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:-lax}
+      SUPERADMIN_EMAILS: ${SUPERADMIN_EMAILS}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      JOBE_BASE_URL: ${JOBE_BASE_URL:-http://jobe/jobe/index.php/restapi}
+      JOBE_TIMEOUT_SECONDS: ${JOBE_TIMEOUT_SECONDS:-20}
+      JOBE_ALLOWED_LANGUAGES: ${JOBE_ALLOWED_LANGUAGES:-c,cpp}
+    volumes:
+      - uploads:/app/backend/var/uploads
+    networks:
+      - marconi-network
+      - nginx-proxy-manager_npm-network
+      - proxy_hostinger-network
+
   postgres:
     image: postgres:16-alpine
     restart: always
