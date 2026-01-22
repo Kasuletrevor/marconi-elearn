@@ -122,34 +122,6 @@ function HeroSection() {
           animate="visible"
           className="text-center"
         >
-          {/* Badge */}
-          <motion.div variants={fadeInUp} className="mb-8">
-            <span className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-full text-sm text-[var(--muted-foreground)]">
-              <Sparkles className="w-4 h-4 text-[var(--secondary)]" />
-              AI-Powered Code Grading
-            </span>
-          </motion.div>
-
-          {/* Headline */}
-          <motion.h1
-            variants={fadeInUp}
-            className="font-[family-name:var(--font-display)] text-5xl md:text-7xl font-bold text-[var(--foreground)] leading-[1.1] tracking-tight mb-6"
-          >
-            Where Code Meets
-            <br />
-            <span className="text-[var(--primary)]">Academic Excellence</span>
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            variants={fadeInUp}
-            className="max-w-2xl mx-auto text-lg md:text-xl text-[var(--muted-foreground)] mb-10 leading-relaxed"
-          >
-            A modern learning platform built for programming courses. Distribute
-            assignments, collect C/C++ submissions, and deliver instant
-            AI-powered feedback at university scale.
-          </motion.p>
-
           {/* CTAs */}
           <motion.div
             variants={fadeInUp}
@@ -168,6 +140,53 @@ function HeroSection() {
             >
               Explore Features
             </Link>
+          </motion.div>
+
+          {/* Code Visual */}
+          <motion.div
+            variants={scaleIn}
+            className="mt-16 relative mx-auto max-w-3xl"
+          >
+            <div className="bg-[#1E1E1E] rounded-2xl shadow-2xl overflow-hidden border border-[var(--border)] text-left relative group">
+              {/* Window Controls */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-[#252526] border-b border-[#333]">
+                <div className="w-3 h-3 rounded-full bg-[#FF5F56]" />
+                <div className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
+                <div className="w-3 h-3 rounded-full bg-[#27C93F]" />
+                <div className="ml-4 text-xs text-gray-400 font-mono flex items-center gap-2">
+                  <FileCode className="w-3 h-3" />
+                  student_submission.cpp
+                </div>
+              </div>
+              
+              {/* Code Content */}
+              <div className="p-6 font-[family-name:var(--font-mono)] text-sm leading-relaxed overflow-x-auto">
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">1</span><span className="text-[#C586C0]">#include</span> <span className="text-[#CE9178]">&lt;iostream&gt;</span></div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">2</span><span className="text-[#C586C0]">#include</span> <span className="text-[#CE9178]">&lt;vector&gt;</span></div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">3</span></div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">4</span><span className="text-[#569CD6]">int</span> <span className="text-[#DCDCAA]">main</span>() {'{'}</div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">5</span>    std::vector&lt;<span className="text-[#569CD6]">int</span>&gt; grades = {'{'} <span className="text-[#B5CEA8]">95</span>, <span className="text-[#B5CEA8]">88</span>, <span className="text-[#B5CEA8]">92</span> {'}'};</div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">6</span>    </div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">7</span>    <span className="text-[#6A9955]">// Auto-grading output</span></div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">8</span>    std::cout &lt;&lt; <span className="text-[#CE9178]">"All tests passed!"</span> &lt;&lt; std::endl;</div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">9</span>    <span className="text-[#C586C0]">return</span> <span className="text-[#B5CEA8]">0</span>;</div>
+                <div className="flex"><span className="text-gray-600 select-none w-8 text-right mr-4">10</span>{'}'}</div>
+              </div>
+
+              {/* Terminal/Output Simulation */}
+              <div className="bg-[#1E1E1E] border-t border-[#333] p-4 font-[family-name:var(--font-mono)] text-xs">
+                <div className="flex items-center gap-2 text-gray-400 mb-2">
+                  <Terminal className="w-3 h-3" />
+                  <span>Output Terminal</span>
+                </div>
+                <div className="text-[#4EC9B0]">➜  g++ student_submission.cpp -o main && ./main</div>
+                <div className="text-gray-300 mt-1">All tests passed!</div>
+                <div className="text-[#4EC9B0] mt-2">➜  <span className="animate-pulse">_</span></div>
+              </div>
+            </div>
+            
+            {/* Decorative background blob behind code */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 rounded-3xl blur-2xl -z-10 opacity-50" />
           </motion.div>
 
           {/* Stats */}
