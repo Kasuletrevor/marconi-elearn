@@ -13,6 +13,8 @@ from app.api.routes.org_audit import router as org_audit_router
 from app.api.routes.org_memberships import router as org_memberships_router
 from app.api.routes.org_users import router as org_users_router
 from app.api.routes.orgs import router as orgs_router
+from app.api.routes.org_integrations_github import router as org_integrations_github_router
+from app.api.routes.org_integrations_github import callback_router as github_oauth_router
 from app.api.routes.staff_course_assignments import router as staff_course_assignments_router
 from app.api.routes.staff_course_assignment_extensions import (
     router as staff_course_assignment_extensions_router,
@@ -54,6 +56,8 @@ api_router.include_router(staff_submissions_router, tags=["staff"])
 api_router.include_router(superadmin_organizations_router, tags=["superadmin"])
 api_router.include_router(superadmin_stats_router, tags=["superadmin"])
 api_router.include_router(orgs_router, tags=["orgs"])
+api_router.include_router(org_integrations_github_router, tags=["integrations"])
+api_router.include_router(github_oauth_router, tags=["integrations"])
 api_router.include_router(users_router, tags=["users"])
 api_router.include_router(org_memberships_router, tags=["org-memberships"])
 api_router.include_router(org_users_router, tags=["org-users"])

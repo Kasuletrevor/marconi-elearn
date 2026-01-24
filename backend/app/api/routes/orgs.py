@@ -88,7 +88,12 @@ async def update_org(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
 
     try:
-        return await update_organization(db, org=org, name=payload.name)
+        return await update_organization(
+            db,
+            org=org,
+            name=payload.name,
+            github_org_login=payload.github_org_login,
+        )
     except OrgNameTakenError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

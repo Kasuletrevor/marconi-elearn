@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     # File uploads
     uploads_dir: str = ""
 
+    # Third-party integrations
+    # Symmetric encryption key (Fernet). Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    token_encryption_key: str = ""
+    # GitHub App (web application flow)
+    github_app_client_id: str = ""
+    github_app_client_secret: str = ""
+    # Full callback URL registered in the GitHub App settings, e.g. https://api.example.com/api/v1/integrations/github/callback
+    github_app_oauth_redirect_url: str = ""
+
     model_config = SettingsConfigDict(
         env_file=str((Path(__file__).resolve().parents[3] / ".env")),
         env_file_encoding="utf-8",

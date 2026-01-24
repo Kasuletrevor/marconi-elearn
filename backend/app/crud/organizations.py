@@ -53,9 +53,18 @@ async def get_organization(db: AsyncSession, *, org_id: int) -> Organization | N
     return await db.get(Organization, org_id)
 
 
-async def update_organization(db: AsyncSession, *, org: Organization, name: str | None) -> Organization:
+async def update_organization(
+    db: AsyncSession,
+    *,
+    org: Organization,
+    name: str | None,
+    github_org_login: str | None,
+) -> Organization:
     if name is not None:
         org.name = name.strip()
+    if github_org_login is not None:
+        val = github_org_login.strip()
+        org.github_org_login = val or None
     try:
         await db.commit()
     except IntegrityError as exc:

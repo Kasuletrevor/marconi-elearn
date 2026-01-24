@@ -11,7 +11,9 @@ from app.models.audit_event import AuditEvent
 from app.models.module import Module
 from app.models.module_resource import ModuleResource
 from app.models.course_notification_preference import CourseNotificationPreference
+from app.models.github_oauth_state import GitHubOAuthState
 from app.models.notification import Notification
+from app.models.org_github_admin_token import OrgGitHubAdminToken
 from app.models.submission import Submission
 from app.models.submission_test_result import SubmissionTestResult
 from app.models.student_profile import StudentProfile
@@ -28,10 +30,12 @@ __all__ = [
     "Course",
     "CourseMembership",
     "CourseNotificationPreference",
+    "GitHubOAuthState",
     "InviteToken",
     "Module",
     "ModuleResource",
     "Notification",
+    "OrgGitHubAdminToken",
     "Organization",
     "OrganizationMembership",
     "Session",

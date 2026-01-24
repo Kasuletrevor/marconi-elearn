@@ -9,6 +9,7 @@ class OrganizationCreate(BaseModel):
 
 class OrganizationUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    github_org_login: str | None = Field(default=None, max_length=100)
 
 
 class OrganizationOut(BaseModel):
@@ -16,5 +17,6 @@ class OrganizationOut(BaseModel):
 
     id: int
     name: str
+    github_org_login: str | None = None
     created_at: datetime
     updated_at: datetime
