@@ -241,6 +241,9 @@ export default function AdminSettingsPage() {
             <p className="text-xs text-[var(--muted-foreground)] mt-2">
               This org should own the GitHub Classroom you want to connect.
             </p>
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-2">
+              Tip: this setting is saved with “Save changes” in the Organization section.
+            </p>
           </div>
 
           <div className="flex items-center justify-end gap-2">
