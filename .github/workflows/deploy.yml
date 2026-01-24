@@ -157,6 +157,10 @@ jobs:
               f"SESSION_COOKIE_NAME={get('SESSION_COOKIE_NAME','marconi_session')}",
               f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
               f"SESSION_COOKIE_SAMESITE={get('SESSION_COOKIE_SAMESITE','lax')}",
+              f"TOKEN_ENCRYPTION_KEY={get('TOKEN_ENCRYPTION_KEY')}",
+              f"GITHUB_APP_CLIENT_ID={get('GITHUB_APP_CLIENT_ID')}",
+              f"GITHUB_APP_CLIENT_SECRET={get('GITHUB_APP_CLIENT_SECRET')}",
+              f"GITHUB_APP_OAUTH_REDIRECT_URL={get('GITHUB_APP_OAUTH_REDIRECT_URL')}",
               f"DOCKER_IMAGE={get('DOCKER_IMAGE')}",
               f"DOCKER_TAG={get('DOCKER_TAG')}",
               f"BACKEND_PORT={get('BACKEND_PORT','32316')}",
@@ -185,7 +189,24 @@ jobs:
             docker compose -p marconi -f docker-compose.yml down --remove-orphans || true
 
             # If older runs created fixed-name containers outside this compose project, remove them too.
-            docker rm -f marconi-backend marconi-postgres marconi-redis marconi-jobe >/dev/null 2>&1 || true
+            docker rm -f marconi-backend marconi-worker marconi-deadline-poller marconi-postgres marconi-redis marconi-jobe >/dev/null 2>&1 || true
+
+            # Defensive: ensure conflicting fixed-name containers are gone before `up`.
+            for name in marconi-backend marconi-worker marconi-deadline-poller marconi-postgres marconi-redis marconi-jobe; do
+              for i in {1..10}; do
+                if docker ps -a --format '{{.Names}}' | grep -qx "$name"; then
+                  docker rm -f "$name" >/dev/null 2>&1 || true
+                  sleep 1
+                else
+                  break
+                fi
+              done
+              if docker ps -a --format '{{.Names}}' | grep -qx "$name"; then
+                echo "Conflicting container still exists: $name"
+                docker ps -a --filter "name=^/${name}$" || true
+                exit 1
+              fi
+            done
 
             docker compose -p marconi -f docker-compose.yml pull
 
