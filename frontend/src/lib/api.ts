@@ -186,6 +186,7 @@ export interface StudentSubmissionTests {
 export interface Organization {
   id: number;
   name: string;
+  github_org_login?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -215,7 +216,22 @@ export interface OrganizationCreate {
 }
 
 export interface OrganizationUpdate {
-  name: string;
+  name?: string | null;
+  github_org_login?: string | null;
+}
+
+export interface OrgGitHubAdminConnection {
+  user_id: number;
+  github_user_id: number;
+  github_login: string;
+  token_expires_at: string;
+  last_verified_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface OrgGitHubStatus {
+  github_org_login: string | null;
+  connected_admins: OrgGitHubAdminConnection[];
 }
 
 export interface CourseCreateInOrg {
@@ -833,6 +849,27 @@ export const orgs = {
       body: JSON.stringify(data),
     });
     return handleResponse<Organization>(res);
+  },
+};
+
+export const orgIntegrations = {
+  githubConnectUrl(orgId: number): string {
+    return `${API_BASE}/api/v1/orgs/${orgId}/integrations/github/connect`;
+  },
+
+  async getGitHubStatus(orgId: number): Promise<OrgGitHubStatus> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}/integrations/github/status`, {
+      credentials: "include",
+    });
+    return handleResponse<OrgGitHubStatus>(res);
+  },
+
+  async disconnectGitHub(orgId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/v1/orgs/${orgId}/integrations/github/disconnect`, {
+      method: "POST",
+      credentials: "include",
+    });
+    return handleResponse<void>(res);
   },
 };
 

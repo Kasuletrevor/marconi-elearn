@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertCircle, Building2, Check, Loader2, Save, Settings } from "lucide-react";
+import { AlertCircle, Building2, Check, ExternalLink, Github, Loader2, Save, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, orgs, superadmin, type Organization } from "@/lib/api";
+import { ApiError, orgIntegrations, orgs, superadmin, type OrgGitHubStatus, type Organization } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import { PageHeader } from "@/components/shared/PageHeader";
 
@@ -12,6 +12,9 @@ export default function AdminSettingsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
   const [orgName, setOrgName] = useState("");
+  const [githubOrgLogin, setGithubOrgLogin] = useState("");
+  const [githubStatus, setGithubStatus] = useState<OrgGitHubStatus | null>(null);
+  const [githubLoading, setGithubLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -51,9 +54,22 @@ export default function AdminSettingsPage() {
     try {
       const org = await orgs.get(orgId);
       setOrgName(org.name);
+      setGithubOrgLogin((org.github_org_login ?? "").toString());
     } catch (err) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load organization");
+    }
+  }, []);
+
+  const loadGitHubStatus = useCallback(async (orgId: number) => {
+    setGithubLoading(true);
+    try {
+      const status = await orgIntegrations.getGitHubStatus(orgId);
+      setGithubStatus(status);
+    } catch {
+      setGithubStatus(null);
+    } finally {
+      setGithubLoading(false);
     }
   }, []);
 
@@ -64,7 +80,8 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (!selectedOrgId) return;
     void loadOrganization(selectedOrgId);
-  }, [loadOrganization, selectedOrgId]);
+    void loadGitHubStatus(selectedOrgId);
+  }, [loadGitHubStatus, loadOrganization, selectedOrgId]);
 
   useEffect(() => {
     if (selectedOrgId && typeof window !== "undefined") {
@@ -83,8 +100,12 @@ export default function AdminSettingsPage() {
     setError("");
     setSaved(false);
     try {
-      const updated = await orgs.update(selectedOrgId, { name });
+      const updated = await orgs.update(selectedOrgId, {
+        name,
+        github_org_login: githubOrgLogin.trim() || null,
+      });
       setOrgName(updated.name);
+      setGithubOrgLogin((updated.github_org_login ?? "").toString());
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (err) {
@@ -184,6 +205,109 @@ export default function AdminSettingsPage() {
             <Save className="w-4 h-4" />
             {isSaving ? "Saving…" : "Save changes"}
           </button>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl"
+      >
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center">
+              <Github className="w-6 h-6 text-[var(--muted-foreground)]" />
+            </div>
+            <div>
+              <p className="text-[var(--foreground)] font-semibold">Integrations</p>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Connect GitHub Classroom for roster + grades sync (coming next).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+              GitHub organization (one per Marconi org)
+            </label>
+            <input
+              value={githubOrgLogin}
+              onChange={(e) => setGithubOrgLogin(e.target.value)}
+              placeholder="e.g. your-university-org"
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <p className="text-xs text-[var(--muted-foreground)] mt-2">
+              This org should own the GitHub Classroom you want to connect.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <a
+              href={selectedOrgId ? orgIntegrations.githubConnectUrl(selectedOrgId) : "#"}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-sm font-semibold"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Connect GitHub
+            </a>
+            <button
+              onClick={() => selectedOrgId && void loadGitHubStatus(selectedOrgId)}
+              disabled={!selectedOrgId || githubLoading}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] disabled:opacity-50"
+            >
+              {githubLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 border-t border-[var(--border)] pt-5">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-semibold text-[var(--foreground)]">Connected org admins</p>
+            <button
+              onClick={() =>
+                selectedOrgId &&
+                void orgIntegrations
+                  .disconnectGitHub(selectedOrgId)
+                  .then(() => loadGitHubStatus(selectedOrgId))
+              }
+              disabled={!selectedOrgId}
+              className="text-xs font-semibold text-[var(--secondary)] hover:underline disabled:opacity-60"
+            >
+              Disconnect my GitHub
+            </button>
+          </div>
+
+          {githubLoading ? (
+            <div className="mt-4 flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading GitHub status…
+            </div>
+          ) : githubStatus && githubStatus.connected_admins.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {githubStatus.connected_admins.map((c) => (
+                <div
+                  key={`${c.user_id}:${c.github_user_id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 bg-[var(--background)] border border-[var(--border)] rounded-xl"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--foreground)] truncate">{c.github_login}</p>
+                    <p className="text-xs text-[var(--muted-foreground)] truncate">
+                      token expires: {new Date(c.token_expires_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-xs text-[var(--muted-foreground)]">
+                    {c.revoked_at ? "revoked" : c.last_verified_at ? "verified" : "connected"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 p-4 rounded-xl bg-[var(--background)] border border-[var(--border)] text-sm text-[var(--muted-foreground)]">
+              No GitHub admins connected yet. Click “Connect GitHub” as an org admin.
+            </div>
+          )}
         </div>
       </motion.div>
     </div>
