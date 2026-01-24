@@ -151,6 +151,17 @@ docker-compose logs -f deadline-poller
 You can also trigger deployment manually:
 - Go to Actions tab → Deploy Backend → Run workflow
 
+## GitHub Classroom (Admin Integrations)
+
+Org admins can connect a GitHub account (GitHub App web flow) at `Admin → Settings → Integrations`.
+
+Server configuration (stored in `.env` on the server):
+
+- `TOKEN_ENCRYPTION_KEY` (Fernet key) – required to store GitHub tokens securely.
+- `GITHUB_APP_CLIENT_ID`
+- `GITHUB_APP_CLIENT_SECRET`
+- `GITHUB_APP_OAUTH_REDIRECT_URL` (must match the callback URL configured in the GitHub App; points to `/api/v1/integrations/github/callback`).
+
 ## Docker Image Tags
 
 Images are tagged with:
