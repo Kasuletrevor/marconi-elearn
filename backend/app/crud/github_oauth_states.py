@@ -12,7 +12,7 @@ from app.models.github_oauth_state import GitHubOAuthState
 async def create_github_oauth_state(
     db: AsyncSession,
     *,
-    organization_id: int,
+    organization_id: int | None,
     user_id: int,
     ttl_minutes: int = 15,
 ) -> GitHubOAuthState:
@@ -57,4 +57,3 @@ async def delete_expired_github_oauth_states(db: AsyncSession) -> int:
     )
     await db.commit()
     return int(res.rowcount or 0)
-

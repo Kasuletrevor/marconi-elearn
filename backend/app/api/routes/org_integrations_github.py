@@ -92,6 +92,31 @@ async def github_disconnect(
 callback_router = APIRouter(prefix="/integrations/github", tags=["integrations"])
 
 
+@callback_router.get("/user/connect")
+async def github_user_connect_start(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> RedirectResponse:
+    try:
+        state_row = await create_github_oauth_state(db, organization_id=None, user_id=current_user.id)
+        url = build_authorize_url(state=state_row.state)
+        return RedirectResponse(url=url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    except GitHubIntegrationNotConfiguredError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@callback_router.get("/user/status")
+async def github_user_status(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    return {
+        "connected": bool(current_user.github_user_id and current_user.github_login),
+        "github_user_id": current_user.github_user_id,
+        "github_login": current_user.github_login,
+        "github_connected_at": current_user.github_connected_at,
+    }
+
+
 @callback_router.get("/callback")
 async def github_oauth_callback(
     code: str,
@@ -108,23 +133,32 @@ async def github_oauth_callback(
     try:
         token_set = await exchange_code_for_token(code=code)
         viewer = await get_viewer(access_token=token_set.access_token)
-        await upsert_org_github_admin_token(
-            db,
-            organization_id=row.organization_id,
-            user_id=row.user_id,
-            github_user_id=int(viewer["id"]),
-            github_login=str(viewer["login"]),
-            access_token=token_set.access_token,
-            refresh_token=token_set.refresh_token,
-            token_expires_at=token_set.expires_at,
-            refresh_token_expires_at=token_set.refresh_token_expires_at,
-        )
+        if row.organization_id is None:
+            current_user.github_user_id = int(viewer["id"])
+            current_user.github_login = str(viewer["login"])
+            current_user.github_connected_at = datetime.now(timezone.utc)
+            await db.commit()
+        else:
+            await upsert_org_github_admin_token(
+                db,
+                organization_id=row.organization_id,
+                user_id=row.user_id,
+                github_user_id=int(viewer["id"]),
+                github_login=str(viewer["login"]),
+                access_token=token_set.access_token,
+                refresh_token=token_set.refresh_token,
+                token_expires_at=token_set.expires_at,
+                refresh_token_expires_at=token_set.refresh_token_expires_at,
+            )
     except (GitHubIntegrationNotConfiguredError, TokenCryptoNotConfiguredError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     # Redirect back to frontend admin settings (best-effort).
     origin = (settings.cors_allow_origins.split(",")[0] or "http://localhost:3000").strip()
-    url = f"{origin}/admin/settings?org_id={row.organization_id}&github=connected"
+    if row.organization_id is None:
+        url = f"{origin}/dashboard/settings?github=connected"
+    else:
+        url = f"{origin}/admin/settings?org_id={row.organization_id}&github=connected"
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
 
 

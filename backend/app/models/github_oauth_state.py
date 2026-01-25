@@ -13,9 +13,10 @@ class GitHubOAuthState(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    organization_id: Mapped[int] = mapped_column(
+    organization_id: Mapped[int | None] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"),
         index=True,
+        nullable=True,
     )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -24,4 +25,3 @@ class GitHubOAuthState(Base):
     state: Mapped[str] = mapped_column(String(128), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-
