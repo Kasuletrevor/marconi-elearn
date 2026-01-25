@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 from app.models.course_membership import CourseRole
@@ -20,3 +22,8 @@ class CourseMembershipOut(BaseModel):
     user_id: int
     user_email: EmailStr | None = None
     role: CourseRole
+    student_number: str | None = None
+    github_user_id: int | None = None
+    github_login: str | None = None
+    github_linked_at: datetime | None = None
+    github_linked_by_user_id: int | None = None
