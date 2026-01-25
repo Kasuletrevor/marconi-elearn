@@ -1,16 +1,40 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { LogOut, Mail, Settings, User } from "lucide-react";
+import { ExternalLink, Github, LogOut, Mail, Settings, User } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { auth } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { ApiError, auth, userIntegrations } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 
 export default function StudentSettingsPage() {
   const router = useRouter();
   const { user, logout: logoutStore } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [githubLogin, setGithubLogin] = useState<string | null>(null);
+  const [githubError, setGithubError] = useState("");
+
+  async function refreshGitHubStatus() {
+    setGithubLoading(true);
+    setGithubError("");
+    try {
+      const status = await userIntegrations.getGitHubStatus();
+      setGithubConnected(status.connected);
+      setGithubLogin(status.github_login);
+    } catch (err) {
+      if (err instanceof ApiError) setGithubError(err.detail);
+      else setGithubError("Failed to load GitHub status");
+    } finally {
+      setGithubLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshGitHubStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -62,6 +86,41 @@ export default function StudentSettingsPage() {
             <LogOut className="w-4 h-4" />
             {isLoggingOut ? "Logging out..." : "Logout"}
           </button>
+        </div>
+
+        <div className="mt-6 p-4 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Github className="w-4 h-4 text-[var(--muted-foreground)]" />
+              <p className="text-sm font-semibold text-[var(--foreground)]">GitHub</p>
+            </div>
+            <button
+              onClick={refreshGitHubStatus}
+              disabled={githubLoading}
+              className="text-xs font-semibold text-[var(--secondary)] hover:underline disabled:opacity-60"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {githubError ? (
+            <p className="mt-2 text-xs text-[var(--secondary)]">{githubError}</p>
+          ) : null}
+
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm text-[var(--muted-foreground)]">
+              {githubConnected && githubLogin
+                ? `Connected as @${githubLogin}`
+                : "Not connected yet. Connect GitHub so you can link your identity to course rosters."}
+            </p>
+            <a
+              href={userIntegrations.githubConnectUrl()}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--card)]"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Connect GitHub
+            </a>
+          </div>
         </div>
 
         <div className="mt-6 p-4 rounded-xl bg-[var(--background)] border border-[var(--border)]">
