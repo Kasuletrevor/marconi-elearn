@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import {
   courseStaff,
+  staffCourseGitHub,
   staffSubmissions,
   type StaffSubmissionQueueItem,
   type MissingSubmissionsSummaryItem,
@@ -51,6 +52,7 @@ import {
   type Module,
   type Assignment,
   type CourseMembership,
+  type CourseGitHubClaim,
   type ModuleResource,
   type OrgMembership,
   type CourseMembershipCreate,
@@ -1220,6 +1222,11 @@ function RosterTab({
   const [confirmRemoveMembershipId, setConfirmRemoveMembershipId] = useState<number | null>(null);
   const [isRemovingMember, setIsRemovingMember] = useState(false);
 
+  const [pendingGitHubClaims, setPendingGitHubClaims] = useState<CourseGitHubClaim[]>([]);
+  const [isLoadingGitHubClaims, setIsLoadingGitHubClaims] = useState(false);
+  const [gitHubClaimsError, setGitHubClaimsError] = useState("");
+  const [claimActionId, setClaimActionId] = useState<number | null>(null);
+
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
   const [studentNumber, setStudentNumber] = useState("");
@@ -1242,6 +1249,24 @@ function RosterTab({
     }
     loadOrgMembers();
   }, [course.id]);
+
+  const refreshGitHubClaims = useCallback(async () => {
+    setIsLoadingGitHubClaims(true);
+    setGitHubClaimsError("");
+    try {
+      const claims = await staffCourseGitHub.listClaims(course.id, "pending");
+      setPendingGitHubClaims(claims);
+    } catch (err) {
+      if (err instanceof ApiError) setGitHubClaimsError(err.detail);
+      else setGitHubClaimsError("Failed to load GitHub linking requests");
+    } finally {
+      setIsLoadingGitHubClaims(false);
+    }
+  }, [course.id]);
+
+  useEffect(() => {
+    void refreshGitHubClaims();
+  }, [refreshGitHubClaims]);
 
   useEffect(() => {
     if (!focusImportCsvOnMount) return;
@@ -1272,6 +1297,10 @@ function RosterTab({
   const students = memberships.filter((m) => m.role === "student");
   const staffMembers = memberships.filter((m) => m.role !== "student");
 
+  const pendingClaimByMembershipId = useMemo(() => {
+    return new Map(pendingGitHubClaims.map((c) => [c.course_membership_id, c]));
+  }, [pendingGitHubClaims]);
+
   const availableOrgMembers = useMemo(() => {
     const assigned = new Set(memberships.map((m) => m.user_id));
     const q = memberSearch.trim().toLowerCase();
@@ -1292,6 +1321,41 @@ function RosterTab({
       return `${origin}/${link}`;
     });
   }, [inviteLinks]);
+
+  async function approveGitHubClaim(claim: CourseGitHubClaim) {
+    setClaimActionId(claim.id);
+    setNoticeArea("student");
+    setError("");
+    setSuccess("");
+    try {
+      await staffCourseGitHub.approveClaim(course.id, claim.id);
+      await onRefresh();
+      await refreshGitHubClaims();
+      setSuccess(`Linked GitHub account @${claim.github_login}.`);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to approve GitHub linking");
+    } finally {
+      setClaimActionId(null);
+    }
+  }
+
+  async function rejectGitHubClaim(claim: CourseGitHubClaim) {
+    setClaimActionId(claim.id);
+    setNoticeArea("student");
+    setError("");
+    setSuccess("");
+    try {
+      await staffCourseGitHub.rejectClaim(course.id, claim.id);
+      await refreshGitHubClaims();
+      setSuccess(`Rejected GitHub linking request from @${claim.github_login}.`);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to reject GitHub linking");
+    } finally {
+      setClaimActionId(null);
+    }
+  }
 
   async function toggleNotifyNewSubmissions() {
     const next = !notifyNewSubmissions;
@@ -1814,6 +1878,31 @@ function RosterTab({
             Students ({students.length})
           </h3>
         </div>
+        <div className="px-4 py-3 bg-[var(--card)] border-b border-[var(--border)] flex items-center justify-between gap-3">
+          <div className="text-xs text-[var(--muted-foreground)]">
+            GitHub linking requests:{" "}
+            <span className="font-medium text-[var(--foreground)]">{pendingGitHubClaims.length}</span>{" "}
+            pending
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshGitHubClaims()}
+            disabled={isLoadingGitHubClaims}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] disabled:opacity-60 transition-colors text-xs"
+          >
+            {isLoadingGitHubClaims ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            Refresh
+          </button>
+        </div>
+        {gitHubClaimsError && (
+          <div className="mx-4 mt-4 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
+            {gitHubClaimsError}
+          </div>
+        )}
         <div className="divide-y divide-[var(--border)]">
           {students.length === 0 ? (
             <div className="p-8 text-center">
@@ -1841,14 +1930,56 @@ function RosterTab({
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => requestRemoveMember(member.id)}
-                    className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
-                    title="Remove student"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                <div className="flex items-center gap-3">
+                  {member.github_login ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full">
+                      <LinkIcon className="w-3.5 h-3.5" />
+                      @{member.github_login}
+                    </span>
+                  ) : pendingClaimByMembershipId.has(member.id) ? (
+                    (() => {
+                      const claim = pendingClaimByMembershipId.get(member.id)!;
+                      const isBusy = claimActionId === claim.id;
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full">
+                            <LinkIcon className="w-3.5 h-3.5" />
+                            Request: @{claim.github_login}
+                          </span>
+                          <button
+                            onClick={() => void approveGitHubClaim(claim)}
+                            disabled={isBusy}
+                            className="px-2.5 py-1 text-xs font-medium bg-[var(--primary)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                          >
+                            {isBusy ? "Working..." : "Approve"}
+                          </button>
+                          <button
+                            onClick={() => void rejectGitHubClaim(claim)}
+                            disabled={isBusy}
+                            className="px-2.5 py-1 text-xs font-medium border border-[var(--border)] text-[var(--foreground)] rounded-lg hover:bg-[var(--background)] transition-colors disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[var(--background)] text-[var(--muted-foreground)] border border-[var(--border)] rounded-full">
+                      <LinkIcon className="w-3.5 h-3.5" />
+                      Not linked
+                    </span>
+                  )}
+
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => requestRemoveMember(member.id)}
+                      className="p-2 text-[var(--secondary)] hover:bg-[var(--secondary)]/10 rounded-lg transition-colors"
+                      title="Remove student"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
