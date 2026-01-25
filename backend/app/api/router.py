@@ -27,9 +27,11 @@ from app.api.routes.staff_course_resources import router as staff_course_resourc
 from app.api.routes.staff_course_submissions import router as staff_course_submissions_router
 from app.api.routes.staff_course_test_cases import router as staff_course_test_cases_router
 from app.api.routes.staff_courses import router as staff_courses_router
+from app.api.routes.staff_course_github_claims import router as staff_course_github_claims_router
 from app.api.routes.staff_missing_submissions import router as staff_missing_submissions_router
 from app.api.routes.staff_submissions import router as staff_submissions_router
 from app.api.routes.student import router as student_router
+from app.api.routes.student_github_claims import router as student_github_claims_router
 from app.api.routes.student_notifications import router as student_notifications_router
 from app.api.routes.student_resources import router as student_resources_router
 from app.api.routes.superadmin_organizations import router as superadmin_organizations_router
@@ -51,6 +53,7 @@ api_router.include_router(staff_course_invites_router, tags=["staff"])
 api_router.include_router(staff_course_org_members_router, tags=["staff"])
 api_router.include_router(staff_course_resources_router, tags=["staff"])
 api_router.include_router(staff_course_test_cases_router, tags=["staff"])
+api_router.include_router(staff_course_github_claims_router, tags=["staff"])
 api_router.include_router(staff_missing_submissions_router, tags=["staff"])
 api_router.include_router(staff_submissions_router, tags=["staff"])
 api_router.include_router(superadmin_organizations_router, tags=["superadmin"])
@@ -69,6 +72,7 @@ api_router.include_router(org_course_submissions_router, tags=["submissions"])
 api_router.include_router(org_course_memberships_router, tags=["course-memberships"])
 api_router.include_router(org_course_invites_router, tags=["invites"])
 api_router.include_router(student_router, tags=["student"])
+api_router.include_router(student_github_claims_router, tags=["student"])
 api_router.include_router(student_resources_router, tags=["student"])
 api_router.include_router(student_notifications_router, tags=["student"])
 api_router.include_router(playground_router, tags=["playground"])
