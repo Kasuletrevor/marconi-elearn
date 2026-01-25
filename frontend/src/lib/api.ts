@@ -295,6 +295,22 @@ export interface CourseMembership {
   user_email?: string | null;
   role: "owner" | "co_lecturer" | "ta" | "student";
   student_number?: string | null;
+  github_user_id?: number | null;
+  github_login?: string | null;
+  github_linked_at?: string | null;
+  github_linked_by_user_id?: number | null;
+}
+
+export interface CourseGitHubClaim {
+  id: number;
+  course_id: number;
+  course_membership_id: number;
+  github_user_id: number;
+  github_login: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  reviewed_by_user_id?: number | null;
+  reviewed_at?: string | null;
 }
 
 export interface CourseMembershipCreate {
@@ -888,6 +904,49 @@ export const userIntegrations = {
       credentials: "include",
     });
     return handleResponse(res);
+  },
+};
+
+export const studentCourseGitHub = {
+  async getClaim(courseId: number): Promise<CourseGitHubClaim | null> {
+    const res = await fetch(`${API_BASE}/api/v1/student/courses/${courseId}/github/claim`, {
+      credentials: "include",
+    });
+    return handleResponse<CourseGitHubClaim | null>(res);
+  },
+
+  async createOrUpdateClaim(courseId: number): Promise<CourseGitHubClaim> {
+    const res = await fetch(`${API_BASE}/api/v1/student/courses/${courseId}/github/claim`, {
+      method: "POST",
+      credentials: "include",
+    });
+    return handleResponse<CourseGitHubClaim>(res);
+  },
+};
+
+export const staffCourseGitHub = {
+  async listClaims(courseId: number, statusFilter?: CourseGitHubClaim["status"]): Promise<CourseGitHubClaim[]> {
+    const qs = statusFilter ? `?status_filter=${encodeURIComponent(statusFilter)}` : "";
+    const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}/github-claims${qs}`, {
+      credentials: "include",
+    });
+    return handleResponse<CourseGitHubClaim[]>(res);
+  },
+
+  async approveClaim(courseId: number, claimId: number): Promise<CourseGitHubClaim> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/github-claims/${claimId}/approve`,
+      { method: "POST", credentials: "include" }
+    );
+    return handleResponse<CourseGitHubClaim>(res);
+  },
+
+  async rejectClaim(courseId: number, claimId: number): Promise<CourseGitHubClaim> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/github-claims/${claimId}/reject`,
+      { method: "POST", credentials: "include" }
+    );
+    return handleResponse<CourseGitHubClaim>(res);
   },
 };
 

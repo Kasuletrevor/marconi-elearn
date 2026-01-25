@@ -21,10 +21,13 @@ import {
 } from "lucide-react";
 import {
   student,
+  studentCourseGitHub,
+  userIntegrations,
   type Course,
   type Module,
   type Assignment,
   type ModuleResource,
+  type CourseGitHubClaim,
   ApiError,
 } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
@@ -59,6 +62,15 @@ export default function CourseDetailPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [gitHubStatus, setGitHubStatus] = useState<{
+    connected: boolean;
+    github_user_id: number | null;
+    github_login: string | null;
+    github_connected_at: string | null;
+  } | null>(null);
+  const [courseGitHubClaim, setCourseGitHubClaim] = useState<CourseGitHubClaim | null>(null);
+  const [isRequestingGitHubClaim, setIsRequestingGitHubClaim] = useState(false);
+  const [gitHubClaimError, setGitHubClaimError] = useState("");
 
   useEffect(() => {
     async function fetchCourseData() {
@@ -79,6 +91,17 @@ export default function CourseDetailPage() {
         setCourse(courseData);
         setModules(modulesData);
         setAssignments(assignmentsData);
+
+        try {
+          const [status, claim] = await Promise.all([
+            userIntegrations.getGitHubStatus(),
+            studentCourseGitHub.getClaim(courseId),
+          ]);
+          setGitHubStatus(status);
+          setCourseGitHubClaim(claim);
+        } catch {
+          // GitHub linking is optional; don't fail the page if it can't load.
+        }
       } catch (err) {
         if (err instanceof ApiError) {
           if (err.status === 404) {
@@ -97,6 +120,20 @@ export default function CourseDetailPage() {
     }
 
     fetchCourseData();
+  }, [courseId]);
+
+  const requestGitHubLink = useCallback(async () => {
+    setIsRequestingGitHubClaim(true);
+    setGitHubClaimError("");
+    try {
+      const claim = await studentCourseGitHub.createOrUpdateClaim(courseId);
+      setCourseGitHubClaim(claim);
+    } catch (err) {
+      if (err instanceof ApiError) setGitHubClaimError(err.detail);
+      else setGitHubClaimError("Failed to request GitHub linking");
+    } finally {
+      setIsRequestingGitHubClaim(false);
+    }
   }, [courseId]);
 
   // Group assignments by module
@@ -207,6 +244,89 @@ export default function CourseDetailPage() {
           <div className="flex items-center gap-1.5">
             <FileText className="w-4 h-4" />
             <span>{assignments.length} assignments</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* GitHub linking (optional) */}
+      <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="mb-8">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+          <div className="p-4 bg-[var(--background)] border-b border-[var(--border)] flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-[family-name:var(--font-display)] font-semibold text-[var(--foreground)]">
+                GitHub (optional)
+              </h2>
+              <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                Link your GitHub account for GitHub-based submissions and Classroom workflows.
+              </p>
+            </div>
+            <div className="shrink-0">
+              {!gitHubStatus?.connected ? (
+                <a
+                  href={userIntegrations.githubConnectUrl()}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[var(--primary)] text-white rounded-xl hover:opacity-90 transition-opacity"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  Connect GitHub
+                </a>
+              ) : courseGitHubClaim?.status === "approved" ? (
+                <span className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl">
+                  Linked: @{courseGitHubClaim.github_login}
+                </span>
+              ) : courseGitHubClaim?.status === "pending" ? (
+                <span className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-xl">
+                  Pending approval
+                </span>
+              ) : (
+                <button
+                  onClick={() => void requestGitHubLink()}
+                  disabled={isRequestingGitHubClaim}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[var(--primary)] text-white rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {isRequestingGitHubClaim ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <LinkIcon className="w-4 h-4" />
+                  )}
+                  Request linking
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="p-4">
+            {!gitHubStatus ? (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                GitHub status not loaded yet.
+              </p>
+            ) : !gitHubStatus.connected ? (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Connect GitHub to claim your account for this course.
+              </p>
+            ) : courseGitHubClaim?.status === "approved" ? (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Your GitHub account is linked for this course. If you switch GitHub accounts, reconnect in Settings and request linking again.
+              </p>
+            ) : courseGitHubClaim?.status === "pending" ? (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Your request was sent to course staff. You can keep using the platform while you wait.
+              </p>
+            ) : courseGitHubClaim?.status === "rejected" ? (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Your request was rejected. Double-check you connected the correct GitHub account, then request linking again.
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Connected as <span className="font-medium text-[var(--foreground)]">@{gitHubStatus.github_login}</span>. Request linking to attach this account to the course roster.
+              </p>
+            )}
+
+            {gitHubClaimError && (
+              <div className="mt-3 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)] flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5" />
+                <span>{gitHubClaimError}</span>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
