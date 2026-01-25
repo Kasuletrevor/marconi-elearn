@@ -1,5 +1,6 @@
 from app.models.course import Course
 from app.models.course_membership import CourseMembership
+from app.models.course_github_claim import CourseGitHubClaim
 from app.models.invite_token import InviteToken
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
@@ -28,6 +29,7 @@ __all__ = [
     "AssignmentExtension",
     "AuditEvent",
     "Course",
+    "CourseGitHubClaim",
     "CourseMembership",
     "CourseNotificationPreference",
     "GitHubOAuthState",
