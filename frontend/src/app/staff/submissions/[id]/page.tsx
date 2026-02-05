@@ -31,6 +31,7 @@ import {
   type ZipContents,
   ApiError,
 } from "@/lib/api";
+import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 14 },
@@ -72,10 +73,17 @@ export default function StaffSubmissionDetailPage() {
   const [zipContents, setZipContents] = useState<ZipContents | null>(null);
   const [zipContentsError, setZipContentsError] = useState("");
   const [isZipContentsLoading, setIsZipContentsLoading] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
 
   const maxPoints = data?.max_points ?? 0;
   const submittedAt = useMemo(() => (data ? new Date(data.submitted_at) : null), [data]);
   const isZip = Boolean(data?.file_name?.toLowerCase().endsWith(".zip"));
+  const isPdfSubmission = Boolean(
+    (data?.file_name || "").toLowerCase().endsWith(".pdf") || data?.content_type?.includes("pdf")
+  );
 
   const testCaseById = useMemo(() => new Map(testCases.map((t) => [t.id, t])), [testCases]);
   const totalTestPoints = useMemo(
@@ -167,6 +175,36 @@ export default function StaffSubmissionDetailPage() {
     } catch (err) {
       if (err instanceof ApiError) setSaveError(err.detail);
       else setSaveError("Download failed");
+    }
+  }
+
+  function closePdfPreview() {
+    setIsPdfPreviewOpen(false);
+    setIsPreviewLoading(false);
+    setPreviewBlob(null);
+    setPreviewError("");
+  }
+
+  async function openPdfPreview() {
+    if (!data || !isPdfSubmission) return;
+    setIsPdfPreviewOpen(true);
+    setPreviewError("");
+    setIsPreviewLoading(true);
+    try {
+      const blob = await staffSubmissions.download(data.id);
+      const isPdf = blob.type.includes("pdf") || (data.file_name || "").toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        setPreviewBlob(null);
+        setPreviewError("Selected submission is not a PDF file.");
+        return;
+      }
+      setPreviewBlob(blob);
+    } catch (err) {
+      setPreviewBlob(null);
+      if (err instanceof ApiError) setPreviewError(err.detail);
+      else setPreviewError("Failed to load PDF preview.");
+    } finally {
+      setIsPreviewLoading(false);
     }
   }
 
@@ -386,6 +424,15 @@ export default function StaffSubmissionDetailPage() {
               <Download className="w-4 h-4" />
               Download
             </button>
+            {isPdfSubmission ? (
+              <button
+                onClick={() => void openPdfPreview()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Preview PDF
+              </button>
+            ) : null}
             <button
               disabled={isRegrading}
               onClick={handleRegrade}
@@ -722,6 +769,19 @@ export default function StaffSubmissionDetailPage() {
           </div>
         </motion.div>
       </div>
+      <PdfPreviewModal
+        isOpen={isPdfPreviewOpen}
+        onClose={closePdfPreview}
+        title="Submission PDF preview"
+        fileName={data?.file_name}
+        blob={previewBlob}
+        isLoading={isPreviewLoading}
+        error={previewError}
+        onRetry={() => {
+          void openPdfPreview();
+        }}
+        onDownload={handleDownload}
+      />
     </div>
   );
 }
