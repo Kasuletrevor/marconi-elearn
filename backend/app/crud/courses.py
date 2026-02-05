@@ -81,6 +81,8 @@ async def update_course(
     late_policy: dict | None | object = UNSET,
     self_enroll_enabled: bool | object = UNSET,
     self_enroll_code: str | None | object = UNSET,
+    github_classroom_id: int | None | object = UNSET,
+    github_classroom_name: str | None | object = UNSET,
 ) -> Course:
     if code is not UNSET:
         if code is not None:
@@ -100,6 +102,12 @@ async def update_course(
         course.self_enroll_enabled = bool(self_enroll_enabled)
     if self_enroll_code is not UNSET:
         course.self_enroll_code = self_enroll_code
+    if github_classroom_id is not UNSET:
+        course.github_classroom_id = None if github_classroom_id is None else int(github_classroom_id)
+    if github_classroom_name is not UNSET:
+        course.github_classroom_name = (
+            None if github_classroom_name is None else (str(github_classroom_name).strip() or None)
+        )
     await db.commit()
     await db.refresh(course)
     return course

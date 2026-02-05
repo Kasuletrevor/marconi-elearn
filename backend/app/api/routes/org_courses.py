@@ -107,6 +107,8 @@ async def update_course_in_org(
         )
         if "late_policy" in fields
         else UNSET,
+        github_classroom_id=payload.github_classroom_id if "github_classroom_id" in fields else UNSET,
+        github_classroom_name=payload.github_classroom_name if "github_classroom_name" in fields else UNSET,
     )
     try:
         await create_audit_event(

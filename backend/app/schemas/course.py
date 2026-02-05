@@ -32,6 +32,8 @@ class CourseUpdate(BaseModel):
     late_policy: LatePolicy | None = None
     self_enroll_enabled: bool | None = None
     regenerate_self_enroll_code: bool | None = None
+    github_classroom_id: int | None = None
+    github_classroom_name: str | None = Field(default=None, max_length=200)
 
 
 class CourseOut(BaseModel):
@@ -46,6 +48,8 @@ class CourseOut(BaseModel):
     year: int | None
     late_policy: dict | None
     self_enroll_enabled: bool
+    github_classroom_id: int | None
+    github_classroom_name: str | None
     created_at: datetime
     updated_at: datetime
 

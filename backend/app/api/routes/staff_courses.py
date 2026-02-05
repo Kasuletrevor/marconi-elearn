@@ -74,6 +74,8 @@ async def update_staff_course(
         if "late_policy" in fields
         else UNSET,
         self_enroll_enabled=payload.self_enroll_enabled if "self_enroll_enabled" in fields else UNSET,
+        github_classroom_id=payload.github_classroom_id if "github_classroom_id" in fields else UNSET,
+        github_classroom_name=payload.github_classroom_name if "github_classroom_name" in fields else UNSET,
     )
 
     if payload.regenerate_self_enroll_code:

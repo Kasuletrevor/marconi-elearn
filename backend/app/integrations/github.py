@@ -144,3 +144,30 @@ async def list_classrooms(*, access_token: str) -> list[dict[str, Any]]:
         res.raise_for_status()
         return list(res.json())
 
+
+async def list_classroom_assignments(*, access_token: str, classroom_id: int) -> list[dict[str, Any]]:
+    async with httpx.AsyncClient(timeout=20) as client:
+        res = await client.get(
+            f"https://api.github.com/classrooms/{classroom_id}/assignments",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {access_token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        res.raise_for_status()
+        return list(res.json())
+
+
+async def list_accepted_assignments(*, access_token: str, assignment_id: int) -> list[dict[str, Any]]:
+    async with httpx.AsyncClient(timeout=20) as client:
+        res = await client.get(
+            f"https://api.github.com/assignments/{assignment_id}/accepted_assignments",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {access_token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        res.raise_for_status()
+        return list(res.json())
