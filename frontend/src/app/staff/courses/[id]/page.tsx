@@ -68,6 +68,7 @@ import { useAuthStore, getCourseRole } from "@/lib/store";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
+import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { reportError } from "@/lib/reportError";
 import { PROGRAMMES, type Programme } from "@/lib/programmes";
@@ -2985,6 +2986,10 @@ function ModuleCard(
   const [confirmDeleteResourceId, setConfirmDeleteResourceId] = useState<number | null>(null);
   const [isDeletingModule, setIsDeletingModule] = useState(false);
   const [isDeletingResource, setIsDeletingResource] = useState(false);
+  const [previewResource, setPreviewResource] = useState<ModuleResource | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
 
   useEffect(() => {
     setEditTitle(module.title);
@@ -3130,6 +3135,43 @@ function ModuleCard(
       window.URL.revokeObjectURL(url);
     } catch (err) {
       reportError("Failed to download resource", err);
+    }
+  }
+
+  function isPdfResource(resource: ModuleResource) {
+    const name = (resource.file_name || "").toLowerCase();
+    return resource.kind === "file" && (name.endsWith(".pdf") || resource.content_type?.includes("pdf"));
+  }
+
+  function closePreview() {
+    setPreviewResource(null);
+    setPreviewBlob(null);
+    setPreviewError("");
+    setIsPreviewLoading(false);
+  }
+
+  async function openPdfPreview(resource: ModuleResource) {
+    if (!isPdfResource(resource)) return;
+    setPreviewResource(resource);
+    setPreviewError("");
+    setIsPreviewLoading(true);
+    try {
+      const blob = await courseStaff.downloadModuleResource(courseId, module.id, resource.id);
+      const isPdf =
+        blob.type.includes("pdf") ||
+        (resource.file_name || "").toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        setPreviewBlob(null);
+        setPreviewError("Selected file is not a PDF.");
+        return;
+      }
+      setPreviewBlob(blob);
+    } catch (err) {
+      setPreviewBlob(null);
+      if (err instanceof ApiError) setPreviewError(err.detail);
+      else setPreviewError("Failed to load PDF preview.");
+    } finally {
+      setIsPreviewLoading(false);
     }
   }
 
@@ -3446,13 +3488,24 @@ function ModuleCard(
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       ) : (
-                        <button
-                          onClick={() => handleDownload(resource)}
-                          className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
-                          title="Download file"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
+                        <>
+                          {isPdfResource(resource) ? (
+                            <button
+                              onClick={() => void openPdfPreview(resource)}
+                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
+                              title="Preview PDF"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          ) : null}
+                          <button
+                            onClick={() => handleDownload(resource)}
+                            className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
+                            title="Download file"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
 
                       {/* Delete */}
@@ -3498,6 +3551,30 @@ function ModuleCard(
         />
       )}
     </div>
+
+    <PdfPreviewModal
+      isOpen={previewResource !== null}
+      onClose={closePreview}
+      title={previewResource?.title || "PDF preview"}
+      fileName={previewResource?.file_name}
+      blob={previewBlob}
+      isLoading={isPreviewLoading}
+      error={previewError}
+      onRetry={
+        previewResource
+          ? () => {
+              void openPdfPreview(previewResource);
+            }
+          : undefined
+      }
+      onDownload={
+        previewResource
+          ? () => {
+              void handleDownload(previewResource);
+            }
+          : undefined
+      }
+    />
 
     <ConfirmModal
       isOpen={showDeleteModuleConfirm}
