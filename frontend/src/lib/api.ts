@@ -38,6 +38,8 @@ export interface Course {
   late_policy?: LatePolicy | null;
   self_enroll_enabled: boolean;
   self_enroll_code?: string | null;
+  github_classroom_id?: number | null;
+  github_classroom_name?: string | null;
   organization_id: number;
   created_at: string;
   updated_at: string;
@@ -252,6 +254,8 @@ export interface CourseUpdate {
   late_policy?: LatePolicy | null;
   self_enroll_enabled?: boolean | null;
   regenerate_self_enroll_code?: boolean | null;
+  github_classroom_id?: number | null;
+  github_classroom_name?: string | null;
 }
 
 export interface ModuleCreate {
@@ -311,6 +315,42 @@ export interface CourseGitHubClaim {
   created_at: string;
   reviewed_by_user_id?: number | null;
   reviewed_at?: string | null;
+}
+
+export interface GitHubClassroom {
+  id: number;
+  name: string;
+  archived_at?: string | null;
+}
+
+export interface GitHubClassroomAssignment {
+  id: number;
+  title: string;
+  invite_link?: string | null;
+  deadline?: string | null;
+}
+
+export interface GitHubMissingLinkStudent {
+  membership_id: number;
+  user_id: number;
+  user_email?: string | null;
+  student_number?: string | null;
+}
+
+export interface GitHubRosterSync {
+  course_id: number;
+  bound_classroom_id?: number | null;
+  bound_classroom_name?: string | null;
+  selected_classroom_id?: number | null;
+  selected_assignment_id?: number | null;
+  classrooms: GitHubClassroom[];
+  assignments: GitHubClassroomAssignment[];
+  linked_students_total: number;
+  accepted_students_total: number;
+  matched_logins: string[];
+  missing_logins: string[];
+  extra_logins: string[];
+  missing_github_students: GitHubMissingLinkStudent[];
 }
 
 export interface CourseMembershipCreate {
@@ -925,6 +965,28 @@ export const studentCourseGitHub = {
 };
 
 export const staffCourseGitHub = {
+  async listClassrooms(courseId: number): Promise<GitHubClassroom[]> {
+    const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}/github/classrooms`, {
+      credentials: "include",
+    });
+    return handleResponse<GitHubClassroom[]>(res);
+  },
+
+  async getRosterSync(
+    courseId: number,
+    opts?: { classroom_id?: number; assignment_id?: number }
+  ): Promise<GitHubRosterSync> {
+    const query = new URLSearchParams();
+    if (opts?.classroom_id !== undefined) query.set("classroom_id", String(opts.classroom_id));
+    if (opts?.assignment_id !== undefined) query.set("assignment_id", String(opts.assignment_id));
+    const qs = query.toString();
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/github/roster-sync${qs ? `?${qs}` : ""}`,
+      { credentials: "include" }
+    );
+    return handleResponse<GitHubRosterSync>(res);
+  },
+
   async listClaims(courseId: number, statusFilter?: CourseGitHubClaim["status"]): Promise<CourseGitHubClaim[]> {
     const qs = statusFilter ? `?status_filter=${encodeURIComponent(statusFilter)}` : "";
     const res = await fetch(`${API_BASE}/api/v1/staff/courses/${courseId}/github-claims${qs}`, {
