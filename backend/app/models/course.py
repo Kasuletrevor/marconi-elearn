@@ -25,6 +25,8 @@ class Course(Base):
         default=None,
         unique=True,
     )
+    github_classroom_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    github_classroom_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
