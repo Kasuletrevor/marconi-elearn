@@ -53,6 +53,9 @@ import {
   type Assignment,
   type CourseMembership,
   type CourseGitHubClaim,
+  type GitHubClassroom,
+  type GitHubClassroomAssignment,
+  type GitHubRosterSync,
   type ModuleResource,
   type OrgMembership,
   type CourseMembershipCreate,
@@ -1226,6 +1229,17 @@ function RosterTab({
   const [isLoadingGitHubClaims, setIsLoadingGitHubClaims] = useState(false);
   const [gitHubClaimsError, setGitHubClaimsError] = useState("");
   const [claimActionId, setClaimActionId] = useState<number | null>(null);
+  const [classrooms, setClassrooms] = useState<GitHubClassroom[]>([]);
+  const [isLoadingClassrooms, setIsLoadingClassrooms] = useState(false);
+  const [githubClassroomsError, setGithubClassroomsError] = useState("");
+  const [selectedClassroomId, setSelectedClassroomId] = useState<number | null>(
+    course.github_classroom_id ?? null
+  );
+  const [isSavingClassroomBinding, setIsSavingClassroomBinding] = useState(false);
+  const [selectedGitHubAssignmentId, setSelectedGitHubAssignmentId] = useState<number | null>(null);
+  const [isRunningRosterSync, setIsRunningRosterSync] = useState(false);
+  const [rosterSync, setRosterSync] = useState<GitHubRosterSync | null>(null);
+  const [githubAssignments, setGithubAssignments] = useState<GitHubClassroomAssignment[]>([]);
 
   const [studentEmail, setStudentEmail] = useState("");
   const [studentName, setStudentName] = useState("");
@@ -1250,6 +1264,10 @@ function RosterTab({
     loadOrgMembers();
   }, [course.id]);
 
+  useEffect(() => {
+    setSelectedClassroomId(course.github_classroom_id ?? null);
+  }, [course.github_classroom_id]);
+
   const refreshGitHubClaims = useCallback(async () => {
     setIsLoadingGitHubClaims(true);
     setGitHubClaimsError("");
@@ -1267,6 +1285,24 @@ function RosterTab({
   useEffect(() => {
     void refreshGitHubClaims();
   }, [refreshGitHubClaims]);
+
+  const refreshGitHubClassrooms = useCallback(async () => {
+    setIsLoadingClassrooms(true);
+    setGithubClassroomsError("");
+    try {
+      const data = await staffCourseGitHub.listClassrooms(course.id);
+      setClassrooms(data);
+    } catch (err) {
+      if (err instanceof ApiError) setGithubClassroomsError(err.detail);
+      else setGithubClassroomsError("Failed to load GitHub classrooms");
+    } finally {
+      setIsLoadingClassrooms(false);
+    }
+  }, [course.id]);
+
+  useEffect(() => {
+    void refreshGitHubClassrooms();
+  }, [refreshGitHubClassrooms]);
 
   useEffect(() => {
     if (!focusImportCsvOnMount) return;
@@ -1356,6 +1392,75 @@ function RosterTab({
       setClaimActionId(null);
     }
   }
+
+  async function saveGitHubClassroomBinding() {
+    setIsSavingClassroomBinding(true);
+    setNoticeArea("student");
+    setError("");
+    setSuccess("");
+    try {
+      const selected = selectedClassroomId
+        ? classrooms.find((item) => item.id === selectedClassroomId) ?? null
+        : null;
+      await courseStaff.updateCourse(course.id, {
+        github_classroom_id: selected?.id ?? null,
+        github_classroom_name: selected?.name ?? null,
+      });
+      await onRefresh();
+      setSuccess(selected ? `Bound to GitHub Classroom: ${selected.name}.` : "GitHub Classroom binding cleared.");
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to save classroom binding");
+    } finally {
+      setIsSavingClassroomBinding(false);
+    }
+  }
+
+  async function runGitHubRosterSync() {
+    setIsRunningRosterSync(true);
+    setNoticeArea("student");
+    setError("");
+    setSuccess("");
+    try {
+      const result = await staffCourseGitHub.getRosterSync(course.id, {
+        classroom_id: selectedClassroomId ?? undefined,
+        assignment_id: selectedGitHubAssignmentId ?? undefined,
+      });
+      setRosterSync(result);
+      setGithubAssignments(result.assignments);
+      setSuccess("GitHub roster sync check updated.");
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.detail);
+      else setError("Failed to run GitHub roster sync");
+    } finally {
+      setIsRunningRosterSync(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedClassroomId) {
+      setGithubAssignments([]);
+      setSelectedGitHubAssignmentId(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadAssignments() {
+      try {
+        const result = await staffCourseGitHub.getRosterSync(course.id, {
+          classroom_id: selectedClassroomId ?? undefined,
+        });
+        if (cancelled) return;
+        setGithubAssignments(result.assignments);
+        setRosterSync(result);
+      } catch {
+        // Assignment options are optional pre-check data.
+      }
+    }
+    void loadAssignments();
+    return () => {
+      cancelled = true;
+    };
+  }, [course.id, selectedClassroomId]);
 
   async function toggleNotifyNewSubmissions() {
     const next = !notifyNewSubmissions;
@@ -1869,6 +1974,151 @@ function RosterTab({
             </p>
           </div>
         </div>
+      </div>
+
+      {/* GitHub Classroom Sync */} 
+      <div className="order-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-medium text-[var(--foreground)] mb-1">GitHub Classroom sync</h3>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Bind this course to a GitHub Classroom and compare linked student logins with accepted assignments.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshGitHubClassrooms()}
+            disabled={isLoadingClassrooms}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] disabled:opacity-60 transition-colors text-xs"
+          >
+            {isLoadingClassrooms ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Refresh classrooms
+          </button>
+        </div>
+
+        {githubClassroomsError && (
+          <div className="mb-4 p-3 bg-[var(--secondary)]/10 border border-[var(--secondary)]/20 rounded-xl text-sm text-[var(--secondary)]">
+            {githubClassroomsError}
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-12 gap-3 items-end">
+          <div className="md:col-span-8">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Classroom
+            </label>
+            <select
+              value={selectedClassroomId ?? ""}
+              onChange={(e) => setSelectedClassroomId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)]"
+            >
+              <option value="">Not bound</option>
+              {classrooms.map((classroom) => (
+                <option key={classroom.id} value={classroom.id}>
+                  {classroom.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-4">
+            <button
+              type="button"
+              onClick={() => void saveGitHubClassroomBinding()}
+              disabled={isSavingClassroomBinding}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 transition-colors"
+            >
+              {isSavingClassroomBinding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save binding
+            </button>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-12 gap-3 items-end mt-4">
+          <div className="md:col-span-8">
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+              Assignment (for accepted-student check)
+            </label>
+            <select
+              value={selectedGitHubAssignmentId ?? ""}
+              onChange={(e) => setSelectedGitHubAssignmentId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)]"
+              disabled={!selectedClassroomId}
+            >
+              <option value="">No assignment selected</option>
+              {githubAssignments.map((assignment) => (
+                <option key={assignment.id} value={assignment.id}>
+                  {assignment.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-4">
+            <button
+              type="button"
+              onClick={() => void runGitHubRosterSync()}
+              disabled={isRunningRosterSync || !selectedClassroomId}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] disabled:opacity-60 transition-colors"
+            >
+              {isRunningRosterSync ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Run sync check
+            </button>
+          </div>
+        </div>
+
+        {rosterSync && (
+          <div className="mt-4 p-4 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">Linked</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">{rosterSync.linked_students_total}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">Accepted</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">{rosterSync.accepted_students_total}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">Missing</p>
+                <p className="text-lg font-semibold text-[var(--secondary)]">{rosterSync.missing_logins.length}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">Unlinked</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">{rosterSync.missing_github_students.length}</p>
+              </div>
+            </div>
+
+            {rosterSync.assignments.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-[var(--muted-foreground)]">Assignment invite links</p>
+                <div className="space-y-2">
+                  {rosterSync.assignments.slice(0, 6).map((assignment) => (
+                    <div key={assignment.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                      <div className="min-w-0">
+                        <p className="text-sm text-[var(--foreground)] truncate">{assignment.title}</p>
+                        {assignment.deadline && (
+                          <p className="text-[10px] text-[var(--muted-foreground)]">
+                            deadline: {new Date(assignment.deadline).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      {assignment.invite_link ? (
+                        <a
+                          href={assignment.invite_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-[var(--border)] rounded-lg hover:bg-[var(--background)]"
+                        >
+                          Open invite
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-[var(--muted-foreground)]">No invite link</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Student List */}
