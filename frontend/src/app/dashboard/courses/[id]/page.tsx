@@ -31,6 +31,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
+import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -421,6 +422,10 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
   const [resources, setResources] = useState<ModuleResource[]>([]);
   const [isLoadingResources, setIsLoadingResources] = useState(false);
   const [resourcesLoaded, setResourcesLoaded] = useState(false);
+  const [previewResource, setPreviewResource] = useState<ModuleResource | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
 
   const fetchResources = useCallback(async () => {
     setIsLoadingResources(true);
@@ -457,6 +462,43 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       reportError("Failed to download resource", err);
+    }
+  }
+
+  function isPdfResource(resource: ModuleResource) {
+    const name = (resource.file_name || "").toLowerCase();
+    return resource.kind === "file" && (name.endsWith(".pdf") || resource.content_type?.includes("pdf"));
+  }
+
+  function closePreview() {
+    setPreviewResource(null);
+    setPreviewBlob(null);
+    setPreviewError("");
+    setIsPreviewLoading(false);
+  }
+
+  async function openPdfPreview(resource: ModuleResource) {
+    if (!isPdfResource(resource)) return;
+    setPreviewResource(resource);
+    setPreviewError("");
+    setIsPreviewLoading(true);
+    try {
+      const blob = await student.downloadResource(resource.id);
+      const isPdf =
+        blob.type.includes("pdf") ||
+        (resource.file_name || "").toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        setPreviewBlob(null);
+        setPreviewError("Selected file is not a PDF.");
+        return;
+      }
+      setPreviewBlob(blob);
+    } catch (err) {
+      setPreviewBlob(null);
+      if (err instanceof ApiError) setPreviewError(err.detail);
+      else setPreviewError("Failed to load PDF preview.");
+    } finally {
+      setIsPreviewLoading(false);
     }
   }
 
@@ -564,13 +606,24 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
                           Open
                         </a>
                       ) : (
-                        <button
-                          onClick={() => handleDownload(resource)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-lg transition-colors"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Download
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {isPdfResource(resource) ? (
+                            <button
+                              onClick={() => void openPdfPreview(resource)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] rounded-lg transition-colors"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Preview
+                            </button>
+                          ) : null}
+                          <button
+                            onClick={() => handleDownload(resource)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-lg transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -612,6 +665,29 @@ function ModuleCard({ module, courseId }: ModuleCardProps) {
           </div>
         )}
       </div>
+      <PdfPreviewModal
+        isOpen={previewResource !== null}
+        onClose={closePreview}
+        title={previewResource?.title || "PDF preview"}
+        fileName={previewResource?.file_name}
+        blob={previewBlob}
+        isLoading={isPreviewLoading}
+        error={previewError}
+        onRetry={
+          previewResource
+            ? () => {
+                void openPdfPreview(previewResource);
+              }
+            : undefined
+        }
+        onDownload={
+          previewResource
+            ? () => {
+                void handleDownload(previewResource);
+              }
+            : undefined
+        }
+      />
     </motion.div>
   );
 }
