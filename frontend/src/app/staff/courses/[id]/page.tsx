@@ -155,10 +155,10 @@ export default function StaffCoursePage() {
 
   const tabs: { id: TabType; label: string; icon: typeof BookOpen }[] = [
     { id: "overview", label: "Overview", icon: BookOpen },
+    { id: "modules", label: "Modules", icon: FolderOpen },
+    { id: "assignments", label: "Assignments", icon: FileText },
     { id: "submissions", label: "Submissions", icon: FileText },
     { id: "roster", label: "Roster", icon: Users },
-    { id: "assignments", label: "Assignments", icon: FileText },
-    { id: "modules", label: "Modules", icon: FolderOpen },
   ];
 
   if (isLoading) {
@@ -1715,6 +1715,7 @@ function RosterTab({
             <select
               value={selectedUserId ?? ""}
               onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               disabled={isLoadingOrg}
             >
@@ -1833,6 +1834,9 @@ function RosterTab({
             <p className="text-xs text-[var(--muted-foreground)]">
               Students are enrolled via invites. Use roster import (CSV) or invite a student by email with their profile details.
             </p>
+            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+              CSV columns: <code>email,name,student_number,programme</code>
+            </p>
           </div>
           <input
             type="file"
@@ -1851,6 +1855,14 @@ function RosterTab({
             {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             Import CSV
           </button>
+          <a
+            href="/templates/roster-template.csv"
+            download
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] transition-colors text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Download template
+          </a>
         </div>
 
         {noticeArea === "student" && error && (
@@ -1909,6 +1921,7 @@ function RosterTab({
               value={studentEmail}
               onChange={(e) => setStudentEmail(e.target.value)}
               placeholder="student@example.com"
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
             />
           </div>
@@ -1920,6 +1933,7 @@ function RosterTab({
               value={studentName}
               onChange={(e) => setStudentName(e.target.value)}
               placeholder="Jane Doe"
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
             />
           </div>
@@ -1931,6 +1945,7 @@ function RosterTab({
               value={studentNumber}
               onChange={(e) => setStudentNumber(e.target.value)}
               placeholder="2100714449"
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
             />
           </div>
@@ -1944,6 +1959,7 @@ function RosterTab({
                 const value = e.target.value;
                 setStudentProgramme(value ? (value as Programme) : "");
               }}
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
             >
               <option value="">Select programme...</option>
@@ -2467,6 +2483,7 @@ function AssignmentsTab({
                     {createError}
                   </div>
                 )}
+                <p className="required-hint">* Required fields</p>
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
@@ -2477,6 +2494,7 @@ function AssignmentsTab({
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                       placeholder="e.g. Assignment 1: Hello World"
+                      required
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
                   </div>
@@ -2524,6 +2542,7 @@ function AssignmentsTab({
                       value={newMaxPoints}
                       min={0}
                       onChange={(e) => setNewMaxPoints(Number(e.target.value))}
+                      required
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
                   </div>
@@ -2549,6 +2568,7 @@ function AssignmentsTab({
                       onChange={(e) =>
                         setNewAutogradeMode(e.target.value as "practice_only" | "final_only" | "hybrid")
                       }
+                      required
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     >
                       <option value="practice_only">Practice only (grade on submit)</option>
@@ -2879,6 +2899,7 @@ function ModulesTab({
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder="e.g. Week 1: Basics"
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
@@ -2889,6 +2910,7 @@ function ModulesTab({
                     type="number"
                     value={newPosition}
                     onChange={(e) => setNewPosition(Number(e.target.value))}
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                   <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">Suggested next position: {nextPosition}</p>
@@ -3315,6 +3337,7 @@ function ModuleCard(
                   <input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
@@ -3325,6 +3348,7 @@ function ModuleCard(
                     type="number"
                     value={editPosition}
                     onChange={(e) => setEditPosition(Number(e.target.value))}
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
