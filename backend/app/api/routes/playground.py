@@ -7,11 +7,16 @@ from httpx import HTTPStatusError
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.jobe import get_jobe_client
+from app.api.deps.rate_limit import make_rate_limit_dependency
 from app.core.config import settings
 from app.integrations.jobe import JobeClient, JobeError
 from app.schemas.playground import PlaygroundLanguage, PlaygroundRunRequest, PlaygroundRunResponse
 
 router = APIRouter(prefix="/playground", dependencies=[Depends(get_current_user)])
+execution_rate_limit = make_rate_limit_dependency(
+    bucket="playground.run",
+    limit=settings.rate_limit_execution_per_minute,
+)
 
 
 def _allowed_language_ids() -> set[str]:
@@ -42,6 +47,7 @@ async def list_languages(
 @router.post("/run", response_model=PlaygroundRunResponse)
 async def run_code(
     payload: PlaygroundRunRequest,
+    _rate_limit: Annotated[None, Depends(execution_rate_limit)],
     jobe: Annotated[JobeClient, Depends(get_jobe_client)],
 ) -> PlaygroundRunResponse:
     allowed = _allowed_language_ids()

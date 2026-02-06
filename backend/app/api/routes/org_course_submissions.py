@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.course_permissions import require_course_staff, require_course_student_or_staff
+from app.api.deps.rate_limit import make_rate_limit_dependency
 from app.core.config import settings
 from app.crud.assignments import get_assignment
 from app.crud.courses import get_course
@@ -23,6 +24,10 @@ from app.worker.enqueue import enqueue_grading
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orgs/{org_id}/courses/{course_id}/assignments/{assignment_id}/submissions")
+submission_upload_rate_limit = make_rate_limit_dependency(
+    bucket="org.submission.upload",
+    limit=settings.rate_limit_uploads_per_minute,
+)
 
 _ALLOWED_EXTENSIONS = {".c", ".cpp", ".zip"}
 _MAX_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -68,6 +73,7 @@ async def upload_submission(
     course_id: int,
     assignment_id: int,
     file: Annotated[UploadFile, File()],
+    _rate_limit: Annotated[None, Depends(submission_upload_rate_limit)],
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> SubmissionOut:

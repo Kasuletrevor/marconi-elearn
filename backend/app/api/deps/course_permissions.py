@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
+from app.api.deps.superadmin import is_superadmin
 from app.db.deps import get_db
 from app.models.course_membership import CourseMembership, CourseRole
 from app.models.user import User
@@ -15,7 +16,7 @@ async def require_course_staff(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    if getattr(current_user, "is_superadmin", False):
+    if is_superadmin(current_user):
         return
     result = await db.execute(
         select(CourseMembership).where(
@@ -34,7 +35,7 @@ async def require_course_instructor(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    if getattr(current_user, "is_superadmin", False):
+    if is_superadmin(current_user):
         return
     result = await db.execute(
         select(CourseMembership).where(
@@ -56,7 +57,7 @@ async def require_course_student_or_staff(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CourseRole:
-    if getattr(current_user, "is_superadmin", False):
+    if is_superadmin(current_user):
         return CourseRole.owner
     result = await db.execute(
         select(CourseMembership).where(

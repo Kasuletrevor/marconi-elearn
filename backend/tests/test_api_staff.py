@@ -1,4 +1,7 @@
 import pytest
+from sqlalchemy import delete
+
+from app.models.course_membership import CourseMembership
 
 
 @pytest.mark.asyncio
@@ -141,3 +144,34 @@ async def test_staff_endpoints_reject_students(client):
     # Course management endpoints should be forbidden
     r = await client.get(f"/api/v1/staff/courses/{course_id}")
     assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_superadmin_bypasses_course_staff_membership(client, db):
+    # Superadmin can reach staff routes even without course membership.
+    r = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "password123"})
+    assert r.status_code == 200
+    admin_user_id = r.json()["id"]
+
+    r = await client.post("/api/v1/orgs", json={"name": "Bypass Org"})
+    assert r.status_code == 201
+    org_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/courses",
+        json={"code": "SYS401", "title": "Systems"},
+    )
+    assert r.status_code == 201
+    course_id = r.json()["id"]
+
+    await db.execute(
+        delete(CourseMembership).where(
+            CourseMembership.course_id == course_id,
+            CourseMembership.user_id == admin_user_id,
+        )
+    )
+    await db.commit()
+
+    # Should still be able to access staff course routes through superadmin bypass.
+    r = await client.get(f"/api/v1/staff/courses/{course_id}")
+    assert r.status_code == 200

@@ -27,6 +27,9 @@ os.environ["SUPERADMIN_PASSWORD"] = "password123"
 os.environ["JOBE_ALLOWED_LANGUAGES"] = "c,cpp"
 # Avoid external services during tests.
 os.environ["REDIS_URL"] = ""
+os.environ["RATE_LIMIT_LOGIN_PER_MINUTE"] = "100000"
+os.environ["RATE_LIMIT_EXECUTION_PER_MINUTE"] = "100000"
+os.environ["RATE_LIMIT_UPLOADS_PER_MINUTE"] = "100000"
 
 from app.main import app  # noqa: E402
 
