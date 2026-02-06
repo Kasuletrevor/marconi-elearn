@@ -496,6 +496,7 @@ export default function StaffAssignmentDetailPage() {
                         <input
                           value={draftName}
                           onChange={(e) => setDraftName(e.target.value)}
+                          required
                           className="w-full px-3 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                           placeholder="e.g., Sample #1"
                         />
@@ -508,6 +509,7 @@ export default function StaffAssignmentDetailPage() {
                           value={draftPoints}
                           onChange={(e) => setDraftPoints(e.target.value)}
                           inputMode="numeric"
+                          required
                           className="w-full px-3 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                           placeholder="e.g., 10"
                         />
