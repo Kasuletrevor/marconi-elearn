@@ -33,6 +33,11 @@ async def test_csv_import_creates_invites_and_accept_enrolls_student(client, db)
     assert body["auto_enrolled"] == 0
     assert len(body["invite_links"]) == 1
     assert len(body["issues"]) == 1
+    assert body["issues"][0]["reason"] == "invalid_email"
+    assert body["issues"][0]["row_number"] == 3
+    assert body["issues"][0]["full_name"] == "No Name"
+    assert body["issues"][0]["student_number"] == "ST002"
+    assert body["issues"][0]["programme"] == "BCS"
 
     token = body["invite_links"][0].split("/invite/")[1]
 
@@ -89,3 +94,30 @@ async def test_csv_import_auto_enrolls_activated_user(client):
     assert body["created_invites"] == 0
     assert body["auto_enrolled"] == 1
     assert body["invite_links"] == []
+
+
+@pytest.mark.asyncio
+async def test_csv_import_accepts_case_insensitive_headers(client):
+    await _login_admin(client)
+    r = await client.post("/api/v1/orgs", json={"name": "Org A"})
+    org_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/courses",
+        json={"code": "CS101", "title": "Intro", "description": None},
+    )
+    course_id = r.json()["id"]
+
+    csv_bytes = BytesIO(
+        b"Email,Name,Student_Number,Programme\n"
+        b"case@example.com,Case Student,ST200,BCS\n"
+    )
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/courses/{course_id}/invites/import-csv",
+        files={"file": ("roster.csv", csv_bytes, "text/csv")},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["created_invites"] == 1
+    assert body["auto_enrolled"] == 0
+    assert body["issues"] == []
