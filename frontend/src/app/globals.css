@@ -121,6 +121,24 @@ html {
   color: var(--primary-foreground);
 }
 
+/* Required field indicator */
+label.required-label::after,
+label:has(+ input[required])::after,
+label:has(+ textarea[required])::after,
+label:has(+ select[required])::after,
+label:has(+ div input[required])::after,
+label:has(+ div textarea[required])::after,
+label:has(+ div select[required])::after {
+  content: " *";
+  color: var(--secondary);
+  font-weight: 700;
+}
+
+.required-hint {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
 /* Noise texture overlay */
 .noise {
   position: fixed;
