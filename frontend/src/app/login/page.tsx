@@ -4,7 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { GraduationCap, Mail, Lock, ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
+import {
+  GraduationCap,
+  Mail,
+  Lock,
+  ArrowRight,
+  Loader2,
+  Eye,
+  EyeOff,
+  Code2,
+  Users,
+  CheckCircle2,
+  Clock3,
+} from "lucide-react";
 import { auth, ApiError } from "@/lib/api";
 import { useAuthStore, getRedirectPath } from "@/lib/store";
 
@@ -20,6 +32,14 @@ const staggerContainer = {
     transition: { staggerChildren: 0.1, delayChildren: 0.1 },
   },
 };
+
+const loginCodePreview = [
+  "#include <iostream>",
+  "int main() {",
+  "  std::cout << \"Marconi\";",
+  "  return 0;",
+  "}",
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -54,11 +74,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[var(--background)] flex">
       {/* Left Panel - Decorative */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[var(--primary)] relative overflow-hidden">
+      <div className="relative hidden overflow-hidden bg-gradient-to-br from-[var(--primary)] via-[#11487E] to-[#0A2B4A] lg:flex lg:w-1/2">
         {/* Decorative elements */}
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 -left-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-[var(--secondary)]/10 rounded-full blur-3xl" />
+          <div className="absolute -left-20 top-1/4 h-80 w-80 rounded-full bg-white/5 blur-3xl" />
+          <div className="absolute -right-20 bottom-1/4 h-96 w-96 rounded-full bg-[var(--secondary)]/20 blur-3xl" />
           <div
             className="absolute inset-0 opacity-5"
             style={{
@@ -92,9 +112,56 @@ export default function LoginPage() {
             </h1>
 
             <p className="text-white/60 text-lg max-w-md">
-              Access your courses, submit assignments, and track your progress
-              in one unified platform.
+              Students move faster with clear submission feedback, while staff
+              runs consistent assignment-level grading and review.
             </p>
+
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-white/20 bg-white/10 p-3">
+                <p className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-white/70">
+                  <Code2 className="h-3.5 w-3.5" />
+                  Student Flow
+                </p>
+                <p className="text-sm text-white">Submit -&gt; grade -&gt; improve</p>
+              </div>
+              <div className="rounded-lg border border-white/20 bg-white/10 p-3">
+                <p className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-white/70">
+                  <Users className="h-3.5 w-3.5" />
+                  Staff Flow
+                </p>
+                <p className="text-sm text-white">Assign -&gt; test -&gt; review</p>
+              </div>
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.3 }}
+              className="mt-6 rounded-xl border border-white/20 bg-[#081726]/70 p-4"
+            >
+              <div className="mb-3 flex items-center justify-between text-xs text-white/70">
+                <span className="font-semibold uppercase tracking-wide">Grading preview</span>
+                <span className="rounded bg-white/10 px-2 py-1">SUB-4821</span>
+              </div>
+              <pre className="rounded-lg border border-white/10 bg-[#0B1F31] p-3 text-[11px] leading-5 text-slate-200">
+                {loginCodePreview.map((line, idx) => (
+                  <div key={`${line}-${idx}`} className="font-[family-name:var(--font-mono)]">
+                    <span className="mr-2 select-none text-slate-500">{String(idx + 1).padStart(2, "0")}</span>
+                    {line}
+                  </div>
+                ))}
+              </pre>
+              <div className="mt-3 flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs text-white/80">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                  test_io_format
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5 text-amber-300" />
+                  queue 12s
+                </span>
+              </div>
+            </motion.div>
           </motion.div>
         </div>
       </div>
