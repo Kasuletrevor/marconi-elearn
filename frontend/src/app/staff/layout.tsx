@@ -172,6 +172,52 @@ interface SidebarContentProps {
   onClose?: () => void;
 }
 
+function toCourseRoleLabel(role: UserType["course_roles"][number]["role"]): string {
+  switch (role) {
+    case "owner":
+    case "co_lecturer":
+      return "Lecturer";
+    case "ta":
+      return "TA";
+    case "student":
+      return "Student";
+    default:
+      return "Staff";
+  }
+}
+
+function getStaffRoleLabel(user: UserType | null, pathname: string): string {
+  if (!user) return "Staff";
+
+  const courseMatch = pathname.match(/^\/staff\/courses\/(\d+)/);
+  if (courseMatch) {
+    const courseId = Number(courseMatch[1]);
+    const courseRole = user.course_roles.find((entry) => entry.course_id === courseId)?.role;
+    if (courseRole) {
+      return toCourseRoleLabel(courseRole);
+    }
+  }
+
+  if (user.course_roles.some((entry) => entry.role === "owner" || entry.role === "co_lecturer")) {
+    return "Lecturer";
+  }
+  if (user.course_roles.some((entry) => entry.role === "ta")) {
+    return "TA";
+  }
+
+  if (user.org_roles.some((entry) => entry.role === "lecturer")) {
+    return "Lecturer";
+  }
+  if (user.org_roles.some((entry) => entry.role === "ta")) {
+    return "TA";
+  }
+  if (user.org_roles.some((entry) => entry.role === "admin")) {
+    return "Org Admin";
+  }
+
+  return "Staff";
+}
+
 function SidebarContent({
   pathname,
   user,
@@ -182,6 +228,7 @@ function SidebarContent({
 }: SidebarContentProps) {
   const router = useRouter();
   const { enterStudentView } = useAuthStore();
+  const roleLabel = getStaffRoleLabel(user, pathname);
   const [coursesExpanded, setCoursesExpanded] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
@@ -222,7 +269,7 @@ function SidebarContent({
               Marconi
             </span>
             <span className="text-xs text-[var(--muted-foreground)]">
-              Course Staff
+              {roleLabel}
             </span>
           </div>
         </Link>
@@ -347,7 +394,7 @@ function SidebarContent({
             <p className="text-sm font-medium text-[var(--foreground)] truncate">
               {user?.email || "Loading..."}
             </p>
-            <p className="text-xs text-[var(--muted-foreground)]">Course Staff</p>
+            <p className="text-xs text-[var(--muted-foreground)]">{roleLabel}</p>
           </div>
         </div>
         <button
