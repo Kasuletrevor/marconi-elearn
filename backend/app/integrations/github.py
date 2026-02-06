@@ -37,7 +37,7 @@ def build_authorize_url(*, state: str) -> str:
         "redirect_uri": settings.github_app_oauth_redirect_url,
         "state": state,
     }
-    return str(httpx.URL("https://github.com/login/oauth/authorize").copy_add_params(params))
+    return str(httpx.URL("https://github.com/login/oauth/authorize").copy_merge_params(params))
 
 
 async def exchange_code_for_token(*, code: str) -> GitHubTokenSet:
