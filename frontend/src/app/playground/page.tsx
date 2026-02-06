@@ -182,8 +182,8 @@ export default function PlaygroundPage() {
         </div>
 
         {/* Output Column */}
-        <div className="flex flex-col h-full bg-[#1e1e1e] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm text-white">
-          <div className="px-4 py-2 border-b border-white/10 bg-[#252526] flex items-center gap-2">
+        <div className="flex flex-col h-full bg-[var(--code-surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm text-[var(--code-foreground)]">
+          <div className="px-4 py-2 border-b border-white/10 bg-[var(--code-surface-alt)] flex items-center gap-2">
             <Terminal className="w-4 h-4 text-[var(--muted-foreground)]" />
             <span className="text-xs font-medium text-[var(--muted-foreground)]">Output</span>
           </div>

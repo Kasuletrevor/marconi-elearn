@@ -53,14 +53,14 @@ const statusConfig: Record<
 > = {
   pending: {
     label: "Pending",
-    color: "text-amber-600",
-    bgColor: "bg-amber-500/10",
+    color: "text-[var(--warning)]",
+    bgColor: "bg-[var(--warning)]/10",
     icon: Clock,
   },
   grading: {
     label: "Grading",
-    color: "text-blue-600",
-    bgColor: "bg-blue-500/10",
+    color: "text-[var(--info)]",
+    bgColor: "bg-[var(--info)]/10",
     icon: RefreshCw,
   },
   graded: {
@@ -599,7 +599,7 @@ function SubmissionCard({
     },
     infra_error: {
       label: "Infra issue",
-      className: "bg-amber-500/10 text-amber-700",
+      className: "bg-[var(--warning)]/10 text-[var(--warning)]",
       hint: "Platform issue. Retry later or contact course staff.",
     },
     internal_error: {

@@ -38,9 +38,16 @@
   --ring: #15508B;
 
   /* Status colors */
+  --info: #1F5E99;
   --success: #14804A;
   --warning: #B76A00;
   --destructive: #C43D2F;
+
+  /* Code surfaces */
+  --code-surface: #0A1B2E;
+  --code-surface-alt: #10253A;
+  --code-foreground: #D7E4F4;
+  --code-line-number: #6E8194;
 }
 
 /* Tailwind v4 theme configuration */
@@ -68,6 +75,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-destructive: var(--destructive);
+  --color-info: var(--info);
 
   /* Typography */
   --font-display: var(--font-playfair), Georgia, serif;

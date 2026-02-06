@@ -62,7 +62,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[var(--background)] flex">
       {/* Left Panel - Decorative */}
-      <div className="relative hidden overflow-hidden bg-gradient-to-br from-[var(--primary)] to-[#0A2B4A] lg:flex lg:w-1/2">
+      <div className="relative hidden overflow-hidden bg-gradient-to-br from-[var(--primary)] to-[var(--code-surface)] lg:flex lg:w-1/2">
         {/* Decorative elements */}
         <div className="absolute inset-0">
           <div className="absolute -left-20 top-1/4 h-80 w-80 rounded-full bg-white/5 blur-3xl" />

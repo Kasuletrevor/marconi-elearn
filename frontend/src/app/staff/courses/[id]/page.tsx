@@ -831,8 +831,8 @@ function OverviewTab({
                   href={`/staff/courses/${course.id}/assignments/${assignment.id}`}
                   className="p-4 flex items-center gap-4 hover:bg-[var(--background)] transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <Clock className="w-5 h-5 text-amber-600" />
+                  <div className="w-10 h-10 rounded-lg bg-[var(--warning)]/10 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5 text-[var(--warning)]" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-[var(--foreground)] truncate">
@@ -877,9 +877,9 @@ const submissionStatusBadge: Record<
   StaffSubmissionQueueItem["status"],
   { label: string; className: string }
 > = {
-  pending: { label: "Pending", className: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
-  grading: { label: "Grading", className: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
-  graded: { label: "Graded", className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+  pending: { label: "Pending", className: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20" },
+  grading: { label: "Grading", className: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20" },
+  graded: { label: "Graded", className: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20" },
   error: { label: "Error", className: "bg-[var(--secondary)]/10 text-[var(--secondary)] border-[var(--secondary)]/20" },
 };
 
@@ -1143,8 +1143,8 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
               return (
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="p-2 bg-[var(--background)] rounded-lg border border-[var(--border)]"><p className="font-bold">{active.total_students}</p><p className="text-[10px] text-[var(--muted-foreground)] uppercase">Total</p></div>
-                  <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20"><p className="font-bold text-emerald-700">{active.submitted_count}</p><p className="text-[10px] text-emerald-700/70 uppercase">Done</p></div>
-                  <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20"><p className="font-bold text-amber-700">{active.missing_count}</p><p className="text-[10px] text-amber-700/70 uppercase">Missing</p></div>
+                  <div className="p-2 bg-[var(--success)]/10 rounded-lg border border-[var(--success)]/20"><p className="font-bold text-[var(--success)]">{active.submitted_count}</p><p className="text-[10px] text-[var(--success)] uppercase">Done</p></div>
+                  <div className="p-2 bg-[var(--warning)]/10 rounded-lg border border-[var(--warning)]/20"><p className="font-bold text-[var(--warning)]">{active.missing_count}</p><p className="text-[10px] text-[var(--warning)] uppercase">Missing</p></div>
                 </div>
               );
             })()}
@@ -2184,7 +2184,7 @@ function RosterTab({
 
                 <div className="flex items-center gap-3">
                   {member.github_login ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[var(--success)]/10 text-[var(--success)] rounded-full">
                       <LinkIcon className="w-3.5 h-3.5" />
                       @{member.github_login}
                     </span>
@@ -2194,7 +2194,7 @@ function RosterTab({
                       const isBusy = claimActionId === claim.id;
                       return (
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[var(--warning)]/10 text-[var(--warning)] rounded-full">
                             <LinkIcon className="w-3.5 h-3.5" />
                             Request: @{claim.github_login}
                           </span>
@@ -3434,7 +3434,7 @@ function ModuleCard(
                           </span>
                         )}
                         {!resource.is_published && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-700 rounded">
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--warning)]/10 text-[var(--warning)] rounded">
                             Draft
                           </span>
                         )}

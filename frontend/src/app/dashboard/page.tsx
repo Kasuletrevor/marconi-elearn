@@ -254,7 +254,7 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
           isUrgent
             ? "bg-[var(--secondary)]/10"
             : isSoon
-            ? "bg-amber-500/10"
+            ? "bg-[var(--warning)]/10"
             : "bg-[var(--primary)]/10"
         }`}
       >
@@ -263,7 +263,7 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
             isUrgent
               ? "text-[var(--secondary)]"
               : isSoon
-              ? "text-amber-600"
+              ? "text-[var(--warning)]"
               : "text-[var(--primary)]"
           }`}
         />
@@ -291,7 +291,7 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
                 isUrgent
                   ? "text-[var(--secondary)]"
                   : isSoon
-                  ? "text-amber-600"
+                  ? "text-[var(--warning)]"
                   : "text-[var(--muted-foreground)]"
               }`}
             >

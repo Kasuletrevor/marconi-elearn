@@ -271,11 +271,11 @@ export default function CourseDetailPage() {
                   Connect GitHub
                 </a>
               ) : courseGitHubClaim?.status === "approved" ? (
-                <span className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl">
+                <span className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[var(--success)]/10 text-[var(--success)] rounded-xl">
                   Linked: @{courseGitHubClaim.github_login}
                 </span>
               ) : courseGitHubClaim?.status === "pending" ? (
-                <span className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-xl">
+                <span className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[var(--warning)]/10 text-[var(--warning)] rounded-xl">
                   Pending approval
                 </span>
               ) : (
@@ -716,7 +716,7 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
           isPastDue
             ? "bg-[var(--secondary)]/10"
             : isUpcoming
-            ? "bg-amber-500/10"
+            ? "bg-[var(--warning)]/10"
             : "bg-[var(--primary)]/10"
         }`}
       >
@@ -725,7 +725,7 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
             isPastDue
               ? "text-[var(--secondary)]"
               : isUpcoming
-              ? "text-amber-600"
+              ? "text-[var(--warning)]"
               : "text-[var(--primary)]"
           }`}
         />
@@ -742,7 +742,7 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
                 isPastDue
                   ? "text-[var(--secondary)]"
                   : isUpcoming
-                  ? "text-amber-600"
+                  ? "text-[var(--warning)]"
                   : "text-[var(--muted-foreground)]"
               }`}
             >

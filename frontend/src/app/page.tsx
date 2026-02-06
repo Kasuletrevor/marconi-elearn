@@ -164,8 +164,8 @@ function EngineeringPanel() {
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)]/65 px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="h-2.5 w-2.5 rounded-full bg-[var(--secondary)]/80" />
-          <div className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
-          <div className="h-2.5 w-2.5 rounded-full bg-emerald-600/80" />
+          <div className="h-2.5 w-2.5 rounded-full bg-[var(--warning)]/80" />
+          <div className="h-2.5 w-2.5 rounded-full bg-[var(--success)]/80" />
         </div>
         <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-semibold text-[var(--muted-foreground)]">
           <Code2 className="h-3.5 w-3.5" />
@@ -175,7 +175,7 @@ function EngineeringPanel() {
 
       <div className="grid gap-0 lg:grid-cols-[1.45fr_1fr]">
         <div className="border-b border-[var(--border)] p-4 lg:border-b-0 lg:border-r">
-          <pre className="overflow-x-auto rounded-lg bg-[#0A1B2E] p-4 text-[12px] leading-6 text-slate-200">
+          <pre className="overflow-x-auto rounded-lg bg-[var(--code-surface)] p-4 text-[12px] leading-6 text-[var(--code-foreground)]">
             {codeLines.map((line, idx) => (
               <motion.div
                 key={`${line}-${idx}`}
@@ -184,7 +184,7 @@ function EngineeringPanel() {
                 transition={{ delay: 0.08 * idx, duration: 2.8, repeat: Infinity, repeatDelay: 1.8 }}
                 className="font-[family-name:var(--font-mono)]"
               >
-                <span className="mr-3 select-none text-slate-500">{String(idx + 1).padStart(2, "0")}</span>
+                <span className="mr-3 select-none text-[var(--code-line-number)]">{String(idx + 1).padStart(2, "0")}</span>
                 {line || " "}
               </motion.div>
             ))}
