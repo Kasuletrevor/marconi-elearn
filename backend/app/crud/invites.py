@@ -24,6 +24,10 @@ def _hash_token(token: str) -> str:
 class InviteIssue:
     email: str
     reason: str
+    row_number: int | None = None
+    full_name: str | None = None
+    student_number: str | None = None
+    programme: str | None = None
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,7 @@ class RosterRow:
     full_name: str
     student_number: str
     programme: str
+    row_number: int | None = None
 
 
 async def create_course_student_invites(
@@ -50,23 +55,38 @@ async def create_course_student_invites(
     seen_student_numbers: set[str] = set()
 
     for row in rows:
+        full_name = row.full_name.strip()
+        student_number = row.student_number.strip()
+        programme = row.programme.strip()
         email = row.email.strip().lower()
+        original_email = row.email.strip()
+
+        def make_issue(reason: str, *, issue_email: str | None = None) -> InviteIssue:
+            return InviteIssue(
+                email=issue_email if issue_email is not None else email,
+                reason=reason,
+                row_number=row.row_number,
+                full_name=full_name or None,
+                student_number=student_number or None,
+                programme=programme or None,
+            )
+
         if not email or "@" not in email:
-            issues.append(InviteIssue(email=row.email, reason="invalid_email"))
+            issues.append(make_issue("invalid_email", issue_email=original_email))
             continue
-        if not row.full_name.strip():
-            issues.append(InviteIssue(email=email, reason="missing_name"))
+        if not full_name:
+            issues.append(make_issue("missing_name"))
             continue
-        if not row.student_number.strip():
-            issues.append(InviteIssue(email=email, reason="missing_student_number"))
+        if not student_number:
+            issues.append(make_issue("missing_student_number"))
             continue
-        if not row.programme.strip():
-            issues.append(InviteIssue(email=email, reason="missing_programme"))
+        if not programme:
+            issues.append(make_issue("missing_programme"))
             continue
-        if row.student_number in seen_student_numbers:
-            issues.append(InviteIssue(email=email, reason="duplicate_student_number_in_csv"))
+        if student_number in seen_student_numbers:
+            issues.append(make_issue("duplicate_student_number_in_csv"))
             continue
-        seen_student_numbers.add(row.student_number)
+        seen_student_numbers.add(student_number)
 
         existing_user = await db.execute(select(User).where(User.email == email))
         user = existing_user.scalars().first()
@@ -77,11 +97,11 @@ async def create_course_student_invites(
 
         profile = await db.get(StudentProfile, user.id)
         if profile is None:
-            profile = StudentProfile(user_id=user.id, full_name=row.full_name.strip(), programme=row.programme.strip())
+            profile = StudentProfile(user_id=user.id, full_name=full_name, programme=programme)
             db.add(profile)
         else:
-            profile.full_name = row.full_name.strip()
-            profile.programme = row.programme.strip()
+            profile.full_name = full_name
+            profile.programme = programme
 
         # If the user has already activated (has a password), enroll immediately and skip invite creation.
         if user.password_hash is not None:
@@ -93,12 +113,12 @@ async def create_course_student_invites(
                 membership = None
 
             if membership is not None:
-                membership.student_number = row.student_number.strip()
+                membership.student_number = student_number
                 try:
                     await db.commit()
                 except IntegrityError:
                     await db.rollback()
-                    issues.append(InviteIssue(email=email, reason="student_number_taken_in_course"))
+                    issues.append(make_issue("student_number_taken_in_course"))
                     continue
                 auto_enrolled += 1
             continue
@@ -108,9 +128,9 @@ async def create_course_student_invites(
             organization_id=organization_id,
             course_id=course_id,
             email=email,
-            full_name=row.full_name.strip(),
-            student_number=row.student_number.strip(),
-            programme=row.programme.strip(),
+            full_name=full_name,
+            student_number=student_number,
+            programme=programme,
             token_hash=_hash_token(token),
             expires_at=expires_at,
             used_at=None,
@@ -129,20 +149,38 @@ def parse_roster_from_csv_bytes(data: bytes) -> list[RosterRow]:
     if reader.fieldnames is None:
         raise ValueError("missing_header")
 
-    normalized = {name.strip().lower() for name in reader.fieldnames if name is not None}
+    header_lookup = {
+        name.strip().lower(): name
+        for name in reader.fieldnames
+        if name is not None
+    }
+    normalized = set(header_lookup.keys())
     required = {"email", "name", "student_number", "programme"}
     if not required.issubset(normalized):
         raise ValueError("missing_required_headers")
 
+    email_key = header_lookup["email"]
+    name_key = header_lookup["name"]
+    student_number_key = header_lookup["student_number"]
+    programme_key = header_lookup["programme"]
+
     rows: list[RosterRow] = []
-    for raw in reader:
-        email = (raw.get("email") or "").strip()
-        name = (raw.get("name") or "").strip()
-        student_number = (raw.get("student_number") or "").strip()
-        programme = (raw.get("programme") or "").strip()
+    for row_number, raw in enumerate(reader, start=2):
+        email = (raw.get(email_key) or "").strip()
+        name = (raw.get(name_key) or "").strip()
+        student_number = (raw.get(student_number_key) or "").strip()
+        programme = (raw.get(programme_key) or "").strip()
         if not any([email, name, student_number, programme]):
             continue
-        rows.append(RosterRow(email=email, full_name=name, student_number=student_number, programme=programme))
+        rows.append(
+            RosterRow(
+                email=email,
+                full_name=name,
+                student_number=student_number,
+                programme=programme,
+                row_number=row_number,
+            )
+        )
     return rows
 
 
