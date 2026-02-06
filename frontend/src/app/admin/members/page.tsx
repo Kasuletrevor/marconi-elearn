@@ -250,6 +250,7 @@ export default function AdminMembersPage() {
             <p className="text-xs text-[var(--muted-foreground)] mb-4">
               Add by email to grant organization access.
             </p>
+            <p className="required-hint mb-3">* Required fields</p>
 
             <div className="space-y-4">
               <div>
@@ -259,6 +260,7 @@ export default function AdminMembersPage() {
                   onChange={(e) => setNewEmail(e.target.value)}
                   inputMode="email"
                   placeholder="lecturer@university.edu"
+                  required
                   className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                 />
               </div>
@@ -267,6 +269,7 @@ export default function AdminMembersPage() {
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value as OrgMembership["role"])}
+                  required
                   className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                 >
                   <option value="admin">{roleLabel("admin")}</option>
