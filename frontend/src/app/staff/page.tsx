@@ -96,14 +96,14 @@ export default function StaffDashboardPage() {
       label: "Grading",
       value: formatCount(queueTotals?.grading),
       icon: CheckCircle,
-      color: "#22c55e",
+      color: "var(--success)",
       href: "/staff/submissions?status=grading",
     },
     {
       label: "Needs attention",
       value: formatCount(queueTotals?.error),
       icon: AlertTriangle,
-      color: "#f59e0b",
+      color: "var(--warning)",
       href: "/staff/submissions?status=error",
     },
     {

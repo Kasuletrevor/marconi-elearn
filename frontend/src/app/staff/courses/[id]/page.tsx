@@ -729,7 +729,7 @@ function OverviewTab({
     { label: "Students", value: studentCount, icon: Users, color: "var(--primary)" },
     { label: "Assignments", value: assignments.length, icon: FileText, color: "var(--secondary)" },
     { label: "Modules", value: modules.length, icon: FolderOpen, color: "var(--primary)" },
-    { label: "Upcoming", value: upcomingAssignments.length, icon: Clock, color: "#f59e0b" },
+    { label: "Upcoming", value: upcomingAssignments.length, icon: Clock, color: "var(--warning)" },
   ];
 
   return (
