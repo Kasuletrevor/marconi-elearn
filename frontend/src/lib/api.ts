@@ -388,10 +388,19 @@ export interface UserPublic {
   email: string;
 }
 
+export interface ImportCsvIssue {
+  email: string;
+  reason: string;
+  row_number?: number | null;
+  full_name?: string | null;
+  student_number?: string | null;
+  programme?: string | null;
+}
+
 export interface ImportCsvResult {
   created_invites: number;
   auto_enrolled: number;
-  issues: Record<string, unknown>[];
+  issues: ImportCsvIssue[];
   invite_links: string[];
 }
 
