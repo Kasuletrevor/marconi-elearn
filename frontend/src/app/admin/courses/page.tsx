@@ -745,6 +745,7 @@ function CourseModal(props: {
               {error}
             </div>
           )}
+          <p className="required-hint mb-3">* Required fields</p>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
@@ -753,6 +754,7 @@ function CourseModal(props: {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="e.g. CS101"
+                required
                 className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               />
             </div>
@@ -762,6 +764,7 @@ function CourseModal(props: {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Introduction to Programming"
+                required
                 className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               />
             </div>
