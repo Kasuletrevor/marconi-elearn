@@ -317,6 +317,7 @@ export default function SuperadminOrganizationsPage() {
 
                 {!createResult ? (
                   <div className="grid gap-4">
+                  <p className="required-hint">* Required fields</p>
                   <div>
                     <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
                       Organization name
@@ -326,6 +327,7 @@ export default function SuperadminOrganizationsPage() {
                       onChange={(e) => setNewOrgName(e.target.value)}
                       placeholder="e.g. CEDAT — Marconi Lab"
                       autoFocus
+                      required
                       className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
                     <p className="mt-2 text-xs text-[var(--muted-foreground)]">
