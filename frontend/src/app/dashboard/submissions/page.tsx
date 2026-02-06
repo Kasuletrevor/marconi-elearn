@@ -24,15 +24,15 @@ const statusBadge: Record<
 > = {
   pending: {
     label: "Pending",
-    className: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+    className: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20",
   },
   grading: {
     label: "Grading",
-    className: "bg-blue-500/10 text-blue-700 border-blue-500/20",
+    className: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20",
   },
   graded: {
     label: "Graded",
-    className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
+    className: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20",
   },
   error: {
     label: "Error",
@@ -56,7 +56,7 @@ const errorKindBadge: Record<
   },
   infra_error: {
     label: "Infra",
-    className: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+    className: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20",
   },
   internal_error: {
     label: "Error",

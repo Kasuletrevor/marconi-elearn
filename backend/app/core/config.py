@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     taskiq_queue_name: str = "marconi"
     # File uploads
     uploads_dir: str = ""
+    # Request rate limits (per minute, per client IP)
+    rate_limit_login_per_minute: int = 10
+    rate_limit_execution_per_minute: int = 30
+    rate_limit_uploads_per_minute: int = 20
 
     # Third-party integrations
     # Symmetric encryption key (Fernet). Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

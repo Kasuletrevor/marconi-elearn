@@ -101,7 +101,7 @@ export default function SuperadminPage() {
         setSystemSummary({
           label: "Core Services Operational",
           className:
-            "text-[10px] font-bold text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded-full border border-green-100",
+            "text-[10px] font-bold text-[var(--success)] uppercase tracking-widest bg-[var(--success)]/10 px-2 py-1 rounded-full border border-[var(--success)]/20",
         });
       } catch (err) {
         if (err instanceof ApiError) setMetricsError(err.detail);
@@ -116,7 +116,7 @@ export default function SuperadminPage() {
         setSystemSummary({
           label: "Degraded",
           className:
-            "text-[10px] font-bold text-amber-700 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-full border border-amber-200/60",
+            "text-[10px] font-bold text-[var(--warning)] uppercase tracking-widest bg-[var(--warning)]/10 px-2 py-1 rounded-full border border-[var(--warning)]/20",
         });
       }
     }
@@ -323,12 +323,12 @@ function StatusBadge({ status }: { status: string }) {
   > = {
     healthy: {
       icon: CheckCircle2,
-      className: "text-green-600 bg-green-500/5 border-green-200/50",
+      className: "text-[var(--success)] bg-[var(--success)]/10 border-[var(--success)]/20",
       label: "Operational",
     },
     degraded: {
       icon: AlertCircle,
-      className: "text-amber-600 bg-amber-500/5 border-amber-200/50",
+      className: "text-[var(--warning)] bg-[var(--warning)]/10 border-[var(--warning)]/20",
       label: "Latency Detected",
     },
     pending: {

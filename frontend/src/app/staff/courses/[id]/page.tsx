@@ -62,12 +62,14 @@ import {
   type CourseMembershipUpdate,
   type CourseUpdate,
   type LatePolicy,
+  type ImportCsvResult,
   ApiError,
 } from "@/lib/api";
 import { useAuthStore, getCourseRole } from "@/lib/store";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataList } from "@/components/shared/DataList";
+import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { reportError } from "@/lib/reportError";
 import { PROGRAMMES, type Programme } from "@/lib/programmes";
@@ -83,6 +85,15 @@ const staggerContainer = {
     opacity: 1,
     transition: { staggerChildren: 0.08, delayChildren: 0.1 },
   },
+};
+
+const IMPORT_ISSUE_REASON_LABELS: Record<string, string> = {
+  invalid_email: "Invalid email format",
+  missing_name: "Missing student name",
+  missing_student_number: "Missing student number",
+  missing_programme: "Missing programme",
+  duplicate_student_number_in_csv: "Duplicate student number in CSV",
+  student_number_taken_in_course: "Student number already exists in this course",
 };
 
 type TabType = "overview" | "submissions" | "roster" | "assignments" | "modules";
@@ -154,10 +165,10 @@ export default function StaffCoursePage() {
 
   const tabs: { id: TabType; label: string; icon: typeof BookOpen }[] = [
     { id: "overview", label: "Overview", icon: BookOpen },
+    { id: "modules", label: "Modules", icon: FolderOpen },
+    { id: "assignments", label: "Assignments", icon: FileText },
     { id: "submissions", label: "Submissions", icon: FileText },
     { id: "roster", label: "Roster", icon: Users },
-    { id: "assignments", label: "Assignments", icon: FileText },
-    { id: "modules", label: "Modules", icon: FolderOpen },
   ];
 
   if (isLoading) {
@@ -728,7 +739,7 @@ function OverviewTab({
     { label: "Students", value: studentCount, icon: Users, color: "var(--primary)" },
     { label: "Assignments", value: assignments.length, icon: FileText, color: "var(--secondary)" },
     { label: "Modules", value: modules.length, icon: FolderOpen, color: "var(--primary)" },
-    { label: "Upcoming", value: upcomingAssignments.length, icon: Clock, color: "#f59e0b" },
+    { label: "Upcoming", value: upcomingAssignments.length, icon: Clock, color: "var(--warning)" },
   ];
 
   return (
@@ -830,8 +841,8 @@ function OverviewTab({
                   href={`/staff/courses/${course.id}/assignments/${assignment.id}`}
                   className="p-4 flex items-center gap-4 hover:bg-[var(--background)] transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <Clock className="w-5 h-5 text-amber-600" />
+                  <div className="w-10 h-10 rounded-lg bg-[var(--warning)]/10 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5 text-[var(--warning)]" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-[var(--foreground)] truncate">
@@ -876,9 +887,9 @@ const submissionStatusBadge: Record<
   StaffSubmissionQueueItem["status"],
   { label: string; className: string }
 > = {
-  pending: { label: "Pending", className: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
-  grading: { label: "Grading", className: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
-  graded: { label: "Graded", className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+  pending: { label: "Pending", className: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20" },
+  grading: { label: "Grading", className: "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20" },
+  graded: { label: "Graded", className: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20" },
   error: { label: "Error", className: "bg-[var(--secondary)]/10 text-[var(--secondary)] border-[var(--secondary)]/20" },
 };
 
@@ -1142,8 +1153,8 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
               return (
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="p-2 bg-[var(--background)] rounded-lg border border-[var(--border)]"><p className="font-bold">{active.total_students}</p><p className="text-[10px] text-[var(--muted-foreground)] uppercase">Total</p></div>
-                  <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20"><p className="font-bold text-emerald-700">{active.submitted_count}</p><p className="text-[10px] text-emerald-700/70 uppercase">Done</p></div>
-                  <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20"><p className="font-bold text-amber-700">{active.missing_count}</p><p className="text-[10px] text-amber-700/70 uppercase">Missing</p></div>
+                  <div className="p-2 bg-[var(--success)]/10 rounded-lg border border-[var(--success)]/20"><p className="font-bold text-[var(--success)]">{active.submitted_count}</p><p className="text-[10px] text-[var(--success)] uppercase">Done</p></div>
+                  <div className="p-2 bg-[var(--warning)]/10 rounded-lg border border-[var(--warning)]/20"><p className="font-bold text-[var(--warning)]">{active.missing_count}</p><p className="text-[10px] text-[var(--warning)] uppercase">Missing</p></div>
                 </div>
               );
             })()}
@@ -1219,6 +1230,7 @@ function RosterTab({
   const [success, setSuccess] = useState<string>("");
   const [showStaffSection, setShowStaffSection] = useState(false);
   const [inviteLinks, setInviteLinks] = useState<string[]>([]);
+  const [lastImportResult, setLastImportResult] = useState<ImportCsvResult | null>(null);
   const [notifyNewSubmissions, setNotifyNewSubmissions] = useState(true);
   const [isSavingNotifyNewSubmissions, setIsSavingNotifyNewSubmissions] = useState(false);
   const [notifyPrefError, setNotifyPrefError] = useState("");
@@ -1591,8 +1603,10 @@ function RosterTab({
     setError("");
     setSuccess("");
     setInviteLinks([]);
+    setLastImportResult(null);
     try {
       const res = await courseStaff.importRosterCsv(course.id, file);     
+      setLastImportResult(res);
       const msg = `Imported: ${res.created_invites} invites created, ${res.auto_enrolled} auto-enrolled.`;
       if (res.issues.length > 0) {
         setError(`${msg} Some rows had issues.`);
@@ -1602,6 +1616,7 @@ function RosterTab({
       if ((res.invite_links ?? []).length > 0) setInviteLinks(res.invite_links);
       await onRefresh();
     } catch (err) {
+      setLastImportResult(null);
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to import CSV");
     } finally {
@@ -1637,6 +1652,20 @@ function RosterTab({
     ta: "TA",
     student: "Student",
   };
+
+  const importIssues = useMemo(() => {
+    const rawIssues = lastImportResult?.issues ?? [];
+    return rawIssues.map((raw, idx) => {
+      const row = raw as { email?: unknown; reason?: unknown };
+      const reasonCode = typeof row.reason === "string" ? row.reason : "unknown";
+      return {
+        key: `${String(row.email ?? "unknown")}-${reasonCode}-${idx}`,
+        email: typeof row.email === "string" && row.email.trim() ? row.email : "(unknown)",
+        reasonCode,
+        reasonLabel: IMPORT_ISSUE_REASON_LABELS[reasonCode] ?? reasonCode,
+      };
+    });
+  }, [lastImportResult?.issues]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -1714,6 +1743,7 @@ function RosterTab({
             <select
               value={selectedUserId ?? ""}
               onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               disabled={isLoadingOrg}
             >
@@ -1826,30 +1856,11 @@ function RosterTab({
         ref={enrollStudentsRef}
         className="order-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5"
       >
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h3 className="font-medium text-[var(--foreground)] mb-1">Enroll students</h3>
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Students are enrolled via invites. Use roster import (CSV) or invite a student by email with their profile details.
-            </p>
-          </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept=".csv"
-            onChange={handleCsvUpload}
-          />
-          <button
-            ref={importCsvButtonRef}
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isAddingStudent}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card)] disabled:opacity-60 transition-colors text-sm"
-          >
-            {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Import CSV
-          </button>
+        <div className="mb-4">
+          <h3 className="font-medium text-[var(--foreground)] mb-1">Enroll students</h3>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Use bulk CSV intake for class reps, then use manual invite for one-off corrections.
+          </p>
         </div>
 
         {noticeArea === "student" && error && (
@@ -1862,13 +1873,191 @@ function RosterTab({
             {success}
           </div>
         )}
+
+        <div className="grid xl:grid-cols-5 gap-4">
+          <div className="xl:col-span-2 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+              <Upload className="w-3.5 h-3.5" />
+              Bulk import
+            </div>
+            <p className="mt-3 text-sm text-[var(--foreground)]">
+              Upload roster CSV with profile data for each student.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {["email", "name", "student_number", "programme"].map((column) => (
+                <span
+                  key={column}
+                  className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-mono text-[var(--foreground)]"
+                >
+                  {column}
+                </span>
+              ))}
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".csv"
+              onChange={handleCsvUpload}
+            />
+            <div className="mt-4 grid gap-2">
+              <button
+                ref={importCsvButtonRef}
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isAddingStudent}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-white disabled:opacity-60 transition-colors text-sm"
+              >
+                {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Import CSV
+              </button>
+              <a
+                href="/templates/roster-template.csv"
+                download
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-white transition-colors text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download template
+              </a>
+            </div>
+            <p className="mt-3 text-[11px] text-[var(--muted-foreground)]">
+              Required headers: <code>email,name,student_number,programme</code>
+            </p>
+          </div>
+
+          <div className="xl:col-span-3 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <p className="text-sm font-semibold text-[var(--foreground)]">Manual invite</p>
+              <p className="required-hint">* Required fields</p>
+            </div>
+            <div className="grid md:grid-cols-12 gap-3 items-end">
+              <div className="md:col-span-4">
+                <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                  Email
+                </label>
+                <input
+                  value={studentEmail}
+                  onChange={(e) => setStudentEmail(e.target.value)}
+                  placeholder="student@example.com"
+                  required
+                  className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+                />
+              </div>
+              <div className="md:col-span-4">
+                <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                  Full name
+                </label>
+                <input
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="Jane Doe"
+                  required
+                  className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                  Student #
+                </label>
+                <input
+                  value={studentNumber}
+                  onChange={(e) => setStudentNumber(e.target.value)}
+                  placeholder="2100714449"
+                  required
+                  className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                  Programme
+                </label>
+                <select
+                  value={studentProgramme}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setStudentProgramme(value ? (value as Programme) : "");
+                  }}
+                  required
+                  className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
+                >
+                  <option value="">Select programme...</option>
+                  {PROGRAMMES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-12">
+                <button
+                  type="button"
+                  onClick={addStudentByEmail}
+                  disabled={
+                    isAddingStudent ||
+                    !studentEmail.trim() ||
+                    !studentName.trim() ||
+                    !studentNumber.trim() ||
+                    !studentProgramme
+                  }
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Enroll / invite student
+                </button>
+                <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                  Existing accounts auto-enroll immediately. New students get invite links valid for 7 days.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {lastImportResult && (
+          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
+            <p className="text-xs uppercase tracking-wider text-[var(--muted-foreground)] mb-3">
+              Import result
+            </p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]">Invites</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">{lastImportResult.created_invites}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]">Auto-enrolled</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">{lastImportResult.auto_enrolled}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]">Rows with issues</p>
+                <p className="text-lg font-semibold text-[var(--secondary)]">{importIssues.length}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {importIssues.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-[var(--secondary)]/30 bg-[var(--secondary)]/5 p-4">
+            <p className="text-sm font-semibold text-[var(--foreground)] mb-2">Rows needing correction</p>
+            <div className="space-y-2">
+              {importIssues.slice(0, 8).map((issue) => (
+                <div
+                  key={issue.key}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-lg border border-[var(--secondary)]/20 bg-[var(--card)] px-3 py-2"
+                >
+                  <code className="text-xs text-[var(--foreground)] break-all">{issue.email}</code>
+                  <p className="text-xs text-[var(--secondary)]">{issue.reasonLabel}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {resolvedInviteLinks.length > 0 && (
-          <div className="mb-4 p-4 bg-[var(--background)] border border-[var(--border)] rounded-2xl">
+          <div className="mt-4 p-4 bg-[var(--background)] border border-[var(--border)] rounded-2xl">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <p className="text-sm font-medium text-[var(--foreground)]">Invite links</p>
                 <p className="text-[11px] text-[var(--muted-foreground)]">
-                  No emails yet — share these manually with the student(s).
+                  No email provider configured yet. Share these links manually with students.
                 </p>
               </div>
               <button
@@ -1898,82 +2087,6 @@ function RosterTab({
             </div>
           </div>
         )}
-
-        <div className="grid md:grid-cols-12 gap-3 items-end">
-          <div className="md:col-span-4">
-            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Email
-            </label>
-            <input
-              value={studentEmail}
-              onChange={(e) => setStudentEmail(e.target.value)}
-              placeholder="student@example.com"
-              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-            />
-          </div>
-          <div className="md:col-span-4">
-            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Full name
-            </label>
-            <input
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-              placeholder="Jane Doe"
-              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Student #
-            </label>
-            <input
-              value={studentNumber}
-              onChange={(e) => setStudentNumber(e.target.value)}
-              placeholder="2100714449"
-              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
-              Programme
-            </label>
-            <select
-              value={studentProgramme}
-              onChange={(e) => {
-                const value = e.target.value;
-                setStudentProgramme(value ? (value as Programme) : "");
-              }}
-              className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-            >
-              <option value="">Select programme...</option>
-              {PROGRAMMES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-12">
-            <button
-              type="button"
-              onClick={addStudentByEmail}
-              disabled={
-                isAddingStudent ||
-                !studentEmail.trim() ||
-                !studentName.trim() ||
-                !studentNumber.trim() ||
-                !studentProgramme
-              }
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            >
-              {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Enroll / invite student
-            </button>
-            <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-              Existing accounts auto-enroll immediately. New students get an invite link (valid 7 days) via the invite flow.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* GitHub Classroom Sync */} 
@@ -2183,7 +2296,7 @@ function RosterTab({
 
                 <div className="flex items-center gap-3">
                   {member.github_login ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[var(--success)]/10 text-[var(--success)] rounded-full">
                       <LinkIcon className="w-3.5 h-3.5" />
                       @{member.github_login}
                     </span>
@@ -2193,7 +2306,7 @@ function RosterTab({
                       const isBusy = claimActionId === claim.id;
                       return (
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[var(--warning)]/10 text-[var(--warning)] rounded-full">
                             <LinkIcon className="w-3.5 h-3.5" />
                             Request: @{claim.github_login}
                           </span>
@@ -2466,6 +2579,7 @@ function AssignmentsTab({
                     {createError}
                   </div>
                 )}
+                <p className="required-hint">* Required fields</p>
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
@@ -2476,6 +2590,7 @@ function AssignmentsTab({
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                       placeholder="e.g. Assignment 1: Hello World"
+                      required
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
                   </div>
@@ -2523,6 +2638,7 @@ function AssignmentsTab({
                       value={newMaxPoints}
                       min={0}
                       onChange={(e) => setNewMaxPoints(Number(e.target.value))}
+                      required
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
                   </div>
@@ -2548,6 +2664,7 @@ function AssignmentsTab({
                       onChange={(e) =>
                         setNewAutogradeMode(e.target.value as "practice_only" | "final_only" | "hybrid")
                       }
+                      required
                       className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     >
                       <option value="practice_only">Practice only (grade on submit)</option>
@@ -2878,6 +2995,7 @@ function ModulesTab({
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder="e.g. Week 1: Basics"
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
@@ -2888,6 +3006,7 @@ function ModulesTab({
                     type="number"
                     value={newPosition}
                     onChange={(e) => setNewPosition(Number(e.target.value))}
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                   <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">Suggested next position: {nextPosition}</p>
@@ -2985,6 +3104,10 @@ function ModuleCard(
   const [confirmDeleteResourceId, setConfirmDeleteResourceId] = useState<number | null>(null);
   const [isDeletingModule, setIsDeletingModule] = useState(false);
   const [isDeletingResource, setIsDeletingResource] = useState(false);
+  const [previewResource, setPreviewResource] = useState<ModuleResource | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
 
   useEffect(() => {
     setEditTitle(module.title);
@@ -3133,6 +3256,43 @@ function ModuleCard(
     }
   }
 
+  function isPdfResource(resource: ModuleResource) {
+    const name = (resource.file_name || "").toLowerCase();
+    return resource.kind === "file" && (name.endsWith(".pdf") || resource.content_type?.includes("pdf"));
+  }
+
+  function closePreview() {
+    setPreviewResource(null);
+    setPreviewBlob(null);
+    setPreviewError("");
+    setIsPreviewLoading(false);
+  }
+
+  async function openPdfPreview(resource: ModuleResource) {
+    if (!isPdfResource(resource)) return;
+    setPreviewResource(resource);
+    setPreviewError("");
+    setIsPreviewLoading(true);
+    try {
+      const blob = await courseStaff.downloadModuleResource(courseId, module.id, resource.id);
+      const isPdf =
+        blob.type.includes("pdf") ||
+        (resource.file_name || "").toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        setPreviewBlob(null);
+        setPreviewError("Selected file is not a PDF.");
+        return;
+      }
+      setPreviewBlob(blob);
+    } catch (err) {
+      setPreviewBlob(null);
+      if (err instanceof ApiError) setPreviewError(err.detail);
+      else setPreviewError("Failed to load PDF preview.");
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  }
+
   function formatFileSize(bytes: number | null) {
     if (!bytes) return "";
     if (bytes < 1024) return `${bytes} B`;
@@ -3273,6 +3433,7 @@ function ModuleCard(
                   <input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
@@ -3283,6 +3444,7 @@ function ModuleCard(
                     type="number"
                     value={editPosition}
                     onChange={(e) => setEditPosition(Number(e.target.value))}
+                    required
                     className="w-full px-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
@@ -3392,7 +3554,7 @@ function ModuleCard(
                           </span>
                         )}
                         {!resource.is_published && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-700 rounded">
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--warning)]/10 text-[var(--warning)] rounded">
                             Draft
                           </span>
                         )}
@@ -3446,13 +3608,24 @@ function ModuleCard(
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       ) : (
-                        <button
-                          onClick={() => handleDownload(resource)}
-                          className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
-                          title="Download file"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
+                        <>
+                          {isPdfResource(resource) ? (
+                            <button
+                              onClick={() => void openPdfPreview(resource)}
+                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
+                              title="Preview PDF"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          ) : null}
+                          <button
+                            onClick={() => handleDownload(resource)}
+                            className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-lg transition-colors"
+                            title="Download file"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
 
                       {/* Delete */}
@@ -3498,6 +3671,30 @@ function ModuleCard(
         />
       )}
     </div>
+
+    <PdfPreviewModal
+      isOpen={previewResource !== null}
+      onClose={closePreview}
+      title={previewResource?.title || "PDF preview"}
+      fileName={previewResource?.file_name}
+      blob={previewBlob}
+      isLoading={isPreviewLoading}
+      error={previewError}
+      onRetry={
+        previewResource
+          ? () => {
+              void openPdfPreview(previewResource);
+            }
+          : undefined
+      }
+      onDownload={
+        previewResource
+          ? () => {
+              void handleDownload(previewResource);
+            }
+          : undefined
+      }
+    />
 
     <ConfirmModal
       isOpen={showDeleteModuleConfirm}
@@ -3846,3 +4043,4 @@ function AddFileModal({ courseId, moduleId, onClose, onSuccess }: AddFileModalPr
     </div>
   );
 }
+

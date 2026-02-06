@@ -4,7 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { GraduationCap, Mail, Lock, ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
+import {
+  GraduationCap,
+  Mail,
+  Lock,
+  ArrowRight,
+  Loader2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { auth, ApiError } from "@/lib/api";
 import { useAuthStore, getRedirectPath } from "@/lib/store";
 
@@ -54,11 +62,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[var(--background)] flex">
       {/* Left Panel - Decorative */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[var(--primary)] relative overflow-hidden">
+      <div className="relative hidden overflow-hidden bg-gradient-to-br from-[var(--primary)] to-[var(--code-surface)] lg:flex lg:w-1/2">
         {/* Decorative elements */}
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 -left-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-[var(--secondary)]/10 rounded-full blur-3xl" />
+          <div className="absolute -left-20 top-1/4 h-80 w-80 rounded-full bg-white/5 blur-3xl" />
+          <div className="absolute -right-20 bottom-1/4 h-96 w-96 rounded-full bg-[var(--secondary)]/20 blur-3xl" />
           <div
             className="absolute inset-0 opacity-5"
             style={{
@@ -91,10 +99,18 @@ export default function LoginPage() {
               your classroom.
             </h1>
 
-            <p className="text-white/60 text-lg max-w-md">
-              Access your courses, submit assignments, and track your progress
-              in one unified platform.
+            <p className="max-w-md text-lg text-white/70">
+              Students move faster with clear submission feedback, while staff
+              runs consistent assignment-level grading and review.
             </p>
+            <div className="mt-7 max-w-md rounded-xl border border-white/20 bg-white/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/70">
+                Student-first platform
+              </p>
+              <p className="mt-2 text-sm text-white">
+                Submit C/C++ work, review feedback, and keep course progress clear.
+              </p>
+            </div>
           </motion.div>
         </div>
       </div>

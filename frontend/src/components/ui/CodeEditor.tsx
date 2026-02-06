@@ -36,7 +36,7 @@ export function CodeEditor({
   };
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-[var(--border)] bg-[#1e1e1e] ${className}`} style={{ height }}>
+    <div className={`relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--code-surface)] ${className}`} style={{ height }}>
       <Editor
         height="100%"
         defaultLanguage={language}

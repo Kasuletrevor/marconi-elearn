@@ -74,6 +74,7 @@ export default function JoinCoursePage() {
       </div>
 
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
+        <p className="required-hint">* Required fields</p>
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
@@ -83,6 +84,7 @@ export default function JoinCoursePage() {
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="e.g. 4H9Q2KJM"
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
@@ -94,6 +96,7 @@ export default function JoinCoursePage() {
               value={studentNumber}
               onChange={(e) => setStudentNumber(e.target.value)}
               placeholder="e.g. 2100714449"
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
@@ -108,6 +111,7 @@ export default function JoinCoursePage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="e.g. Jane Doe"
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
@@ -121,6 +125,7 @@ export default function JoinCoursePage() {
                 const value = e.target.value;
                 setProgramme(value ? (value as Programme) : "");
               }}
+              required
               className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             >
               <option value="">Select programme...</option>

@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.course_permissions import require_course_staff
+from app.api.deps.rate_limit import make_rate_limit_dependency
+from app.core.config import settings
 from app.crud.courses import get_course
 from app.crud.module_resources import (
     create_file_resource,
@@ -26,6 +28,10 @@ from app.models.user import User
 from app.schemas.module_resource import ModuleResourceCreateLink, ModuleResourceOut, ModuleResourceUpdate
 
 router = APIRouter(prefix="/staff/courses/{course_id}/modules/{module_id}/resources", dependencies=[Depends(get_current_user)])
+resource_upload_rate_limit = make_rate_limit_dependency(
+    bucket="staff.resource.upload",
+    limit=settings.rate_limit_uploads_per_minute,
+)
 
 _MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
@@ -85,6 +91,7 @@ async def upload_file(
     module_id: int,
     title: Annotated[str, Form(min_length=1, max_length=200)],
     file: Annotated[UploadFile, File()],
+    _rate_limit: Annotated[None, Depends(resource_upload_rate_limit)],
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     position: Annotated[int, Form()] = 0,
@@ -177,4 +184,3 @@ async def download_resource(
     if not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
     return FileResponse(path=path, filename=resource.file_name, media_type=resource.content_type or "application/octet-stream")
-

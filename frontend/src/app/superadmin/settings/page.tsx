@@ -93,7 +93,7 @@ export default function SuperadminSettingsPage() {
               </div>
               {status ? (
                 status.ok ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-tight text-green-600 bg-green-500/5 border-green-200/50">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-tight text-[var(--success)] bg-[var(--success)]/10 border-[var(--success)]/20">
                     <CheckCircle2 className="w-3 h-3" />
                     Operational
                   </span>

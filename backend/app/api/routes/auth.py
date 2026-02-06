@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
+from app.api.deps.rate_limit import make_rate_limit_dependency
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +34,10 @@ from app.schemas.auth import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
+login_rate_limit = make_rate_limit_dependency(
+    bucket="auth.login",
+    limit=settings.rate_limit_login_per_minute,
+)
 
 
 async def _build_me_response(db: AsyncSession, *, user: User) -> MeResponse:
@@ -70,6 +75,7 @@ async def _build_me_response(db: AsyncSession, *, user: User) -> MeResponse:
 async def login(
     payload: LoginRequest,
     response: Response,
+    _rate_limit: Annotated[None, Depends(login_rate_limit)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> MeResponse:
     user = await get_user_by_email(db, email=str(payload.email))

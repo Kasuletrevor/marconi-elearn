@@ -1,94 +1,151 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  BookOpen,
-  Code2,
-  GraduationCap,
-  Users,
-  Sparkles,
   ArrowRight,
-  Terminal,
-  FileCode,
+  BookOpen,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  Code2,
+  FileCode2,
+  GraduationCap,
+  ShieldCheck,
+  Users,
+  XCircle,
 } from "lucide-react";
-import Link from "next/link";
 
-/* ============================================
-   ANIMATION VARIANTS
-   ============================================ */
 const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
+  hidden: { opacity: 0, y: 28 },
   visible: { opacity: 1, y: 0 },
 };
 
-const staggerContainer = {
+const stagger = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.12,
-      delayChildren: 0.1,
+      staggerChildren: 0.1,
+      delayChildren: 0.08,
     },
   },
 };
 
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: { opacity: 1, scale: 1 },
-};
+const studentHighlights = [
+  {
+    title: "Submit code with confidence",
+    description:
+      "Upload C/C++ work, track each attempt, and understand compile vs runtime outcomes.",
+    icon: FileCode2,
+  },
+  {
+    title: "Know deadlines and penalties",
+    description:
+      "See due dates, late windows, and policy impact before you click submit.",
+    icon: CalendarClock,
+  },
+  {
+    title: "Readable grading feedback",
+    description:
+      "Test-case results are grouped clearly so you know what failed and why.",
+    icon: CheckCircle2,
+  },
+];
 
-/* ============================================
-   COMPONENTS
-   ============================================ */
+const staffHighlights = [
+  {
+    title: "Assignment-level autograding",
+    description:
+      "Define tests once, then apply consistently across every student submission.",
+    icon: BookOpen,
+  },
+  {
+    title: "Roster and role control",
+    description:
+      "Manage course staff and students with clear, scoped permissions per course.",
+    icon: Users,
+  },
+  {
+    title: "Safe execution pipeline",
+    description:
+      "Untrusted code runs through isolated grading workers with predictable limits.",
+    icon: ShieldCheck,
+  },
+];
+
+const workflow = [
+  {
+    title: "Staff publish assignment",
+    note: "Instructions, tests, due date, and grading mode are configured once.",
+  },
+  {
+    title: "Students submit C/C++",
+    note: "The queue receives each submission with full attempt history retained.",
+  },
+  {
+    title: "Autograder runs tests",
+    note: "Compile and runtime results are separated for actionable debugging.",
+  },
+  {
+    title: "Feedback and review",
+    note: "Students iterate faster while staff review edge cases and overrides.",
+  },
+];
+
+const codeLines = [
+  "#include <iostream>",
+  "#include <vector>",
+  "using namespace std;",
+  "",
+  "int sum_even(const vector<int>& values) {",
+  "  int total = 0;",
+  "  for (int v : values) {",
+  "    if (v % 2 == 0) total += v;",
+  "  }",
+  "  return total;",
+  "}",
+];
 
 function Navbar() {
   return (
     <motion.nav
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="fixed top-0 left-0 right-0 z-50 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--border)]"
+      transition={{ duration: 0.55 }}
+      className="fixed inset-x-0 top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-md"
     >
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-            <GraduationCap className="w-5 h-5 text-white" />
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary)] text-white">
+            <GraduationCap className="h-5 w-5" />
           </div>
-          <span className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)] tracking-tight">
+          <span className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)]">
             Marconi<span className="text-[var(--primary)]">.</span>
           </span>
         </Link>
 
-        {/* Navigation Links */}
-        <div className="hidden md:flex items-center gap-8">
-          <Link
-            href="#features"
-            className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-          >
-            Features
-          </Link>
-          <Link
-            href="#how-it-works"
-            className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-          >
-            How It Works
-          </Link>
+        <div className="hidden items-center gap-7 text-sm md:flex">
+          <a href="#students" className="text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]">
+            Students
+          </a>
+          <a href="#staff" className="text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]">
+            Staff
+          </a>
+          <a href="#workflow" className="text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]">
+            Workflow
+          </a>
         </div>
 
-        {/* CTA */}
         <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="text-sm font-bold text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors"
-          >
+          <Link href="/login" className="text-sm font-bold text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">
             Sign In
           </Link>
           <Link
             href="/login"
-            className="px-4 py-2 text-sm font-bold bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-hover)] transition-colors"
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--primary-hover)]"
           >
-            Get Started
+            Open Platform
           </Link>
         </div>
       </div>
@@ -96,195 +153,293 @@ function Navbar() {
   );
 }
 
-function HeroSection() {
+function EngineeringPanel() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: `linear-gradient(var(--primary) 1px, transparent 1px),
-                              linear-gradient(90deg, var(--primary) 1px, transparent 1px)`,
-            backgroundSize: "60px 60px",
-          }}
-        />
-        {/* Gradient orbs */}
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-[var(--primary)]/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-[var(--secondary)]/5 rounded-full blur-3xl" />
+    <motion.div
+      initial={{ opacity: 0, x: 28 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.7, delay: 0.15 }}
+      className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-[0_24px_60px_-42px_rgba(14,58,102,0.55)]"
+    >
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)]/65 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="h-2.5 w-2.5 rounded-full bg-[var(--secondary)]/80" />
+          <div className="h-2.5 w-2.5 rounded-full bg-[var(--warning)]/80" />
+          <div className="h-2.5 w-2.5 rounded-full bg-[var(--success)]/80" />
+        </div>
+        <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-semibold text-[var(--muted-foreground)]">
+          <Code2 className="h-3.5 w-3.5" />
+          grader/session.cpp
+        </div>
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-6 py-24">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-          className="text-center"
-        >
-          {/* Headline */}
-          <motion.h1
-            variants={fadeInUp}
-            className="font-[family-name:var(--font-display)] text-5xl md:text-7xl font-bold text-[var(--foreground)] leading-[1.1] tracking-tight mb-6"
-          >
-            Where Code Meets
-            <br />
-            <span className="text-[var(--primary)]">Academic Excellence</span>
-          </motion.h1>
+      <div className="grid gap-0 lg:grid-cols-[1.45fr_1fr]">
+        <div className="border-b border-[var(--border)] p-4 lg:border-b-0 lg:border-r">
+          <pre className="overflow-x-auto rounded-lg bg-[var(--code-surface)] p-4 text-[12px] leading-6 text-[var(--code-foreground)]">
+            {codeLines.map((line, idx) => (
+              <motion.div
+                key={`${line}-${idx}`}
+                initial={{ opacity: 0.25 }}
+                animate={{ opacity: [0.25, 1, 0.7] }}
+                transition={{ delay: 0.08 * idx, duration: 2.8, repeat: Infinity, repeatDelay: 1.8 }}
+                className="font-[family-name:var(--font-mono)]"
+              >
+                <span className="mr-3 select-none text-[var(--code-line-number)]">{String(idx + 1).padStart(2, "0")}</span>
+                {line || " "}
+              </motion.div>
+            ))}
+          </pre>
+        </div>
 
-          {/* Subheadline */}
+        <div className="space-y-4 p-4">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+              <Clock3 className="h-3.5 w-3.5" />
+              Queue
+            </div>
+            <div className="space-y-2 text-sm">
+              <p className="flex items-center justify-between">
+                <span>SUB-4821</span>
+                <span className="rounded bg-[var(--primary)]/10 px-2 py-0.5 text-xs font-semibold text-[var(--primary)]">grading</span>
+              </p>
+              <p className="flex items-center justify-between">
+                <span>SUB-4822</span>
+                <span className="rounded bg-[var(--muted)] px-2 py-0.5 text-xs font-semibold text-[var(--muted-foreground)]">pending</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+              Test Results
+            </div>
+            <div className="space-y-2 text-sm">
+              <p className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  test_even_sum
+                </span>
+                <span className="font-semibold text-emerald-700">PASS</span>
+              </p>
+              <p className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-[var(--secondary)]" />
+                  test_negative_range
+                </span>
+                <span className="font-semibold text-[var(--secondary)]">FAIL</span>
+              </p>
+              <p className="rounded bg-[var(--secondary)]/10 px-2 py-1 text-xs text-[var(--secondary)]">
+                Runtime mismatch at case #2: expected 12, received 10
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <motion.div
+        className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--primary)]/10 blur-3xl"
+        animate={{ scale: [1, 1.16, 1] }}
+        transition={{ duration: 5.4, repeat: Infinity }}
+      />
+    </motion.div>
+  );
+}
+
+function HeroSection() {
+  return (
+    <section className="relative overflow-hidden pt-28">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.055]"
+        style={{
+          backgroundImage:
+            "linear-gradient(var(--primary) 1px, transparent 1px), linear-gradient(90deg, var(--primary) 1px, transparent 1px)",
+          backgroundSize: "52px 52px",
+        }}
+      />
+      <motion.div
+        className="pointer-events-none absolute -left-20 top-24 h-72 w-72 rounded-full bg-[var(--primary)]/10 blur-3xl"
+        animate={{ x: [0, 26, 0], y: [0, -20, 0] }}
+        transition={{ duration: 10, repeat: Infinity }}
+      />
+      <motion.div
+        className="pointer-events-none absolute -right-24 bottom-16 h-72 w-72 rounded-full bg-[var(--secondary)]/10 blur-3xl"
+        animate={{ x: [0, -24, 0], y: [0, 18, 0] }}
+        transition={{ duration: 11, repeat: Infinity }}
+      />
+
+      <div className="mx-auto grid w-full max-w-6xl gap-10 px-6 py-16 lg:grid-cols-[1.08fr_1fr] lg:items-center">
+        <motion.div variants={stagger} initial="hidden" animate="visible" className="max-w-2xl">
           <motion.p
             variants={fadeInUp}
-            className="max-w-2xl mx-auto text-lg md:text-xl text-[var(--muted-foreground)] mb-10 leading-relaxed"
+            className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--card)] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--primary)]"
           >
-            A modern platform for programming courses—built for students who submit
-            code and staff who teach, manage rosters, and grade consistently at scale.
+            C/C++ coursework platform
           </motion.p>
-
-          {/* CTAs */}
-          <motion.div
+          <motion.h1
             variants={fadeInUp}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="font-[family-name:var(--font-display)] text-5xl font-bold leading-[1.04] tracking-tight text-[var(--foreground)] md:text-7xl"
           >
+            Built for students
+            <br />
+            <span className="text-[var(--primary)]">ready to ship working code.</span>
+          </motion.h1>
+          <motion.p variants={fadeInUp} className="mt-6 text-lg leading-relaxed text-[var(--muted-foreground)] md:text-xl">
+            Marconi keeps the student path fast and clear, while giving staff the controls needed to run serious programming courses.
+            Submissions, autograding, modules, and roster operations all live in one engineering workflow.
+          </motion.p>
+          <motion.div variants={fadeInUp} className="mt-9 flex flex-wrap items-center gap-3">
             <Link
               href="/login"
-              className="group flex items-center gap-2 px-6 py-3 bg-[var(--primary)] text-white font-bold rounded-lg hover:bg-[var(--primary-hover)] transition-all shadow-lg shadow-[var(--primary)]/20"
+              className="group inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--primary-hover)]"
             >
-              I’m a Student
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              Student Login
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <Link
               href="/login"
-              className="flex items-center gap-2 px-6 py-3 bg-[var(--card)] text-[var(--foreground)] font-bold rounded-lg border border-[var(--border)] hover:border-[var(--primary)]/30 transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-6 py-3 text-sm font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--background)]"
             >
-              I’m Course Staff
+              Staff Console
             </Link>
           </motion.div>
-
-          {/* Stats */}
-          <motion.div
-            variants={fadeInUp}
-            className="mt-20 grid grid-cols-3 gap-8 max-w-2xl mx-auto"
-          >
-            {[
-              { value: "C/C++", label: "First-class submissions" },
-              { value: "Modules", label: "Organize course content" },
-              { value: "Test Cases", label: "Autograding you can trust" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="font-[family-name:var(--font-display)] text-3xl md:text-4xl font-bold text-[var(--primary)]">
-                  {stat.value}
-                </div>
-                <div className="text-sm text-[var(--muted-foreground)] mt-1">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
+          <motion.div variants={fadeInUp} className="mt-12 grid grid-cols-3 gap-5">
+            <div>
+              <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--primary)]">C/C++</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Native assignment support</p>
+            </div>
+            <div>
+              <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--primary)]">Queue</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Reliable grading pipeline</p>
+            </div>
+            <div>
+              <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--primary)]">Tests</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Assignment-level consistency</p>
+            </div>
           </motion.div>
         </motion.div>
+
+        <EngineeringPanel />
       </div>
     </section>
   );
 }
 
-function FeaturesSection() {
-  const features = [
-    {
-      icon: BookOpen,
-      title: "Course Management",
-      description:
-        "Organize your curriculum into modules. Add resources, set deadlines, and keep everything in one place.",
-      color: "var(--primary)",
-    },
-    {
-      icon: Code2,
-      title: "Student Submissions",
-      description:
-        "Students submit C/C++ solutions and see clear results. Staff gets a clean history and a predictable grading flow.",
-      color: "var(--secondary)",
-    },
-    {
-      icon: Terminal,
-      title: "Sandboxed Execution",
-      description:
-        "Run untrusted code in isolation with strict resource limits. Built to be safe, secure, and scalable.",
-      color: "var(--primary)",
-    },
-    {
-      icon: Sparkles,
-      title: "Assignments + Test Cases",
-      description:
-        "Define grading rules once at the assignment level—then submissions follow the same rules every time.",
-      color: "var(--secondary)",
-    },
-    {
-      icon: Users,
-      title: "Role-Based Access",
-      description:
-        "Lecturers, co-lecturers, TAs, and students—each with scoped permissions and an audit trail.",
-      color: "var(--primary)",
-    },
-    {
-      icon: FileCode,
-      title: "Clear Feedback",
-      description:
-        "Show the right level of detail: compile errors vs runtime errors vs infrastructure issues—without guesswork.",
-      color: "var(--secondary)",
-    },
-  ];
-
+function AudienceSection() {
   return (
-    <section id="features" className="py-32 relative">
-      <div className="max-w-6xl mx-auto px-6">
+    <section className="py-24">
+      <div className="mx-auto w-full max-w-6xl px-6">
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <motion.div
+            id="students"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+            variants={stagger}
+            className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-8"
+          >
+            <motion.p variants={fadeInUp} className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
+              Student First
+            </motion.p>
+            <motion.h2 variants={fadeInUp} className="mt-2 text-3xl font-bold text-[var(--foreground)] md:text-4xl">
+              The daily experience is built around student momentum.
+            </motion.h2>
+            <motion.div variants={stagger} className="mt-7 grid gap-4">
+              {studentHighlights.map((item) => (
+                <motion.div
+                  key={item.title}
+                  variants={fadeInUp}
+                  className="flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/12 text-[var(--primary)]">
+                    <item.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-[var(--foreground)]">{item.title}</p>
+                    <p className="text-sm text-[var(--muted-foreground)]">{item.description}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.div>
+
+          <motion.div
+            id="staff"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+            variants={stagger}
+            className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-8"
+          >
+            <motion.p variants={fadeInUp} className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--secondary)]">
+              Staff Control
+            </motion.p>
+            <motion.h3 variants={fadeInUp} className="mt-2 text-2xl font-bold text-[var(--foreground)]">
+              Staff tools stay focused and production-safe.
+            </motion.h3>
+            <motion.div variants={stagger} className="mt-6 space-y-3">
+              {staffHighlights.map((item) => (
+                <motion.div
+                  key={item.title}
+                  variants={fadeInUp}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
+                >
+                  <div className="mb-2 flex items-center gap-2 text-[var(--foreground)]">
+                    <item.icon className="h-4 w-4 text-[var(--secondary)]" />
+                    <p className="font-semibold">{item.title}</p>
+                  </div>
+                  <p className="text-sm text-[var(--muted-foreground)]">{item.description}</p>
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WorkflowSection() {
+  return (
+    <section id="workflow" className="border-y border-[var(--border)] bg-[var(--card)] py-24">
+      <div className="mx-auto w-full max-w-6xl px-6">
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={staggerContainer}
-          className="text-center mb-16"
+          viewport={{ once: true, margin: "-80px" }}
+          variants={stagger}
+          className="mb-12"
         >
-          <motion.span
-            variants={fadeInUp}
-            className="text-sm font-medium text-[var(--primary)] uppercase tracking-wider"
-          >
-            Features
-          </motion.span>
-          <motion.h2
-            variants={fadeInUp}
-            className="font-[family-name:var(--font-display)] text-4xl md:text-5xl font-bold text-[var(--foreground)] mt-4"
-          >
-            Everything You Need to Teach Code
+          <motion.p variants={fadeInUp} className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
+            Engineering Workflow
+          </motion.p>
+          <motion.h2 variants={fadeInUp} className="mt-2 text-3xl font-bold text-[var(--foreground)] md:text-5xl">
+            One path from assignment design to learner feedback.
           </motion.h2>
         </motion.div>
 
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={staggerContainer}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+          viewport={{ once: true, margin: "-60px" }}
+          variants={stagger}
+          className="grid gap-4 md:grid-cols-2"
         >
-          {features.map((feature) => (
+          {workflow.map((item, idx) => (
             <motion.div
-              key={feature.title}
-              variants={scaleIn}
-              className="group p-8 bg-[var(--card)] rounded-2xl border border-[var(--border)] hover:border-[var(--primary)]/30 hover:shadow-xl hover:shadow-[var(--primary)]/5 transition-all duration-300"
+              key={item.title}
+              variants={fadeInUp}
+              className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)] p-6"
             >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
-                style={{ backgroundColor: `color-mix(in srgb, ${feature.color} 15%, transparent)` }}
-              >
-                <feature.icon
-                  className="w-6 h-6"
-                  style={{ color: feature.color }}
-                />
-              </div>
-              <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)] mb-3">
-                {feature.title}
-              </h3>
-              <p className="text-[var(--muted-foreground)] leading-relaxed">
-                {feature.description}
+              <motion.div
+                className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-[var(--primary)] via-[var(--secondary)] to-[var(--primary)]"
+                animate={{ x: ["-100%", "100%"] }}
+                transition={{ duration: 5.2, repeat: Infinity, delay: idx * 0.45 }}
+              />
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                Step {String(idx + 1).padStart(2, "0")}
               </p>
+              <p className="text-xl font-bold text-[var(--foreground)]">{item.title}</p>
+              <p className="mt-2 text-sm text-[var(--muted-foreground)]">{item.note}</p>
             </motion.div>
           ))}
         </motion.div>
@@ -293,131 +448,35 @@ function FeaturesSection() {
   );
 }
 
-function HowItWorksSection() {
-  const steps = [
-    {
-      step: "01",
-      title: "Create Your Course",
-      description:
-        "Set up your course structure with modules, resources, and assignment templates. Invite students via secure, single-use links.",
-    },
-    {
-      step: "02",
-      title: "Design Assignments",
-      description:
-        "Write instructions in Markdown, add starter code, and define hidden test cases. Set due dates and late policies.",
-    },
-    {
-      step: "03",
-      title: "Students Submit Code",
-      description:
-        "Students upload their C/C++ solutions. Our system queues, compiles, and executes code in secure sandboxes.",
-    },
-    {
-      step: "04",
-      title: "Instant Feedback",
-      description:
-        "Auto-grading shows pass/fail per test case, plus actionable compile/runtime output when things go wrong.",
-    },
-  ];
-
-  return (
-    <section
-      id="how-it-works"
-      className="py-32 bg-[var(--card)] border-y border-[var(--border)]"
-    >
-      <div className="max-w-6xl mx-auto px-6">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={staggerContainer}
-          className="text-center mb-16"
-        >
-          <motion.span
-            variants={fadeInUp}
-            className="text-sm font-medium text-[var(--secondary)] uppercase tracking-wider"
-          >
-            How It Works
-          </motion.span>
-          <motion.h2
-            variants={fadeInUp}
-            className="font-[family-name:var(--font-display)] text-4xl md:text-5xl font-bold text-[var(--foreground)] mt-4"
-          >
-            From Assignment to Grade in Minutes
-          </motion.h2>
-        </motion.div>
-
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={staggerContainer}
-          className="relative"
-        >
-          {/* Connection line */}
-          <div className="hidden lg:block absolute top-24 left-[calc(12.5%+24px)] right-[calc(12.5%+24px)] h-0.5 bg-gradient-to-r from-[var(--primary)] via-[var(--secondary)] to-[var(--primary)]" />
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((item) => (
-              <motion.div
-                key={item.step}
-                variants={fadeInUp}
-                className="relative text-center"
-              >
-                {/* Step number */}
-                <div className="relative z-10 w-12 h-12 mx-auto mb-6 rounded-full bg-[var(--background)] border-2 border-[var(--primary)] flex items-center justify-center">
-                  <span className="font-[family-name:var(--font-mono)] text-sm font-bold text-[var(--primary)]">
-                    {item.step}
-                  </span>
-                </div>
-                <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)] mb-3">
-                  {item.title}
-                </h3>
-                <p className="text-[var(--muted-foreground)] leading-relaxed">
-                  {item.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
 function CTASection() {
   return (
-    <section className="py-32">
-      <div className="max-w-4xl mx-auto px-6">
+    <section className="py-24">
+      <div className="mx-auto w-full max-w-5xl px-6">
         <motion.div
-          initial="hidden"
-          whileInView="visible"
+          initial={{ opacity: 0, y: 28 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          variants={staggerContainer}
-          className="relative p-12 md:p-16 bg-[var(--primary)] rounded-3xl text-center overflow-hidden"
+          transition={{ duration: 0.55 }}
+          className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--primary)] p-10 text-center md:p-14"
         >
-          {/* Decorative elements */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-[var(--secondary)]/20 rounded-full blur-2xl -translate-x-1/2 translate-y-1/2" />
-
-          <motion.div variants={fadeInUp} className="relative z-10">
-            <GraduationCap className="w-12 h-12 text-white/80 mx-auto mb-6" />
-            <h2 className="font-[family-name:var(--font-display)] text-3xl md:text-4xl font-bold text-white mb-4">
-              Ready to Transform Your Classroom?
-            </h2>
-            <p className="text-white/70 text-lg mb-8 max-w-xl mx-auto">
-              Join lecturers at Makerere University who are already using
-              Marconi to streamline their programming courses.
-            </p>
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[var(--primary)] font-bold rounded-xl hover:bg-white/90 transition-colors shadow-xl"
-            >
-              Get Started Today
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          </motion.div>
+          <motion.div
+            className="pointer-events-none absolute -left-12 top-0 h-52 w-52 rounded-full bg-white/10 blur-3xl"
+            animate={{ scale: [1, 1.15, 1] }}
+            transition={{ duration: 7.4, repeat: Infinity }}
+          />
+          <h2 className="relative z-10 text-3xl font-bold text-white md:text-4xl">
+            Build stronger coding outcomes this semester.
+          </h2>
+          <p className="relative z-10 mx-auto mt-4 max-w-2xl text-white/80">
+            Students get fast, understandable feedback. Staff get a reliable grading and course-operations surface.
+          </p>
+          <Link
+            href="/login"
+            className="relative z-10 mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-sm font-bold text-[var(--primary)] transition-colors hover:bg-white/90"
+          >
+            Launch Marconi
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </motion.div>
       </div>
     </section>
@@ -426,54 +485,28 @@ function CTASection() {
 
 function Footer() {
   return (
-    <footer className="py-12 border-t border-[var(--border)]">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-              <GraduationCap className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-[family-name:var(--font-display)] text-lg font-bold text-[var(--foreground)]">
-              Marconi
-            </span>
+    <footer className="border-t border-[var(--border)] py-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-5 px-6 text-sm text-[var(--muted-foreground)] md:flex-row">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--primary)] text-white">
+            <GraduationCap className="h-4 w-4" />
           </div>
-
-          {/* Links */}
-          <div className="flex items-center gap-6 text-sm text-[var(--muted-foreground)]">
-            <span>
-              Built at <a
-                href="https://cit.ac.ug"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--primary)] hover:underline"
-              >
-                Marconi Lab
-              </a>
-            </span>
-          </div>
-
-          {/* Copyright */}
-          <div className="text-sm text-[var(--muted-foreground)]">
-            &copy; {new Date().getFullYear()} Makerere University
-          </div>
+          <span className="font-[family-name:var(--font-display)] text-lg font-bold text-[var(--foreground)]">Marconi</span>
         </div>
+        <p>Built for programming courses at university scale.</p>
+        <p>&copy; {new Date().getFullYear()} Makerere University</p>
       </div>
     </footer>
   );
 }
-
-/* ============================================
-   PAGE EXPORT
-   ============================================ */
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-[var(--background)]">
       <Navbar />
       <HeroSection />
-      <FeaturesSection />
-      <HowItWorksSection />
+      <AudienceSection />
+      <WorkflowSection />
       <CTASection />
       <Footer />
     </main>

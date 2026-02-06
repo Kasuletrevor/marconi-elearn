@@ -127,6 +127,7 @@ jobs:
           JOBE_TIMEOUT_SECONDS: ${{ secrets.JOBE_TIMEOUT_SECONDS != '' && secrets.JOBE_TIMEOUT_SECONDS || '20' }}
           JOBE_ALLOWED_LANGUAGES: ${{ secrets.JOBE_ALLOWED_LANGUAGES != '' && secrets.JOBE_ALLOWED_LANGUAGES || 'c,cpp,python3,java' }}
           REDIS_URL: ${{ secrets.REDIS_URL != '' && secrets.REDIS_URL || 'redis://redis:6379/0' }}
+          TOKEN_ENCRYPTION_KEY: ${{ secrets.TOKEN_ENCRYPTION_KEY }}
           DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
           DOCKER_TAG: main-${{ github.sha }}
           SESSION_COOKIE_SECURE: "true"
@@ -142,6 +143,9 @@ jobs:
           def get(name: str, default: str = "") -> str:
               value = os.environ.get(name)
               return value if value else default
+
+          if not get("TOKEN_ENCRYPTION_KEY"):
+              raise SystemExit("Missing TOKEN_ENCRYPTION_KEY in GitHub Secrets")
 
           lines = [
               f"POSTGRES_USER={get('POSTGRES_USER')}",

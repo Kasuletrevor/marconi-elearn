@@ -10,3 +10,12 @@ __pycache__/
 dist/
 build/
 *.egg
+
+# Playwright artifacts
+frontend/test-results/
+frontend/playwright-report/
+output/playwright/
+
+# GitHub App private keys
+*.pem
+github-app-private-key*

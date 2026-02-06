@@ -2,8 +2,8 @@
 
 /* ============================================
    MARCONI ELEARN - DESIGN TOKENS
-   Aesthetic: Modern Academic Archive
-   Palette: Emergent Navy + Warm Paper
+   Aesthetic: Signal Lab
+   Palette: Student-first engineering UI
    ============================================ */
 
 :root {
@@ -11,36 +11,43 @@
   --font-dm-sans: "DM Sans";
   --font-jetbrains: "JetBrains Mono";
 
-  /* Canvas - The warm paper background */
-  --background: #F5F2ED;
-  --foreground: #1A1A1A;
+  /* Canvas */
+  --background: #F3F7FB;
+  --foreground: #0B1726;
 
-  /* Brand - Emergent Navy (Primary) */
-  --primary: #193E74;
-  --primary-hover: #2C5FA8;
+  /* Brand */
+  --primary: #0E3A66;
+  --primary-hover: #15508B;
   --primary-foreground: #FFFFFF;
 
-  /* Accent - CEDAT Brick (Secondary) */
-  --secondary: #B24A3A;
-  --secondary-hover: #8F3B2E;
+  /* Accent */
+  --secondary: #E07A24;
+  --secondary-hover: #BF6418;
   --secondary-foreground: #FFFFFF;
 
-  /* Surface - Ice Blue cards */
-  --card: #EEF6FB;
-  --card-foreground: #1A1A1A;
+  /* Surface */
+  --card: #FFFFFF;
+  --card-foreground: #0B1726;
 
   /* Muted elements */
-  --muted: #F1F5F9;
-  --muted-foreground: #475569;
+  --muted: #E8F0F8;
+  --muted-foreground: #40566F;
 
   /* Borders */
-  --border: #D8E3EE;
-  --ring: #193E74;
+  --border: #C6D6E6;
+  --ring: #15508B;
 
   /* Status colors */
-  --success: #16A34A;
-  --warning: #CA8A04;
-  --destructive: #DC2626;
+  --info: #1F5E99;
+  --success: #14804A;
+  --warning: #B76A00;
+  --destructive: #C43D2F;
+
+  /* Code surfaces */
+  --code-surface: #0A1B2E;
+  --code-surface-alt: #10253A;
+  --code-foreground: #D7E4F4;
+  --code-line-number: #6E8194;
 }
 
 /* Tailwind v4 theme configuration */
@@ -68,6 +75,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-destructive: var(--destructive);
+  --color-info: var(--info);
 
   /* Typography */
   --font-display: var(--font-playfair), Georgia, serif;
@@ -111,6 +119,24 @@ html {
 ::selection {
   background-color: var(--primary);
   color: var(--primary-foreground);
+}
+
+/* Required field indicator */
+label.required-label::after,
+label:has(+ input[required])::after,
+label:has(+ textarea[required])::after,
+label:has(+ select[required])::after,
+label:has(+ div input[required])::after,
+label:has(+ div textarea[required])::after,
+label:has(+ div select[required])::after {
+  content: " *";
+  color: var(--secondary);
+  font-weight: 700;
+}
+
+.required-hint {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
 }
 
 /* Noise texture overlay */
