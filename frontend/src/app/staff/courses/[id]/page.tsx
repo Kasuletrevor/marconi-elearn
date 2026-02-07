@@ -97,6 +97,35 @@ const IMPORT_ISSUE_REASON_LABELS: Record<string, string> = {
   student_number_taken_in_course: "Student number already exists in this course",
 };
 
+const REQUIRED_ROSTER_HEADERS = ["email", "name", "student_number", "programme"] as const;
+
+type CsvPreviewIssue = {
+  rowNumber: number | null;
+  reasonCode: string;
+  reasonLabel: string;
+  email: string;
+  fullName: string;
+  studentNumber: string;
+  programme: string;
+};
+
+type CsvPreviewRow = {
+  rowNumber: number;
+  email: string;
+  fullName: string;
+  studentNumber: string;
+  programme: string;
+  isValid: boolean;
+};
+
+type CsvPreviewData = {
+  fileName: string;
+  headerRow: string[];
+  missingHeaders: string[];
+  rows: CsvPreviewRow[];
+  issues: CsvPreviewIssue[];
+};
+
 type TabType = "overview" | "submissions" | "roster" | "assignments" | "modules";
 
 export default function StaffCoursePage() {
@@ -1232,6 +1261,9 @@ function RosterTab({
   const [showStaffSection, setShowStaffSection] = useState(false);
   const [inviteLinks, setInviteLinks] = useState<string[]>([]);
   const [lastImportResult, setLastImportResult] = useState<ImportCsvResult | null>(null);
+  const [selectedCsvFile, setSelectedCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<CsvPreviewData | null>(null);
+  const [isBuildingCsvPreview, setIsBuildingCsvPreview] = useState(false);
   const [notifyNewSubmissions, setNotifyNewSubmissions] = useState(true);
   const [isSavingNotifyNewSubmissions, setIsSavingNotifyNewSubmissions] = useState(false);
   const [notifyPrefError, setNotifyPrefError] = useState("");
@@ -1595,9 +1627,186 @@ function RosterTab({
     }
   }
 
-  async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (char === '"') {
+        const next = line[i + 1];
+        if (inQuotes && next === '"') {
+          current += '"';
+          i += 1;
+          continue;
+        }
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (char === "," && !inQuotes) {
+        values.push(current);
+        current = "";
+        continue;
+      }
+      current += char;
+    }
+    values.push(current);
+    return values;
+  }
+
+  async function buildCsvPreview(file: File): Promise<CsvPreviewData> {
+    const text = await file.text();
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+
+    const headerCells = parseCsvLine(lines[0] ?? "").map((value) => value.trim());
+    const headerIndex = new Map<string, number>();
+    headerCells.forEach((header, index) => {
+      if (!header) return;
+      const key = header.toLowerCase();
+      if (!headerIndex.has(key)) {
+        headerIndex.set(key, index);
+      }
+    });
+
+    const missingHeaders = REQUIRED_ROSTER_HEADERS.filter((header) => !headerIndex.has(header));
+    const issues: CsvPreviewIssue[] = missingHeaders.map((header) => ({
+      rowNumber: null,
+      reasonCode: "missing_required_headers",
+      reasonLabel: `Missing required header: ${header}`,
+      email: "",
+      fullName: "",
+      studentNumber: "",
+      programme: "",
+    }));
+
+    const rows: CsvPreviewRow[] = [];
+    const seenStudentNumbers = new Set<string>();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const getCellValue = (cells: string[], key: string): string => {
+      const index = headerIndex.get(key);
+      if (index === undefined) return "";
+      return (cells[index] ?? "").trim();
+    };
+
+    for (let index = 1; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (!line || !line.trim()) continue;
+
+      const rowNumber = index + 1;
+      const cells = parseCsvLine(line);
+      const email = getCellValue(cells, "email");
+      const fullName = getCellValue(cells, "name");
+      const studentNumber = getCellValue(cells, "student_number");
+      const programme = getCellValue(cells, "programme");
+
+      if (!email && !fullName && !studentNumber && !programme) continue;
+
+      const rowIssues: CsvPreviewIssue[] = [];
+      const pushRowIssue = (reasonCode: string, reasonLabel: string) => {
+        rowIssues.push({
+          rowNumber,
+          reasonCode,
+          reasonLabel,
+          email,
+          fullName,
+          studentNumber,
+          programme,
+        });
+      };
+
+      if (!email || !emailRegex.test(email)) {
+        pushRowIssue("invalid_email", IMPORT_ISSUE_REASON_LABELS.invalid_email);
+      }
+      if (!fullName) {
+        pushRowIssue("missing_name", IMPORT_ISSUE_REASON_LABELS.missing_name);
+      }
+      if (!studentNumber) {
+        pushRowIssue("missing_student_number", IMPORT_ISSUE_REASON_LABELS.missing_student_number);
+      }
+      if (!programme) {
+        pushRowIssue("missing_programme", IMPORT_ISSUE_REASON_LABELS.missing_programme);
+      }
+      if (studentNumber) {
+        if (seenStudentNumbers.has(studentNumber)) {
+          pushRowIssue(
+            "duplicate_student_number_in_csv",
+            IMPORT_ISSUE_REASON_LABELS.duplicate_student_number_in_csv
+          );
+        } else {
+          seenStudentNumbers.add(studentNumber);
+        }
+      }
+
+      issues.push(...rowIssues);
+      rows.push({
+        rowNumber,
+        email,
+        fullName,
+        studentNumber,
+        programme,
+        isValid: rowIssues.length === 0 && missingHeaders.length === 0,
+      });
+    }
+
+    return {
+      fileName: file.name,
+      headerRow: headerCells,
+      missingHeaders,
+      rows,
+      issues,
+    };
+  }
+
+  async function handleCsvFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+
+    setNoticeArea("student");
+    setError("");
+    setSuccess("");
+    setInviteLinks([]);
+    setLastImportResult(null);
+    setSelectedCsvFile(file);
+    setIsBuildingCsvPreview(true);
+
+    try {
+      const preview = await buildCsvPreview(file);
+      setCsvPreview(preview);
+
+      const rowIssueCount = preview.issues.filter((issue) => issue.rowNumber !== null).length;
+      if (preview.missingHeaders.length > 0) {
+        setError(
+          `Preview failed: missing headers (${preview.missingHeaders.join(", ")}). Download the template and retry.`
+        );
+      } else {
+        const validRows = preview.rows.filter((row) => row.isValid).length;
+        setSuccess(
+          `Preview ready: ${preview.rows.length} row(s), ${validRows} valid, ${rowIssueCount} row issue(s).`
+        );
+      }
+    } catch {
+      setCsvPreview(null);
+      setSelectedCsvFile(null);
+      setError("Failed to parse CSV preview. Check file encoding/format and try again.");
+    } finally {
+      setIsBuildingCsvPreview(false);
+    }
+  }
+
+  async function importSelectedCsv() {
+    if (!selectedCsvFile || !csvPreview) {
+      setNoticeArea("student");
+      setError("Select and preview a CSV file first.");
+      return;
+    }
+    if (csvPreview.missingHeaders.length > 0) {
+      setNoticeArea("student");
+      setError("Cannot import: CSV is missing required headers.");
+      return;
+    }
 
     setIsAddingStudent(true);
     setNoticeArea("student");
@@ -1606,7 +1815,7 @@ function RosterTab({
     setInviteLinks([]);
     setLastImportResult(null);
     try {
-      const res = await courseStaff.importRosterCsv(course.id, file);     
+      const res = await courseStaff.importRosterCsv(course.id, selectedCsvFile);
       setLastImportResult(res);
       const msg = `Imported: ${res.created_invites} invites created, ${res.auto_enrolled} auto-enrolled.`;
       if (res.issues.length > 0) {
@@ -1616,14 +1825,14 @@ function RosterTab({
       }
       if ((res.invite_links ?? []).length > 0) setInviteLinks(res.invite_links);
       await onRefresh();
+      setSelectedCsvFile(null);
+      setCsvPreview(null);
     } catch (err) {
       setLastImportResult(null);
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to import CSV");
     } finally {
       setIsAddingStudent(false);
-      // Reset input
-      e.target.value = "";
     }
   }
 
@@ -1695,9 +1904,26 @@ function RosterTab({
     });
   }, [lastImportResult?.issues]);
 
+  const previewIssues = useMemo(() => {
+    if (!csvPreview) return [];
+    return csvPreview.issues.map((issue, idx) => ({
+      key: `preview-${issue.rowNumber ?? "header"}-${issue.reasonCode}-${idx}`,
+      email: issue.email?.trim() ? issue.email : "(unknown)",
+      rowNumber: issue.rowNumber,
+      fullName: issue.fullName,
+      studentNumber: issue.studentNumber,
+      programme: issue.programme,
+      reasonCode: issue.reasonCode,
+      reasonLabel: issue.reasonLabel,
+    }));
+  }, [csvPreview]);
+
+  const rosterIssues = importIssues.length > 0 ? importIssues : previewIssues;
+  const issueSourceLabel = importIssues.length > 0 ? "Import issues" : "Preview issues";
+
   function downloadIssueReportCsv() {
-    if (importIssues.length === 0) return;
-    const rows = importIssues.map((issue) => [
+    if (rosterIssues.length === 0) return;
+    const rows = rosterIssues.map((issue) => [
       issue.rowNumber === null ? "" : String(issue.rowNumber),
       issue.email,
       issue.fullName,
@@ -1716,8 +1942,8 @@ function RosterTab({
   }
 
   function downloadCorrectionCsv() {
-    if (importIssues.length === 0) return;
-    const rows = importIssues.map((issue) => [
+    if (rosterIssues.length === 0) return;
+    const rows = rosterIssues.map((issue) => [
       issue.email === "(unknown)" ? "" : issue.email,
       issue.fullName,
       issue.studentNumber,
@@ -1963,18 +2189,32 @@ function RosterTab({
               ref={fileInputRef}
               className="hidden"
               accept=".csv"
-              onChange={handleCsvUpload}
+              onChange={handleCsvFileSelected}
             />
             <div className="mt-4 grid gap-2">
               <button
                 ref={importCsvButtonRef}
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isAddingStudent}
+                disabled={isAddingStudent || isBuildingCsvPreview}
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-white disabled:opacity-60 transition-colors text-sm"
               >
+                {isBuildingCsvPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Select CSV
+              </button>
+              <button
+                type="button"
+                onClick={importSelectedCsv}
+                disabled={
+                  isAddingStudent ||
+                  !selectedCsvFile ||
+                  !csvPreview ||
+                  csvPreview.missingHeaders.length > 0
+                }
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+              >
                 {isAddingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                Import CSV
+                Import previewed CSV
               </button>
               <a
                 href="/templates/roster-template.csv"
@@ -1988,6 +2228,27 @@ function RosterTab({
             <p className="mt-3 text-[11px] text-[var(--muted-foreground)]">
               Required headers: <code>email,name,student_number,programme</code>
             </p>
+            {csvPreview && (
+              <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+                <p className="text-xs font-semibold text-[var(--foreground)] break-all">
+                  Preview file: {csvPreview.fileName}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                  Header check:{" "}
+                  {csvPreview.missingHeaders.length === 0 ? (
+                    <span className="text-[var(--success)] font-semibold">Pass</span>
+                  ) : (
+                    <span className="text-[var(--secondary)] font-semibold">
+                      Missing {csvPreview.missingHeaders.join(", ")}
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                  Rows parsed: {csvPreview.rows.length} | Row issues:{" "}
+                  {csvPreview.issues.filter((issue) => issue.rowNumber !== null).length}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="xl:col-span-3 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
@@ -2077,6 +2338,73 @@ function RosterTab({
           </div>
         </div>
 
+        {csvPreview && (
+          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <p className="text-xs uppercase tracking-wider text-[var(--muted-foreground)]">
+                CSV Preview
+              </p>
+              <p className="text-[11px] text-[var(--muted-foreground)]">
+                Standards:{" "}
+                {csvPreview.missingHeaders.length === 0 ? (
+                  <span className="font-semibold text-[var(--success)]">Header check passed</span>
+                ) : (
+                  <span className="font-semibold text-[var(--secondary)]">Header check failed</span>
+                )}
+              </p>
+            </div>
+
+            {csvPreview.rows.length === 0 ? (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                No data rows found in this file.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--card)]">
+                <table className="w-full min-w-[680px] text-xs">
+                  <thead className="bg-[var(--background)] border-b border-[var(--border)]">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold text-[var(--muted-foreground)]">Row</th>
+                      <th className="text-left px-3 py-2 font-semibold text-[var(--muted-foreground)]">Email</th>
+                      <th className="text-left px-3 py-2 font-semibold text-[var(--muted-foreground)]">Name</th>
+                      <th className="text-left px-3 py-2 font-semibold text-[var(--muted-foreground)]">Student #</th>
+                      <th className="text-left px-3 py-2 font-semibold text-[var(--muted-foreground)]">Programme</th>
+                      <th className="text-left px-3 py-2 font-semibold text-[var(--muted-foreground)]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {csvPreview.rows.slice(0, 12).map((row) => (
+                      <tr key={`${row.rowNumber}-${row.email}-${row.studentNumber}`}>
+                        <td className="px-3 py-2 text-[var(--muted-foreground)]">{row.rowNumber}</td>
+                        <td className="px-3 py-2 text-[var(--foreground)] break-all">{row.email || "-"}</td>
+                        <td className="px-3 py-2 text-[var(--foreground)]">{row.fullName || "-"}</td>
+                        <td className="px-3 py-2 text-[var(--foreground)]">{row.studentNumber || "-"}</td>
+                        <td className="px-3 py-2 text-[var(--foreground)]">{row.programme || "-"}</td>
+                        <td className="px-3 py-2">
+                          {row.isValid ? (
+                            <span className="inline-flex rounded-full bg-[var(--success)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--success)]">
+                              Valid
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-[var(--secondary)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--secondary)]">
+                              Needs fix
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {csvPreview.rows.length > 12 && (
+              <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                Showing first 12 rows of {csvPreview.rows.length}.
+              </p>
+            )}
+          </div>
+        )}
+
         {lastImportResult && (
           <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
             <p className="text-xs uppercase tracking-wider text-[var(--muted-foreground)] mb-3">
@@ -2099,10 +2427,12 @@ function RosterTab({
           </div>
         )}
 
-        {importIssues.length > 0 && (
+        {rosterIssues.length > 0 && (
           <div className="mt-4 rounded-2xl border border-[var(--secondary)]/30 bg-[var(--secondary)]/5 p-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-              <p className="text-sm font-semibold text-[var(--foreground)]">Rows needing correction</p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                Rows needing correction ({issueSourceLabel})
+              </p>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -2123,7 +2453,7 @@ function RosterTab({
               </div>
             </div>
             <div className="space-y-2">
-              {importIssues.slice(0, 8).map((issue) => (
+              {rosterIssues.slice(0, 8).map((issue) => (
                 <div
                   key={issue.key}
                   className="rounded-lg border border-[var(--secondary)]/20 bg-[var(--card)] px-3 py-2"
@@ -2149,9 +2479,16 @@ function RosterTab({
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-              Download correction CSV, fix rows, then import the corrected file.
-            </p>
+            {importIssues.length === 0 && (
+              <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                These are preview checks before import. Fix rows and then import.
+              </p>
+            )}
+            {importIssues.length > 0 && (
+              <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                Download correction CSV, fix rows, then import the corrected file.
+              </p>
+            )}
           </div>
         )}
 
