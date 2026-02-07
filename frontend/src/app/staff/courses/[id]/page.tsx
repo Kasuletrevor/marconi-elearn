@@ -62,6 +62,7 @@ import {
   type CourseMembershipUpdate,
   type CourseUpdate,
   type LatePolicy,
+  type ImportCsvIssue,
   type ImportCsvResult,
   ApiError,
 } from "@/lib/api";
@@ -1646,6 +1647,26 @@ function RosterTab({
     }
   }
 
+  function escapeCsvCell(value: string): string {
+    const escaped = value.replaceAll('"', '""');
+    return `"${escaped}"`;
+  }
+
+  function downloadCsv(filename: string, header: string[], rows: string[][]) {
+    const lines = [header, ...rows]
+      .map((cols) => cols.map((col) => escapeCsvCell(col)).join(","))
+      .join("\n");
+    const blob = new Blob([lines], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
   const roleLabels: Record<string, string> = {
     owner: "Owner",
     co_lecturer: "Co-Lecturer",
@@ -1654,18 +1675,62 @@ function RosterTab({
   };
 
   const importIssues = useMemo(() => {
-    const rawIssues = lastImportResult?.issues ?? [];
-    return rawIssues.map((raw, idx) => {
-      const row = raw as { email?: unknown; reason?: unknown };
-      const reasonCode = typeof row.reason === "string" ? row.reason : "unknown";
+    const rawIssues = (lastImportResult?.issues ?? []) as ImportCsvIssue[];
+    return rawIssues.map((issue, idx) => {
+      const reasonCode = issue.reason || "unknown";
+      const fullName = (issue.full_name ?? "").trim();
+      const studentNumber = (issue.student_number ?? "").trim();
+      const programme = (issue.programme ?? "").trim();
+      const rowNumber = typeof issue.row_number === "number" ? issue.row_number : null;
       return {
-        key: `${String(row.email ?? "unknown")}-${reasonCode}-${idx}`,
-        email: typeof row.email === "string" && row.email.trim() ? row.email : "(unknown)",
+        key: `${String(issue.email ?? "unknown")}-${reasonCode}-${idx}`,
+        email: issue.email?.trim() ? issue.email : "(unknown)",
+        rowNumber,
+        fullName,
+        studentNumber,
+        programme,
         reasonCode,
         reasonLabel: IMPORT_ISSUE_REASON_LABELS[reasonCode] ?? reasonCode,
       };
     });
   }, [lastImportResult?.issues]);
+
+  function downloadIssueReportCsv() {
+    if (importIssues.length === 0) return;
+    const rows = importIssues.map((issue) => [
+      issue.rowNumber === null ? "" : String(issue.rowNumber),
+      issue.email,
+      issue.fullName,
+      issue.studentNumber,
+      issue.programme,
+      issue.reasonCode,
+      issue.reasonLabel,
+    ]);
+    downloadCsv(
+      `roster-import-issues-${course.code.toLowerCase()}.csv`,
+      ["row_number", "email", "name", "student_number", "programme", "reason_code", "reason"],
+      rows
+    );
+    setNoticeArea("student");
+    setSuccess("Issue report CSV downloaded.");
+  }
+
+  function downloadCorrectionCsv() {
+    if (importIssues.length === 0) return;
+    const rows = importIssues.map((issue) => [
+      issue.email === "(unknown)" ? "" : issue.email,
+      issue.fullName,
+      issue.studentNumber,
+      issue.programme,
+    ]);
+    downloadCsv(
+      `roster-corrections-${course.code.toLowerCase()}.csv`,
+      ["email", "name", "student_number", "programme"],
+      rows
+    );
+    setNoticeArea("student");
+    setSuccess("Correction CSV downloaded. Fix rows and re-import.");
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -2036,18 +2101,57 @@ function RosterTab({
 
         {importIssues.length > 0 && (
           <div className="mt-4 rounded-2xl border border-[var(--secondary)]/30 bg-[var(--secondary)]/5 p-4">
-            <p className="text-sm font-semibold text-[var(--foreground)] mb-2">Rows needing correction</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+              <p className="text-sm font-semibold text-[var(--foreground)]">Rows needing correction</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={downloadIssueReportCsv}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[11px] text-[var(--foreground)] hover:bg-white transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download issues
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadCorrectionCsv}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[11px] text-[var(--foreground)] hover:bg-white transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download correction CSV
+                </button>
+              </div>
+            </div>
             <div className="space-y-2">
               {importIssues.slice(0, 8).map((issue) => (
                 <div
                   key={issue.key}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-lg border border-[var(--secondary)]/20 bg-[var(--card)] px-3 py-2"
+                  className="rounded-lg border border-[var(--secondary)]/20 bg-[var(--card)] px-3 py-2"
                 >
-                  <code className="text-xs text-[var(--foreground)] break-all">{issue.email}</code>
-                  <p className="text-xs text-[var(--secondary)]">{issue.reasonLabel}</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {issue.rowNumber !== null && (
+                        <span className="inline-flex rounded-full bg-[var(--secondary)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--secondary)]">
+                          Row {issue.rowNumber}
+                        </span>
+                      )}
+                      <code className="text-xs text-[var(--foreground)] break-all">{issue.email}</code>
+                    </div>
+                    <p className="text-xs text-[var(--secondary)]">{issue.reasonLabel}</p>
+                  </div>
+                  {(issue.fullName || issue.studentNumber || issue.programme) && (
+                    <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                      {issue.fullName ? `Name: ${issue.fullName}` : "Name: -"} |{" "}
+                      {issue.studentNumber ? `Student #: ${issue.studentNumber}` : "Student #: -"} |{" "}
+                      {issue.programme ? `Programme: ${issue.programme}` : "Programme: -"}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
+            <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+              Download correction CSV, fix rows, then import the corrected file.
+            </p>
           </div>
         )}
 
