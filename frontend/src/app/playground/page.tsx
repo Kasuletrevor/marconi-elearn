@@ -12,16 +12,45 @@ const fadeInUp = {
   visible: { opacity: 1, y: 0 },
 };
 
-const DEFAULT_CODE = `#include <stdio.h>
+const C_STARTER_CODE = `#include <stdio.h>
 
 int main() {
-    printf("Hello, Marconi!\n");
+    printf("Hello, Marconi!\\n");
     return 0;
 }
 `;
 
+const CPP_STARTER_CODE = `#include <iostream>
+
+int main() {
+    std::cout << "Hello, Marconi!" << std::endl;
+    return 0;
+}
+`;
+
+function toMonacoLanguage(languageId: string): string {
+  const normalized = languageId.trim().toLowerCase();
+  if (normalized === "c") return "c";
+  if (normalized.includes("cpp") || normalized.includes("c++")) return "cpp";
+  return "plaintext";
+}
+
+function starterCodeForLanguage(languageId: string): string {
+  const monacoLanguage = toMonacoLanguage(languageId);
+  if (monacoLanguage === "cpp") return CPP_STARTER_CODE;
+  return C_STARTER_CODE;
+}
+
+function fileNameForLanguage(languageId: string): string {
+  const monacoLanguage = toMonacoLanguage(languageId);
+  if (monacoLanguage === "cpp") return "main.cpp";
+  if (monacoLanguage === "c") return "main.c";
+  const normalized = languageId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return `main.${normalized || "txt"}`;
+}
+
 export default function PlaygroundPage() {
-  const [code, setCode] = useState(DEFAULT_CODE);
+  const [code, setCode] = useState(() => starterCodeForLanguage("c"));
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [languages, setLanguages] = useState<PlaygroundLanguage[] | null>(null);
@@ -34,9 +63,20 @@ export default function PlaygroundPage() {
       .then((langs) => {
         if (cancelled) return;
         setLanguages(langs);
-        setLanguageId((prev) => {
-          if (langs.some((l) => l.id === prev)) return prev;
-          return langs.length > 0 ? langs[0].id : prev;
+        setLanguageId((previousLanguageId) => {
+          const selectedLanguage = langs.some((l) => l.id === previousLanguageId)
+            ? previousLanguageId
+            : langs.length > 0
+              ? langs[0].id
+              : previousLanguageId;
+          setCode((currentCode) => {
+            const previousStarterCode = starterCodeForLanguage(previousLanguageId);
+            if (currentCode.trim() === "" || currentCode === previousStarterCode) {
+              return starterCodeForLanguage(selectedLanguage);
+            }
+            return currentCode;
+          });
+          return selectedLanguage;
         });
       })
       .catch(() => {
@@ -54,6 +94,21 @@ export default function PlaygroundPage() {
     return `${match.id.toUpperCase()} (${match.version})`;
   }, [languages, languageId]);
 
+  const editorLanguage = useMemo(() => toMonacoLanguage(languageId), [languageId]);
+  const editorFileName = useMemo(() => fileNameForLanguage(languageId), [languageId]);
+
+  const switchLanguage = (nextLanguageId: string) => {
+    const previousStarterCode = starterCodeForLanguage(languageId);
+    setLanguageId(nextLanguageId);
+    setOutput("");
+    setCode((currentCode) => {
+      if (currentCode.trim() === "" || currentCode === previousStarterCode) {
+        return starterCodeForLanguage(nextLanguageId);
+      }
+      return currentCode;
+    });
+  };
+
   const handleRun = async () => {
     setIsRunning(true);
     setOutput(""); // Clear previous output
@@ -65,7 +120,14 @@ export default function PlaygroundPage() {
         stdin: "",
       });
 
+      const statusLabel = res.compile_output.trim()
+        ? "Compile error"
+        : res.stderr.trim()
+          ? "Runtime error"
+          : "Completed";
       const parts: string[] = [];
+      parts.push(`Status: ${statusLabel}`);
+      parts.push(`Language: ${languageId.toUpperCase()}`);
       parts.push("Compiling...");
       if (res.compile_output.trim()) {
         parts.push(res.compile_output.trimEnd());
@@ -73,7 +135,7 @@ export default function PlaygroundPage() {
       parts.push("Running...");
       if (res.stdout.trim()) parts.push(res.stdout.trimEnd());
       if (res.stderr.trim()) parts.push(res.stderr.trimEnd());
-      parts.push(`\nOutcome: ${res.outcome}`);
+      parts.push(`\nOutcome code: ${res.outcome}`);
       setOutput(parts.join("\n\n"));
     } catch (err) {
       if (err instanceof ApiError) {
@@ -89,7 +151,7 @@ export default function PlaygroundPage() {
   };
 
   const handleClear = () => {
-    setCode(DEFAULT_CODE);
+    setCode(starterCodeForLanguage(languageId));
     setOutput("");
   };
 
@@ -155,12 +217,12 @@ export default function PlaygroundPage() {
         {/* Editor Column */}
         <div className="flex flex-col h-full bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
           <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between">
-            <span className="text-xs font-medium text-[var(--muted-foreground)] font-mono">main.c</span>
+            <span className="text-xs font-medium text-[var(--muted-foreground)] font-mono">{editorFileName}</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-[var(--muted-foreground)]">{languageLabel}</span>
               <select
                 value={languageId}
-                onChange={(e) => setLanguageId(e.target.value)}
+                onChange={(e) => switchLanguage(e.target.value)}
                 className="text-xs bg-[var(--background)] border border-[var(--border)] rounded-lg px-2 py-1 text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
               >
                 {(languages ?? []).map((l) => (
@@ -175,7 +237,7 @@ export default function PlaygroundPage() {
             <CodeEditor
               value={code}
               onChange={(val) => setCode(val || "")}
-              language="c"
+              language={editorLanguage}
               className="h-full border-0 rounded-none"
             />
           </div>
