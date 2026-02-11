@@ -7,7 +7,7 @@ import shlex
 import tempfile
 from typing import Any
 
-from app.integrations.jobe import JobeClient
+from app.integrations.jobe import JOBE_OUTCOME_OK, JobeClient
 from app.models.assignment import Assignment
 from app.worker.zip_extract import ZipExtractionError, safe_extract_zip
 
@@ -308,7 +308,8 @@ async def run_test_case(
         )
 
     passed = (
-        _normalize_output(result.stdout) == _normalize_output(expected_stdout)
+        result.outcome == JOBE_OUTCOME_OK
+        and _normalize_output(result.stdout) == _normalize_output(expected_stdout)
         and _normalize_output(result.stderr) == _normalize_output(expected_stderr)
     )
     return RunCheck(
