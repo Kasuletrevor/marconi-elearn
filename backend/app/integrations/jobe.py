@@ -39,16 +39,23 @@ class JobeRunResult:
 
 
 class JobeClient:
-    def __init__(self, *, base_url: str, timeout_seconds: float) -> None:
+    def __init__(self, *, base_url: str, timeout_seconds: float, api_key: str = "") -> None:
         base_url = base_url.strip().rstrip("/")
         if not base_url:
             raise JobeMisconfiguredError("JOBE base URL is not configured")
         self._base_url = base_url
         self._timeout = httpx.Timeout(timeout_seconds)
+        self._api_key = api_key.strip()
+
+    def _client_kwargs(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {"base_url": self._base_url, "timeout": self._timeout}
+        if self._api_key:
+            kwargs["headers"] = {"X-API-KEY": self._api_key}
+        return kwargs
 
     async def list_languages(self) -> list[JobeLanguage]:
         try:
-            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+            async with httpx.AsyncClient(**self._client_kwargs()) as client:
                 resp = await client.get("/languages")
                 resp.raise_for_status()
                 data = resp.json()
@@ -98,7 +105,7 @@ class JobeClient:
         payload: dict[str, Any] = {"run_spec": run_spec}
 
         try:
-            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+            async with httpx.AsyncClient(**self._client_kwargs()) as client:
                 resp = await client.post("/runs", json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -131,7 +138,7 @@ class JobeClient:
 
     async def check_file(self, *, file_id: str) -> bool:
         try:
-            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+            async with httpx.AsyncClient(**self._client_kwargs()) as client:
                 resp = await client.head(f"/files/{file_id}")
         except httpx.TimeoutException as exc:
             raise JobeTransientError("JOBE request timed out") from exc
@@ -146,7 +153,7 @@ class JobeClient:
 
     async def put_file(self, *, file_id: str, content: bytes) -> None:
         try:
-            async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
+            async with httpx.AsyncClient(**self._client_kwargs()) as client:
                 resp = await client.put(f"/files/{file_id}", content=content)
         except httpx.TimeoutException as exc:
             raise JobeTransientError("JOBE request timed out") from exc

@@ -8,5 +8,5 @@ def get_jobe_client() -> JobeClient:
     return JobeClient(
         base_url=settings.jobe_base_url,
         timeout_seconds=settings.jobe_timeout_seconds,
+        api_key=settings.jobe_api_key,
     )
-

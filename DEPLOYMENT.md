@@ -74,6 +74,7 @@ Add the following secrets:
 | `SUPERADMIN_PASSWORD` | Bootstrap password | `temp_password_change_me` |
 | `CORS_ALLOW_ORIGINS` | Frontend URLs | `https://your-frontend.com` |
 | `JOBE_BASE_URL` | JOBE service URL | `http://jobe/jobe/index.php/restapi` |
+| `JOBE_API_KEY` | Optional JOBE API key (if enabled on JOBE) | `your-jobe-api-key` |
 
 **Optional Secrets** (have sensible defaults):
 
@@ -110,6 +111,7 @@ When you push to the `main` branch, following happens automatically:
    - Pulls latest Docker image
    - Restarts containers
    - Runs Alembic migrations
+   - Verifies backend -> JOBE connectivity from inside the backend container
 
 ## Background Worker (Auto-grading)
 

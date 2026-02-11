@@ -126,6 +126,7 @@ jobs:
           JOBE_BASE_URL: ${{ secrets.JOBE_BASE_URL }}
           JOBE_TIMEOUT_SECONDS: ${{ secrets.JOBE_TIMEOUT_SECONDS != '' && secrets.JOBE_TIMEOUT_SECONDS || '20' }}
           JOBE_ALLOWED_LANGUAGES: ${{ secrets.JOBE_ALLOWED_LANGUAGES != '' && secrets.JOBE_ALLOWED_LANGUAGES || 'c,cpp,python3,java' }}
+          JOBE_API_KEY: ${{ secrets.JOBE_API_KEY }}
           REDIS_URL: ${{ secrets.REDIS_URL != '' && secrets.REDIS_URL || 'redis://redis:6379/0' }}
           TOKEN_ENCRYPTION_KEY: ${{ secrets.TOKEN_ENCRYPTION_KEY }}
           DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
@@ -157,6 +158,7 @@ jobs:
               f"JOBE_BASE_URL={get('JOBE_BASE_URL')}",
               f"JOBE_TIMEOUT_SECONDS={get('JOBE_TIMEOUT_SECONDS','20')}",
               f"JOBE_ALLOWED_LANGUAGES={get('JOBE_ALLOWED_LANGUAGES','c,cpp,python3,java')}",
+              f"JOBE_API_KEY={get('JOBE_API_KEY')}",
               f"REDIS_URL={get('REDIS_URL','redis://redis:6379/0')}",
               f"SESSION_COOKIE_NAME={get('SESSION_COOKIE_NAME','marconi_session')}",
               f"SESSION_COOKIE_SECURE={get('SESSION_COOKIE_SECURE','true')}",
@@ -273,6 +275,25 @@ jobs:
                 exit 1
               fi
             done
+
+            # Verify backend -> JOBE connectivity from inside backend container.
+            echo "Verifying JOBE connectivity from backend..."
+            docker compose -p marconi -f docker-compose.yml exec -T backend python - <<'PY'
+            import asyncio
+            from app.core.config import settings
+            from app.integrations.jobe import JobeClient
+
+            async def main() -> None:
+                client = JobeClient(
+                    base_url=settings.jobe_base_url,
+                    timeout_seconds=settings.jobe_timeout_seconds,
+                    api_key=settings.jobe_api_key,
+                )
+                languages = await client.list_languages()
+                print(f"JOBE connectivity verified. languages={len(languages)}")
+
+            asyncio.run(main())
+            PY
 
             # Cleanup dangling images to prevent disk bloat.
             docker image prune -f --filter dangling=true >/dev/null 2>&1 || true

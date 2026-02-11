@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     cors_allow_origins: str = "http://localhost:3000"
     jobe_base_url: str = ""
     jobe_timeout_seconds: float = 20.0
+    # Optional API key for JOBE upstream auth (if enabled on the JOBE deployment).
+    jobe_api_key: str = ""
     # Comma-separated list. If empty, no filtering is applied.
     jobe_allowed_languages: str = "c,cpp"
     # Queue/worker

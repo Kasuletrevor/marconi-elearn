@@ -24,7 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 def _jobe_client() -> JobeClient:
-    return JobeClient(base_url=settings.jobe_base_url, timeout_seconds=settings.jobe_timeout_seconds)
+    return JobeClient(
+        base_url=settings.jobe_base_url,
+        timeout_seconds=settings.jobe_timeout_seconds,
+        api_key=settings.jobe_api_key,
+    )
 
 
 @broker.task
