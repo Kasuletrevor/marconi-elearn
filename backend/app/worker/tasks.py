@@ -31,14 +31,19 @@ def _jobe_client() -> JobeClient:
     )
 
 
-@broker.task
-async def grade_submission(submission_id: int, phase: str = "practice", attempt: int = 0) -> dict[str, Any]:
+async def _grade_submission_impl(
+    submission_id: int,
+    phase: str = "practice",
+    attempt: int = 0,
+    *,
+    session_factory=SessionLocal,
+) -> dict[str, Any]:
     phase = str(phase or "practice").strip().lower()
     if phase not in {GradingPhase.practice.value, GradingPhase.final.value}:
         phase = GradingPhase.practice.value
 
     # Idempotency: only one worker transitions pending -> grading.
-    async with SessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(
             update(Submission)
             .where(Submission.id == submission_id, Submission.status == SubmissionStatus.pending)
@@ -55,7 +60,7 @@ async def grade_submission(submission_id: int, phase: str = "practice", attempt:
     try:
         jobe = _jobe_client()
     except JobeMisconfiguredError as exc:
-        async with SessionLocal() as db:
+        async with session_factory() as db:
             submission = await db.get(Submission, submission_id)
             if submission is None:
                 return {"status": "missing"}
@@ -65,7 +70,7 @@ async def grade_submission(submission_id: int, phase: str = "practice", attempt:
             await db.commit()
         return {"status": "error", "reason": "misconfigured"}
 
-    async with SessionLocal() as db:
+    async with session_factory() as db:
         submission = await db.get(Submission, submission_id)
         if submission is None:
             return {"status": "missing"}
@@ -281,3 +286,8 @@ async def grade_submission(submission_id: int, phase: str = "practice", attempt:
 
         await db.commit()
         return {"status": "error", "tests": len(tests), "phase": phase}
+
+
+@broker.task
+async def grade_submission(submission_id: int, phase: str = "practice", attempt: int = 0) -> dict[str, Any]:
+    return await _grade_submission_impl(submission_id=submission_id, phase=phase, attempt=attempt)
