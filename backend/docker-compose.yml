@@ -1,6 +1,6 @@
 services:
   jobe:
-    image: trampgeek/jobeinabox:latest
+    image: trampgeek/jobeinabox@sha256:2720e97aeb988fc2ce9f522845d264124ebc266f042f3619d0d5caf2f04037b2
     restart: always
     container_name: marconi-jobe
     networks:
@@ -189,3 +189,4 @@ networks:
     external: true
   proxy_hostinger-network:
     external: true
+

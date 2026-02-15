@@ -243,6 +243,81 @@ View logs in real-time:
 docker-compose logs -f backend
 ```
 
+
+## Residual Risk (JOBE Runtime)
+
+`KJT-5` is complete from a code/deploy perspective, but production reliability still depends on active operations.
+
+### Remaining risks
+
+- Capacity saturation: bursts of submissions can exhaust JOBE CPU/RAM and increase grading latency.
+- Queue backlog growth: worker throughput can fall behind enqueue rate during peak windows.
+- Untrusted code pressure: pathological submissions can hit timeout/memory limits repeatedly.
+- Detection lag: without clear alerts, failed grading or slowdowns can go unnoticed.
+- Maintenance drift: pinned image improves reproducibility, but security fixes still require controlled upgrades.
+
+### Operational controls
+
+- Track queue depth, grading duration, and worker failure rates.
+- Alert on sustained backlog growth and repeated JOBE execution failures.
+- Enforce timeout/memory limits and review them after each assessment cycle.
+- Run periodic rollback-tested image upgrades (new digest in staging, then production).
+- Keep a runbook for incident triage: isolate cause (queue, worker, JOBE, DB), then apply rollback or scale-up.
+
+### Suggested alert thresholds (starting point)
+
+- Queue depth > `100` for `10` minutes.
+- Median grading latency > `2x` baseline for `15` minutes.
+- Job failure rate > `5%` over `15` minutes.
+- JOBE health check failures on `3` consecutive probes.
+
+## Centralized Log Access (Grafana/Loki)
+
+For least-privilege troubleshooting, deploy the logging stack in `ops/logging/` and share a short-lived Grafana Viewer service-account token instead of server SSH access.
+
+### Deploy on server
+
+```bash
+ssh deploy@your-server
+sudo mkdir -p /opt/marconi-logging
+sudo chown -R $USER:$USER /opt/marconi-logging
+cd /opt/marconi-logging
+# copy files from repo: ops/logging/*
+cp .env.example .env
+# set GF_SECURITY_ADMIN_PASSWORD, GF_SERVER_ROOT_URL, and optional LOG_STACK_PREFIX
+
+docker compose up -d
+```
+
+### Access model
+
+- Grafana binds to `127.0.0.1:3001`.
+- Loki binds to `127.0.0.1:3100`.
+- Publish Grafana through HTTPS reverse proxy (for example `logs.yourdomain.com`).
+- Keep Loki private (no public route).
+
+### Query-only token workflow
+
+1. Grafana -> Administration -> Service accounts.
+2. Create service account `log-reader` with role `Viewer`.
+3. Generate token with expiry (24h or 72h).
+4. Share only Grafana URL + token + requested time window + target services.
+5. Revoke token after incident review.
+
+### Core LogQL filters
+
+```logql
+{service="backend"} |= "ERROR"
+```
+
+```logql
+{service="worker"} |= "grade_submission"
+```
+
+```logql
+{service="jobe"}
+```
+
 ## Nginx Proxy Manager Integration
 
 The backend connects to two external Docker networks for reverse proxy access:
@@ -368,3 +443,5 @@ docker-compose up -d
 - Enable firewall rules to restrict access to random ports only
 - Consider using managed database service for production
 - Backend container runs as non-root user (`appuser`)
+
+
