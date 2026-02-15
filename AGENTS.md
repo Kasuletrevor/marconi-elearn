@@ -68,3 +68,4 @@ Agent expectations:
 - Plan-of-record: update and follow `spec.md`.
 - Keep changes small, reversible, and aligned to current milestone order in `spec.md`.
 - When behavior changes user flows or roles, update `USER_JOURNEY.md` and (if relevant) add a note to `review.md`.
+- Default SCM flow is feature branch -> PR -> merge to `main` (avoid direct commits to `main` unless Trevor explicitly asks for an exception).
