@@ -15,6 +15,7 @@ import {
   ChevronRight,
   User,
   Code,
+  CalendarDays,
 } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import { auth, ApiError, type User as UserType } from "@/lib/api";
@@ -25,6 +26,7 @@ interface DashboardLayoutProps {
 }
 const sidebarLinks = [
   { href: "/dashboard", label: "My Courses", icon: BookOpen },
+  { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/playground", label: "Playground", icon: Code },
   { href: "/dashboard/submissions", label: "Submissions", icon: FileText },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

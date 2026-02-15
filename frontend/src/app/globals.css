@@ -139,6 +139,83 @@ label:has(+ div select[required])::after {
   color: var(--muted-foreground);
 }
 
+.marconi-calendar .fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--background);
+  --fc-today-bg-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  --fc-event-bg-color: color-mix(in srgb, var(--primary) 16%, var(--card));
+  --fc-event-border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  --fc-event-text-color: var(--foreground);
+  --fc-button-text-color: var(--foreground);
+  --fc-button-bg-color: var(--background);
+  --fc-button-border-color: var(--border);
+  --fc-button-hover-bg-color: var(--muted);
+  --fc-button-hover-border-color: var(--border);
+  --fc-button-active-bg-color: var(--primary);
+  --fc-button-active-border-color: var(--primary);
+}
+
+.marconi-calendar .fc .fc-toolbar-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--foreground);
+}
+
+.marconi-calendar .fc .fc-button {
+  border-radius: 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow: none;
+}
+
+.marconi-calendar .fc .fc-button:focus {
+  box-shadow: none;
+}
+
+.marconi-calendar .fc .fc-event {
+  border-radius: 0.6rem;
+  padding: 0.16rem 0.28rem;
+}
+
+.marconi-fc-event {
+  display: grid;
+  gap: 0.12rem;
+  line-height: 1.1;
+}
+
+.marconi-fc-course {
+  display: inline-block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+}
+
+.marconi-fc-title {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marconi-fc-extension {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 0.08rem;
+  padding: 0.06rem 0.3rem;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--secondary) 18%, transparent);
+}
+
 /* Noise texture overlay */
 .noise {
   position: fixed;

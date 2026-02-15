@@ -77,6 +77,22 @@ export interface Assignment {
   compile_command: string | null;
 }
 
+export interface CalendarEventBase {
+  assignment_id: number;
+  assignment_title: string;
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  due_date: string;
+}
+
+export interface StudentCalendarEvent extends CalendarEventBase {
+  effective_due_date: string;
+  has_extension: boolean;
+}
+
+export type StaffCalendarEvent = CalendarEventBase;
+
 export interface Submission {
   id: number;
   assignment_id: number;
@@ -710,6 +726,24 @@ export const student = {
       { credentials: "include" }
     );
     return handleResponse<Assignment[]>(res);
+  },
+
+  async getCalendarEvents(params?: {
+    course_id?: number;
+    starts_at?: string;
+    ends_at?: string;
+    limit?: number;
+  }): Promise<StudentCalendarEvent[]> {
+    const query = new URLSearchParams();
+    if (params?.course_id !== undefined) query.set("course_id", String(params.course_id));
+    if (params?.starts_at) query.set("starts_at", params.starts_at);
+    if (params?.ends_at) query.set("ends_at", params.ends_at);
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+    const qs = query.toString();
+    const res = await fetch(`${API_BASE}/api/v1/student/calendar/events${qs ? `?${qs}` : ""}`, {
+      credentials: "include",
+    });
+    return handleResponse<StudentCalendarEvent[]>(res);
   },
 
   async getSubmissions(courseId: number, assignmentId: number): Promise<Submission[]> {
@@ -1435,6 +1469,24 @@ export const courseStaff = {
       credentials: "include",
     });
     return handleResponse<void>(res);
+  },
+
+  async getCalendarEvents(params?: {
+    course_id?: number;
+    starts_at?: string;
+    ends_at?: string;
+    limit?: number;
+  }): Promise<StaffCalendarEvent[]> {
+    const query = new URLSearchParams();
+    if (params?.course_id !== undefined) query.set("course_id", String(params.course_id));
+    if (params?.starts_at) query.set("starts_at", params.starts_at);
+    if (params?.ends_at) query.set("ends_at", params.ends_at);
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+    const qs = query.toString();
+    const res = await fetch(`${API_BASE}/api/v1/staff/calendar/events${qs ? `?${qs}` : ""}`, {
+      credentials: "include",
+    });
+    return handleResponse<StaffCalendarEvent[]>(res);
   },
 
   async listTestCases(

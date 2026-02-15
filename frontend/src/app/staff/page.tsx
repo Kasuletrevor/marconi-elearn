@@ -11,9 +11,17 @@ import {
   CheckCircle,
   Loader2,
   Calendar,
+  Clock3,
 } from "lucide-react";
 import { useAuthStore, getCourseRole } from "@/lib/store";
-import { courseStaff, staffSubmissions, type Course, ApiError, type User as ApiUser } from "@/lib/api";
+import {
+  courseStaff,
+  staffSubmissions,
+  type Course,
+  ApiError,
+  type User as ApiUser,
+  type StaffCalendarEvent,
+} from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 
@@ -41,13 +49,25 @@ export default function StaffDashboardPage() {
     graded: number;
     error: number;
   } | null>(null);
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState<StaffCalendarEvent[]>([]);
 
   useEffect(() => {
     async function fetchCourses() {
       try {
         if (!user) return;
-        const staffCourses = await courseStaff.listCourses();
+        const nowIso = new Date().toISOString();
+        const [staffCourses, calendarEvents] = await Promise.all([
+          courseStaff.listCourses(),
+          courseStaff.getCalendarEvents({ starts_at: nowIso, limit: 1000 }),
+        ]);
         setCourses(staffCourses);
+        const upcoming = calendarEvents
+          .sort(
+            (a, b) =>
+              new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+          )
+          .slice(0, 5);
+        setUpcomingDeadlines(upcoming);
 
         try {
           const [pendingPage, gradingPage, errorPage, gradedPage] = await Promise.all([
@@ -209,6 +229,39 @@ export default function StaffDashboardPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
+        className="space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
+            Upcoming Deadlines
+          </h2>
+          <Link
+            href="/staff/calendar"
+            className="text-sm text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors"
+          >
+            Open calendar
+          </Link>
+        </div>
+        {upcomingDeadlines.length === 0 ? (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 text-sm text-[var(--muted-foreground)]">
+            No upcoming deadlines in your staff courses.
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] divide-y divide-[var(--border)]">
+            {upcomingDeadlines.map((event) => (
+              <UpcomingDeadlineRow
+                key={`${event.course_id}-${event.assignment_id}`}
+                event={event}
+              />
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
         className="space-y-6"
       >
         <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
@@ -230,6 +283,43 @@ export default function StaffDashboardPage() {
         )}
       </motion.div>
     </div>
+  );
+}
+
+interface UpcomingDeadlineRowProps {
+  event: StaffCalendarEvent;
+}
+
+function UpcomingDeadlineRow({ event }: UpcomingDeadlineRowProps) {
+  const dueDate = new Date(event.due_date);
+  return (
+    <Link
+      href={`/staff/courses/${event.course_id}/assignments/${event.assignment_id}`}
+      className="group flex items-center justify-between gap-4 p-4 hover:bg-[var(--background)] transition-colors"
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 px-1.5 py-0.5 rounded">
+            {event.course_code}
+          </span>
+          <span className="text-xs text-[var(--muted-foreground)] truncate">
+            {event.course_title}
+          </span>
+        </div>
+        <p className="font-medium text-[var(--foreground)] truncate group-hover:text-[var(--primary)] transition-colors">
+          {event.assignment_title}
+        </p>
+      </div>
+      <span className="inline-flex items-center gap-1.5 text-xs text-[var(--muted-foreground)] shrink-0">
+        <Clock3 className="w-3.5 h-3.5" />
+        {dueDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })}
+      </span>
+    </Link>
   );
 }
 

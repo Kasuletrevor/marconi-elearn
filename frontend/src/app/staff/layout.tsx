@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ChevronDown,
   User,
+  CalendarDays,
 } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import { auth, ApiError, type User as UserType, type Course, courseStaff } from "@/lib/api";
@@ -253,6 +254,7 @@ function SidebarContent({
   // Main navigation items (course-agnostic)
   const mainLinks = [
     { href: "/staff", label: "Overview", icon: BookOpen },
+    { href: "/staff/calendar", label: "Calendar", icon: CalendarDays },
     { href: "/staff/submissions", label: "Submissions Queue", icon: FileText },
   ];
 

@@ -55,6 +55,7 @@ Org admin:
 
 Course staff:
 - `/staff` - staff dashboard (courses you teach)
+- `/staff/calendar` - deadline calendar across staff courses
 - `/staff/courses/[id]` - course management (tabs: overview, submissions, roster, assignments, modules)
 - `/staff/courses/[id]/assignments/[assignmentId]` - assignment test case builder (configure autograding)
 - `/staff/submissions` - submissions queue (filters + pagination + next-ungraded)
@@ -62,6 +63,7 @@ Course staff:
 
 Student:
 - `/dashboard` - student dashboard (courses + upcoming assignments)
+- `/dashboard/calendar` - deadline calendar with extension-aware dates
 - `/dashboard/courses/[id]` - course detail (modules + published resources + assignments)
 - `/dashboard/courses/[id]/assignments/[assignmentId]` - assignment detail + submission history + upload
 - `/dashboard/submissions` - global submission history (download + deep links)
@@ -74,6 +76,10 @@ Auth uses HTTP-only cookie sessions. All frontend `fetch()` calls include `crede
 
 Audit events:
 - `GET /api/v1/orgs/{org_id}/audit` (org admin or superadmin)
+
+Calendar:
+- `GET /api/v1/student/calendar/events`
+- `GET /api/v1/staff/calendar/events`
 
 ## Common Flows and Their API Calls
 
@@ -241,7 +247,13 @@ Goal: manage content and grade submissions for the courses you teach.
 2) Staff dashboard (your courses)
 - Route: `/staff`
 - API:
-  - `GET /api/v1/student/courses` (then filtered client-side to staff courses based on `user.course_roles`)
+  - `GET /api/v1/staff/courses`
+  - `GET /api/v1/staff/calendar/events` (upcoming deadlines widget)
+
+2b) Staff calendar (cross-course planning)
+- Route: `/staff/calendar`
+- API:
+  - `GET /api/v1/staff/calendar/events?starts_at=...&ends_at=...&course_id=...`
 
 3) Manage a course
 - Route: `/staff/courses/[id]`
@@ -323,7 +335,7 @@ Goal: enroll via invite, access course content, submit assignments, track histor
 - API:
   - `GET /api/v1/student/courses`
   - For upcoming assignments:
-    - `GET /api/v1/student/courses/{course_id}/assignments` (per course)
+    - `GET /api/v1/student/calendar/events?starts_at=...`
 
 3) View course content
 - Route: `/dashboard/courses/[id]`
@@ -353,6 +365,11 @@ Goal: enroll via invite, access course content, submit assignments, track histor
 - API:
   - `GET /api/v1/student/submissions?course_id=...&assignment_id=...&offset=...&limit=...`
   - `GET /api/v1/student/submissions/{submission_id}/download`
+
+5b) Calendar deadline planning
+- Route: `/dashboard/calendar`
+- API:
+  - `GET /api/v1/student/calendar/events?starts_at=...&ends_at=...&course_id=...`
 
 6) Notifications (submission graded, etc)
 - Route: notification bell is embedded in layouts

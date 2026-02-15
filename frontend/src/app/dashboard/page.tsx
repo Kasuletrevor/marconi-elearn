@@ -14,7 +14,7 @@ import {
   AlertCircle,
   Users,
 } from "lucide-react";
-import { student, type Course, type Assignment, ApiError } from "@/lib/api";
+import { student, type Course, type StudentCalendarEvent, ApiError } from "@/lib/api";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -29,15 +29,9 @@ const staggerContainer = {
   },
 };
 
-interface AssignmentWithCourse extends Assignment {
-  course: Course;
-}
-
 export default function DashboardPage() {
   const [courses, setCourses] = useState<Course[]>([]);
-  const [upcomingAssignments, setUpcomingAssignments] = useState<
-    AssignmentWithCourse[]
-  >([]);
+  const [upcomingAssignments, setUpcomingAssignments] = useState<StudentCalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true);
   const [error, setError] = useState("");
@@ -45,38 +39,22 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch courses first
-        const coursesData = await student.getCourses();
+        const nowIso = new Date().toISOString();
+        const [coursesData, eventsData] = await Promise.all([
+          student.getCourses(),
+          student.getCalendarEvents({ starts_at: nowIso, limit: 1000 }),
+        ]);
         setCourses(coursesData);
         setIsLoading(false);
 
-        // Then fetch assignments for each course in parallel
-        if (coursesData.length > 0) {
-          const assignmentsPromises = coursesData.map(async (course) => {
-            try {
-              const assignments = await student.getAssignments(course.id);
-              return assignments.map((a) => ({ ...a, course }));
-            } catch {
-              return [];
-            }
-          });
-
-          const allAssignments = await Promise.all(assignmentsPromises);
-          const flatAssignments = allAssignments.flat();
-
-          // Filter for upcoming (due date in future) and sort by due date
-          const now = new Date();
-          const upcoming = flatAssignments
-            .filter((a) => a.due_date && new Date(a.due_date) > now)
-            .sort(
-              (a, b) =>
-                new Date(a.due_date!).getTime() -
-                new Date(b.due_date!).getTime()
-            )
-            .slice(0, 5); // Show max 5 upcoming
-
-          setUpcomingAssignments(upcoming);
-        }
+        const upcoming = eventsData
+          .sort(
+            (a, b) =>
+              new Date(a.effective_due_date).getTime() -
+              new Date(b.effective_due_date).getTime()
+          )
+          .slice(0, 5);
+        setUpcomingAssignments(upcoming);
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.detail);
@@ -168,11 +146,12 @@ export default function DashboardPage() {
               <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
                 Upcoming Assignments
               </h2>
-              {upcomingAssignments.length > 0 && (
-                <span className="text-sm text-[var(--muted-foreground)]">
-                  Next {upcomingAssignments.length} due
-                </span>
-              )}
+              <Link
+                href="/dashboard/calendar"
+                className="text-sm text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors"
+              >
+                Open calendar
+              </Link>
             </div>
 
             {isLoadingAssignments ? (
@@ -190,7 +169,7 @@ export default function DashboardPage() {
               <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden divide-y divide-[var(--border)]">
                 {upcomingAssignments.map((assignment) => (
                   <UpcomingAssignmentRow
-                    key={`${assignment.course.id}-${assignment.id}`}
+                    key={`${assignment.course_id}-${assignment.assignment_id}`}
                     assignment={assignment}
                   />
                 ))}
@@ -231,11 +210,13 @@ export default function DashboardPage() {
 }
 
 interface UpcomingAssignmentRowProps {
-  assignment: AssignmentWithCourse;
+  assignment: StudentCalendarEvent;
 }
 
 function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
-  const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;
+  const dueDate = assignment.effective_due_date
+    ? new Date(assignment.effective_due_date)
+    : null;
   const now = new Date();
   const daysUntilDue = dueDate
     ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -246,7 +227,7 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
 
   return (
     <Link
-      href={`/dashboard/courses/${assignment.course.id}/assignments/${assignment.id}`}
+      href={`/dashboard/courses/${assignment.course_id}/assignments/${assignment.assignment_id}`}
       className="group flex items-center gap-4 p-4 hover:bg-[var(--background)] transition-colors"
     >
       <div
@@ -272,7 +253,7 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs font-medium text-[var(--primary)] bg-[var(--primary)]/10 px-1.5 py-0.5 rounded">
-            {assignment.course.code}
+            {assignment.course_code}
           </span>
           {isUrgent && (
             <span className="text-xs font-medium text-[var(--secondary)] bg-[var(--secondary)]/10 px-1.5 py-0.5 rounded flex items-center gap-1">
@@ -282,7 +263,7 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
           )}
         </div>
         <h3 className="font-medium text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors truncate">
-          {assignment.title}
+          {assignment.assignment_title}
         </h3>
         <div className="flex items-center gap-3 mt-1">
           {dueDate && (
@@ -311,8 +292,13 @@ function UpcomingAssignmentRow({ assignment }: UpcomingAssignmentRowProps) {
             </span>
           )}
           <span className="text-xs text-[var(--muted-foreground)]">
-            {assignment.max_points} pts
+            {assignment.course_title}
           </span>
+          {assignment.has_extension && (
+            <span className="text-xs font-medium text-[var(--secondary)] bg-[var(--secondary)]/12 px-1.5 py-0.5 rounded">
+              Extension
+            </span>
+          )}
         </div>
       </div>
 
