@@ -7,8 +7,43 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import listPlugin from "@fullcalendar/list";
 import interactionPlugin from "@fullcalendar/interaction";
-import type { DatesSetArg, EventClickArg, EventContentArg, EventInput } from "@fullcalendar/core";
+import type {
+  DatesSetArg,
+  EventClickArg,
+  EventContentArg,
+  EventInput,
+} from "@fullcalendar/core";
 import { Calendar, Loader2, RotateCcw } from "lucide-react";
+
+type DeadlineMarker = "overdue" | "today" | "soon" | "upcoming";
+
+const DEADLINE_LABEL: Record<DeadlineMarker, string> = {
+  overdue: "Overdue",
+  today: "Today",
+  soon: "Soon",
+  upcoming: "Upcoming",
+};
+
+const LEGEND_ITEMS: Array<{ marker: DeadlineMarker; label: string }> = [
+  { marker: "overdue", label: "Overdue" },
+  { marker: "today", label: "Due today" },
+  { marker: "soon", label: "Due in ≤3 days" },
+  { marker: "upcoming", label: "Upcoming" },
+];
+
+function toStartOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function resolveDeadlineMarker(dueDate: Date, now: Date): DeadlineMarker {
+  if (dueDate.getTime() < now.getTime()) return "overdue";
+  const today = toStartOfDay(now);
+  const dueDay = toStartOfDay(dueDate);
+  const diffDays = Math.floor((dueDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays === 0) return "today";
+  if (diffDays <= 3) return "soon";
+  return "upcoming";
+}
 
 export interface AssignmentCalendarEvent {
   id: string;
@@ -40,8 +75,12 @@ export function AssignmentCalendar({
   const router = useRouter();
 
   const calendarEvents = useMemo<EventInput[]>(
-    () =>
-      events.map((event) => ({
+    () => {
+      const now = new Date();
+      return events.map((event) => {
+        const dueDate = new Date(event.dueDate);
+        const deadlineMarker = resolveDeadlineMarker(dueDate, now);
+        return {
         id: event.id,
         title: event.title,
         start: event.dueDate,
@@ -51,8 +90,12 @@ export function AssignmentCalendar({
           courseCode: event.courseCode,
           courseTitle: event.courseTitle,
           hasExtension: Boolean(event.hasExtension),
+          deadlineMarker,
+          deadlineLabel: DEADLINE_LABEL[deadlineMarker],
         },
-      })),
+      };
+      });
+    },
     [events]
   );
 
@@ -79,13 +122,26 @@ export function AssignmentCalendar({
   const renderEventContent = useCallback((arg: EventContentArg) => {
     const courseCode = (arg.event.extendedProps?.courseCode as string | undefined) ?? "";
     const hasExtension = Boolean(arg.event.extendedProps?.hasExtension);
+    const deadlineMarker = (arg.event.extendedProps?.deadlineMarker as DeadlineMarker | undefined) ?? "upcoming";
+    const deadlineLabel =
+      (arg.event.extendedProps?.deadlineLabel as string | undefined) ?? DEADLINE_LABEL[deadlineMarker];
     return (
       <div className="marconi-fc-event">
         <span className="marconi-fc-course">{courseCode}</span>
         <span className="marconi-fc-title">{arg.event.title}</span>
-        {hasExtension && <span className="marconi-fc-extension">EXT</span>}
+        <div className="marconi-fc-meta">
+          <span className={`marconi-fc-marker marconi-fc-marker-${deadlineMarker}`}>
+            {deadlineLabel}
+          </span>
+          {hasExtension && <span className="marconi-fc-extension">EXT</span>}
+        </div>
       </div>
     );
+  }, []);
+
+  const eventClassNames = useCallback((arg: { event: { extendedProps?: Record<string, unknown> } }) => {
+    const marker = (arg.event.extendedProps?.deadlineMarker as DeadlineMarker | undefined) ?? "upcoming";
+    return [`marconi-fc-deadline-${marker}`];
   }, []);
 
   if (isLoading) {
@@ -122,29 +178,47 @@ export function AssignmentCalendar({
           <p className="text-sm text-[var(--muted-foreground)]">{emptyMessage}</p>
         </div>
       ) : (
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          height="auto"
-          events={calendarEvents}
-          eventClick={handleEventClick}
-          datesSet={handleDatesSet}
-          eventContent={renderEventContent}
-          dayMaxEvents={3}
-          fixedWeekCount={false}
-          nowIndicator
-          headerToolbar={{
-            left: "prev,next today",
-            center: "title",
-            right: "dayGridMonth,timeGridWeek,listWeek",
-          }}
-          buttonText={{
-            today: "Today",
-            month: "Month",
-            week: "Week",
-            list: "Agenda",
-          }}
-        />
+        <div className="space-y-4">
+          <div className="marconi-fc-legend">
+            {LEGEND_ITEMS.map((item) => (
+              <span key={item.marker} className="marconi-fc-legend-item">
+                <span
+                  className={`marconi-fc-legend-dot marconi-fc-legend-dot-${item.marker}`}
+                  aria-hidden="true"
+                />
+                {item.label}
+              </span>
+            ))}
+            <span className="marconi-fc-legend-item">
+              <span className="marconi-fc-legend-dot marconi-fc-legend-dot-extension" aria-hidden="true" />
+              Extension
+            </span>
+          </div>
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            height="auto"
+            events={calendarEvents}
+            eventClick={handleEventClick}
+            datesSet={handleDatesSet}
+            eventContent={renderEventContent}
+            eventClassNames={eventClassNames}
+            dayMaxEvents={3}
+            fixedWeekCount={false}
+            nowIndicator
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth,timeGridWeek,listWeek",
+            }}
+            buttonText={{
+              today: "Today",
+              month: "Month",
+              week: "Week",
+              list: "Agenda",
+            }}
+          />
+        </div>
       )}
     </div>
   );

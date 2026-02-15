@@ -180,6 +180,26 @@ label:has(+ div select[required])::after {
   padding: 0.16rem 0.28rem;
 }
 
+.marconi-calendar .fc .fc-event.marconi-fc-deadline-overdue {
+  background: color-mix(in srgb, var(--destructive) 15%, var(--card));
+  border-color: color-mix(in srgb, var(--destructive) 35%, var(--border));
+}
+
+.marconi-calendar .fc .fc-event.marconi-fc-deadline-today {
+  background: color-mix(in srgb, var(--secondary) 18%, var(--card));
+  border-color: color-mix(in srgb, var(--secondary) 34%, var(--border));
+}
+
+.marconi-calendar .fc .fc-event.marconi-fc-deadline-soon {
+  background: color-mix(in srgb, var(--warning) 14%, var(--card));
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+}
+
+.marconi-calendar .fc .fc-event.marconi-fc-deadline-upcoming {
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
 .marconi-fc-event {
   display: grid;
   gap: 0.12rem;
@@ -204,16 +224,101 @@ label:has(+ div select[required])::after {
   white-space: nowrap;
 }
 
+.marconi-fc-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+}
+
+.marconi-fc-marker {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.05rem 0.34rem;
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.marconi-fc-marker-overdue {
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 18%, transparent);
+}
+
+.marconi-fc-marker-today {
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--secondary) 18%, transparent);
+}
+
+.marconi-fc-marker-soon {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+.marconi-fc-marker-upcoming {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
 .marconi-fc-extension {
   display: inline-block;
   width: fit-content;
-  margin-top: 0.08rem;
   padding: 0.06rem 0.3rem;
   border-radius: 999px;
   font-size: 0.55rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--secondary);
   background: color-mix(in srgb, var(--secondary) 18%, transparent);
+}
+
+.marconi-fc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 0.1rem;
+}
+
+.marconi-fc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.marconi-fc-legend-dot {
+  width: 0.56rem;
+  height: 0.56rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.marconi-fc-legend-dot-overdue {
+  background: color-mix(in srgb, var(--destructive) 22%, transparent);
+  border-color: color-mix(in srgb, var(--destructive) 44%, transparent);
+}
+
+.marconi-fc-legend-dot-today {
+  background: color-mix(in srgb, var(--secondary) 24%, transparent);
+  border-color: color-mix(in srgb, var(--secondary) 44%, transparent);
+}
+
+.marconi-fc-legend-dot-soon {
+  background: color-mix(in srgb, var(--warning) 24%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 44%, transparent);
+}
+
+.marconi-fc-legend-dot-upcoming {
+  background: color-mix(in srgb, var(--primary) 24%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 44%, transparent);
+}
+
+.marconi-fc-legend-dot-extension {
+  background: color-mix(in srgb, var(--secondary) 18%, transparent);
+  border-color: color-mix(in srgb, var(--secondary) 38%, transparent);
 }
 
 /* Noise texture overlay */
