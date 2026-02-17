@@ -34,3 +34,21 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Rendering Strategy (Issue #13)
+
+- The landing route (`src/app/page.tsx`) now renders as a Server Component.
+- Student course routes now use Server Component wrappers for initial data fetch:
+  - `src/app/dashboard/courses/[id]/page.tsx`
+  - `src/app/dashboard/courses/[id]/assignments/[assignmentId]/page.tsx`
+- Interactive behavior remains in client islands:
+  - `src/components/dashboard/student/StudentCourseDetailClient.tsx`
+  - `src/components/dashboard/student/StudentAssignmentDetailClient.tsx`
+- Shared server-side API helper:
+  - `src/lib/api/server.ts`
+
+### Bundle/Render impact
+
+- Landing page no longer depends on `framer-motion` at route level, reducing client-side JavaScript for `/`.
+- Student course pages avoid client-only request waterfalls for first paint by resolving initial course/assignment data on the server.
+- Client JavaScript is now focused on interactive controls (submission upload, resource expand/download, GitHub claim actions).
