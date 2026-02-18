@@ -7,10 +7,6 @@
    ============================================ */
 
 :root {
-  --font-playfair: "Playfair Display";
-  --font-dm-sans: "DM Sans";
-  --font-jetbrains: "JetBrains Mono";
-
   /* Canvas */
   --background: #F3F7FB;
   --foreground: #0B1726;
@@ -78,9 +74,9 @@
   --color-info: var(--info);
 
   /* Typography */
-  --font-display: var(--font-playfair), Georgia, serif;
-  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), monospace;
+  --font-display: var(--font-playfair, "Playfair Display"), Georgia, serif;
+  --font-sans: var(--font-dm-sans, "DM Sans"), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains, "JetBrains Mono"), monospace;
 }
 
 /* Base styles */

@@ -355,14 +355,13 @@ function OrgCard({ orgData }: OrgCardProps) {
         </div>
       ) : (
         <div className="divide-y divide-[var(--border)]/50">
-          {courses.slice(0, 3).map((course) => (
-            <CourseRow
-              key={course.id}
-              course={course}
-              orgId={organization.id}
-              memberCount={memberCounts[course.id] || { students: 0, staff: 0 }}
-            />
-          ))}
+            {courses.slice(0, 3).map((course) => (
+              <CourseRow
+                key={course.id}
+                course={course}
+                memberCount={memberCounts[course.id] || { students: 0, staff: 0 }}
+              />
+            ))}
           {courses.length > 3 && (
             <Link
               href={`/admin/courses?org=${organization.id}`}
@@ -379,11 +378,10 @@ function OrgCard({ orgData }: OrgCardProps) {
 
 interface CourseRowProps {
   course: Course;
-  orgId: number;
   memberCount: { students: number; staff: number };
 }
 
-function CourseRow({ course, orgId, memberCount }: CourseRowProps) {
+function CourseRow({ course, memberCount }: CourseRowProps) {
   return (
     <Link
       href={`/staff/courses/${course.id}`}

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { ExternalLink, Github, LogOut, Mail, Settings, User } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError, auth, userIntegrations } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 
@@ -16,7 +16,7 @@ export default function StudentSettingsPage() {
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
   const [githubError, setGithubError] = useState("");
 
-  async function refreshGitHubStatus() {
+  const refreshGitHubStatus = useCallback(async () => {
     setGithubLoading(true);
     setGithubError("");
     try {
@@ -29,12 +29,11 @@ export default function StudentSettingsPage() {
     } finally {
       setGithubLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void refreshGitHubStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshGitHubStatus]);
 
   async function handleLogout() {
     setIsLoggingOut(true);

@@ -23,7 +23,7 @@ export function CodeEditor({
   theme = "vs-dark",
   className = "",
 }: CodeEditorProps) {
-  const handleEditorDidMount: OnMount = (editor, monaco) => {
+  const handleEditorDidMount: OnMount = (editor) => {
     // You can configure the editor here
     editor.updateOptions({
       minimap: { enabled: false },

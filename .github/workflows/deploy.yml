@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/marconi-backend
 
@@ -216,8 +220,13 @@ jobs:
 
             docker compose -p marconi -f docker-compose.yml pull
 
-            # Bring up all services - depends_on with service_healthy handles ordering
-            docker compose -p marconi -f docker-compose.yml up -d --force-recreate
+            # Bring up all services - depends_on with service_healthy handles ordering.
+            # Avoid force-recreate here; overlapping runs can race container replacement.
+            if ! docker compose -p marconi -f docker-compose.yml up -d --remove-orphans; then
+              docker compose -p marconi -f docker-compose.yml ps || true
+              docker compose -p marconi -f docker-compose.yml logs postgres redis || true
+              exit 1
+            fi
 
             # Extract values from .env file for DB creation check
             set +u  # Allow unbound variables temporarily
