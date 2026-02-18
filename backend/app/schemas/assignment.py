@@ -131,3 +131,5 @@ class AssignmentOut(BaseModel):
     allows_zip: bool
     expected_filename: str | None
     compile_command: str | None
+    effective_due_date: datetime | None = None
+    has_extension: bool = False

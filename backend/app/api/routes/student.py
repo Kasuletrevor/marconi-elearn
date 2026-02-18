@@ -195,7 +195,29 @@ async def course_assignments(
     limit: int = 100,
 ) -> Any:
     await require_course_student_or_staff(course_id, current_user, db)
-    return await list_course_assignments(db, course_id=course_id, offset=offset, limit=limit)
+    assignments = await list_course_assignments(db, course_id=course_id, offset=offset, limit=limit)
+    assignment_ids = [assignment.id for assignment in assignments]
+    extensions = await list_assignment_extensions_for_user(
+        db,
+        user_id=current_user.id,
+        assignment_ids=assignment_ids,
+    )
+    extension_by_assignment: dict[int, datetime] = {
+        extension.assignment_id: extension.extended_due_date for extension in extensions
+    }
+
+    out: list[AssignmentOut] = []
+    for assignment in assignments:
+        extension_due_date = extension_by_assignment.get(assignment.id)
+        effective_due_date = compute_effective_due_date(
+            assignment_due_date=assignment.due_date,
+            extension_due_date=extension_due_date,
+        )
+        item = AssignmentOut.model_validate(assignment)
+        item.effective_due_date = effective_due_date
+        item.has_extension = extension_due_date is not None
+        out.append(item)
+    return out
 
 
 @router.get(
