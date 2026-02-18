@@ -166,6 +166,11 @@ export default function AdminMembersPage() {
 
   async function updateRole(membershipId: number, role: OrgMembership["role"]) {
     if (!selectedOrgId) return;
+    const membership = memberships.find((m) => m.id === membershipId);
+    if (membership && membership.user_id === user?.id) {
+      setError("You cannot change your own organization role.");
+      return;
+    }
     setError("");
     try {
       const updated = await staff.updateOrgMembership(selectedOrgId, membershipId, { role });
@@ -178,6 +183,11 @@ export default function AdminMembersPage() {
 
   async function removeMember(membershipId: number) {
     if (!selectedOrgId) return;
+    const membership = memberships.find((m) => m.id === membershipId);
+    if (membership && membership.user_id === user?.id) {
+      setError("You cannot remove your own membership.");
+      return;
+    }
     setConfirmRemoveId(membershipId);
     return;
   }
@@ -363,42 +373,51 @@ export default function AdminMembersPage() {
                 {filteredMemberships
                   .slice()
                   .sort((a, b) => a.id - b.id)
-                  .map((m) => (
-                    <motion.div 
-                      key={m.id} 
-                      layout
-                      className="px-5 py-4 flex items-center gap-4 hover:bg-[var(--background)] transition-colors group"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/10 flex items-center justify-center shrink-0 group-hover:bg-[var(--primary)]/10 transition-colors">
-                        <UsersIcon className="w-5 h-5 text-[var(--primary)]" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-[var(--foreground)] truncate">
-                          {m.user_email ?? `User #${m.user_id}`}
-                        </p>
-                        <p className="text-[10px] text-[var(--muted-foreground)] font-mono">ID: {m.user_id}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={m.role}
-                          onChange={(e) => updateRole(m.id, e.target.value as OrgMembership["role"])}
-                          className="px-3 py-1.5 text-xs bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] cursor-pointer hover:border-[var(--primary)]/30 transition-colors"
-                        >
-                          <option value="admin">{roleLabel("admin")}</option>
-                          <option value="lecturer">{roleLabel("lecturer")}</option>
-                          <option value="ta">{roleLabel("ta")}</option>
-                        </select>
-                        <button
-                          onClick={() => removeMember(m.id)}
-                          className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 transition-all opacity-0 group-hover:opacity-100"
-                          aria-label="Remove member"
-                          title="Remove Member"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
+                  .map((m) => {
+                    const isSelf = m.user_id === user?.id;
+                    return (
+                      <motion.div
+                        key={m.id}
+                        layout
+                        className="px-5 py-4 flex items-center gap-4 hover:bg-[var(--background)] transition-colors group"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/10 flex items-center justify-center shrink-0 group-hover:bg-[var(--primary)]/10 transition-colors">
+                          <UsersIcon className="w-5 h-5 text-[var(--primary)]" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                            {m.user_email ?? `User #${m.user_id}`}
+                          </p>
+                          <p className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                            ID: {m.user_id}
+                            {isSelf ? " • You" : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={m.role}
+                            onChange={(e) => updateRole(m.id, e.target.value as OrgMembership["role"])}
+                            disabled={isSelf}
+                            className="px-3 py-1.5 text-xs bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] cursor-pointer hover:border-[var(--primary)]/30 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            title={isSelf ? "You cannot change your own role" : "Change member role"}
+                          >
+                            <option value="admin">{roleLabel("admin")}</option>
+                            <option value="lecturer">{roleLabel("lecturer")}</option>
+                            <option value="ta">{roleLabel("ta")}</option>
+                          </select>
+                          <button
+                            onClick={() => removeMember(m.id)}
+                            disabled={isSelf}
+                            className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--secondary)] hover:bg-[var(--secondary)]/10 transition-all opacity-0 group-hover:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--muted-foreground)]"
+                            aria-label="Remove member"
+                            title={isSelf ? "You cannot remove yourself" : "Remove Member"}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
               </div>
             )}
           </DataList>

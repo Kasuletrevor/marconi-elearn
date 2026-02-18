@@ -10,6 +10,7 @@ from app.crud.invites import create_org_member_invite
 from app.crud.org_memberships import (
     OrgMembershipExistsError,
     add_membership,
+    count_admin_memberships,
     delete_membership,
     get_membership,
     list_memberships,
@@ -17,6 +18,7 @@ from app.crud.org_memberships import (
 )
 from app.crud.users import get_user_by_email, create_pending_user
 from app.db.deps import get_db
+from app.models.organization_membership import OrgRole
 from app.models.user import User
 from app.schemas.org_membership import (
     OrgMembershipCreate,
@@ -122,6 +124,22 @@ async def update_member(
     membership = await get_membership(db, membership_id=membership_id)
     if membership is None or membership.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
+    if membership.user_id == _current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot change your own organization role",
+        )
+    if payload.role is not None and membership.role == OrgRole.admin and payload.role != OrgRole.admin:
+        admin_count = await count_admin_memberships(
+            db,
+            organization_id=org_id,
+            exclude_membership_id=membership.id,
+        )
+        if admin_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Organization must have at least one admin",
+            )
 
     updated = await update_membership(db, membership=membership, role=payload.role)
     enqueue_audit_event(
@@ -147,6 +165,22 @@ async def remove_member(
     membership = await get_membership(db, membership_id=membership_id)
     if membership is None or membership.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
+    if membership.user_id == _current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot remove your own membership",
+        )
+    if membership.role == OrgRole.admin:
+        admin_count = await count_admin_memberships(
+            db,
+            organization_id=org_id,
+            exclude_membership_id=membership.id,
+        )
+        if admin_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Organization must have at least one admin",
+            )
 
     await delete_membership(db, membership=membership)
     enqueue_audit_event(

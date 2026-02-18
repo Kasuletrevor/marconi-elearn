@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -81,3 +81,20 @@ async def update_membership(
 async def delete_membership(db: AsyncSession, *, membership: OrganizationMembership) -> None:
     await db.delete(membership)
     await db.commit()
+
+
+async def count_admin_memberships(
+    db: AsyncSession,
+    *,
+    organization_id: int,
+    exclude_membership_id: int | None = None,
+) -> int:
+    query = select(func.count(OrganizationMembership.id)).where(
+        OrganizationMembership.organization_id == organization_id,
+        OrganizationMembership.role == OrgRole.admin,
+    )
+    if exclude_membership_id is not None:
+        query = query.where(OrganizationMembership.id != exclude_membership_id)
+
+    result = await db.execute(query)
+    return int(result.scalar_one())
