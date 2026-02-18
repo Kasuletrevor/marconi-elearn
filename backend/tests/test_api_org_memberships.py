@@ -34,11 +34,11 @@ async def test_org_memberships_crud(client):
 
     r = await client.patch(
         f"/api/v1/orgs/{org_id}/memberships/{membership_id}",
-        json={"role": "admin"},
+        json={"role": "ta"},
     )
     assert r.status_code == 200
     updated = r.json()
-    assert updated["role"] == "admin"
+    assert updated["role"] == "ta"
 
     r = await client.delete(f"/api/v1/orgs/{org_id}/memberships/{membership_id}")
     assert r.status_code == 204
@@ -112,3 +112,85 @@ async def test_list_memberships_pagination(client):
     assert r.status_code == 200
     memberships = r.json()
     assert len(memberships) == 1
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_remove_own_membership(client):
+    await _login_admin(client)
+    r = await client.post("/api/v1/orgs", json={"name": "Self Remove Guard"})
+    assert r.status_code == 201
+    org_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/memberships/by-email",
+        json={"email": "admin@example.com", "role": "admin"},
+    )
+    assert r.status_code == 201
+    membership_id = r.json()["id"]
+
+    r = await client.delete(f"/api/v1/orgs/{org_id}/memberships/{membership_id}")
+    assert r.status_code == 400
+    assert "own membership" in r.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_change_own_membership_role(client):
+    await _login_admin(client)
+    r = await client.post("/api/v1/orgs", json={"name": "Self Role Guard"})
+    assert r.status_code == 201
+    org_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/memberships/by-email",
+        json={"email": "admin@example.com", "role": "admin"},
+    )
+    assert r.status_code == 201
+    membership_id = r.json()["id"]
+
+    r = await client.patch(
+        f"/api/v1/orgs/{org_id}/memberships/{membership_id}",
+        json={"role": "lecturer"},
+    )
+    assert r.status_code == 400
+    assert "own organization role" in r.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_cannot_remove_last_admin_membership(client):
+    await _login_admin(client)
+    r = await client.post("/api/v1/orgs", json={"name": "Last Admin Remove Guard"})
+    assert r.status_code == 201
+    org_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/memberships/by-email",
+        json={"email": "member@example.com", "role": "admin"},
+    )
+    assert r.status_code == 201
+    membership_id = r.json()["id"]
+
+    r = await client.delete(f"/api/v1/orgs/{org_id}/memberships/{membership_id}")
+    assert r.status_code == 400
+    assert "at least one admin" in r.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_cannot_downgrade_last_admin_membership(client):
+    await _login_admin(client)
+    r = await client.post("/api/v1/orgs", json={"name": "Last Admin Downgrade Guard"})
+    assert r.status_code == 201
+    org_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/orgs/{org_id}/memberships/by-email",
+        json={"email": "member@example.com", "role": "admin"},
+    )
+    assert r.status_code == 201
+    membership_id = r.json()["id"]
+
+    r = await client.patch(
+        f"/api/v1/orgs/{org_id}/memberships/{membership_id}",
+        json={"role": "lecturer"},
+    )
+    assert r.status_code == 400
+    assert "at least one admin" in r.json()["detail"].lower()
