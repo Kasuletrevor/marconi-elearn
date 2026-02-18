@@ -176,7 +176,7 @@ export default function InvitePage({ params }: InvitePageProps) {
                 <GraduationCap className="w-6 h-6 text-white" />
               </div>
               <span className="font-[family-name:var(--font-display)] text-2xl font-semibold text-white">
-                Marconi
+                Marc-Elearn
               </span>
             </div>
 
@@ -210,7 +210,7 @@ export default function InvitePage({ params }: InvitePageProps) {
                 <GraduationCap className="w-5 h-5 text-white" />
               </div>
               <span className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--foreground)]">
-                Marconi
+                Marc-Elearn
               </span>
             </Link>
           </motion.div>

@@ -15,7 +15,7 @@ const fadeInUp = {
 const C_STARTER_CODE = `#include <stdio.h>
 
 int main() {
-    printf("Hello, Marconi!\\n");
+    printf("Hello, Marc-Elearn!\\n");
     return 0;
 }
 `;
@@ -23,7 +23,7 @@ int main() {
 const CPP_STARTER_CODE = `#include <iostream>
 
 int main() {
-    std::cout << "Hello, Marconi!" << std::endl;
+    std::cout << "Hello, Marc-Elearn!" << std::endl;
     return 0;
 }
 `;

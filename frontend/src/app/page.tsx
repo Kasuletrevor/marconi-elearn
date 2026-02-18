@@ -102,7 +102,7 @@ function Navbar() {
             <GraduationCap className="h-5 w-5" />
           </div>
           <span className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)]">
-            Marconi<span className="text-[var(--primary)]">.</span>
+            Marc-Elearn<span className="text-[var(--primary)]">.</span>
           </span>
         </Link>
 
@@ -251,7 +251,7 @@ function HeroSection() {
             <span className="text-[var(--primary)]">ready to ship working code.</span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-[var(--muted-foreground)] md:text-xl">
-            Marconi keeps the student path fast and clear, while giving staff the controls needed to run serious programming courses.
+            Marc-Elearn keeps the student path fast and clear, while giving staff the controls needed to run serious programming courses.
             Submissions, autograding, modules, and roster operations all live in one engineering workflow.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -414,7 +414,7 @@ function CTASection() {
             href="/login"
             className="relative z-10 mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-sm font-bold text-[var(--primary)] transition-colors hover:bg-white/90"
           >
-            Launch Marconi
+            Launch Marc-Elearn
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -431,7 +431,7 @@ function Footer() {
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--primary)] text-white">
             <GraduationCap className="h-4 w-4" />
           </div>
-          <span className="font-[family-name:var(--font-display)] text-lg font-bold text-[var(--foreground)]">Marconi</span>
+          <span className="font-[family-name:var(--font-display)] text-lg font-bold text-[var(--foreground)]">Marc-Elearn</span>
         </div>
         <p>Built for programming courses at university scale.</p>
         <p>&copy; {new Date().getFullYear()} Makerere University</p>

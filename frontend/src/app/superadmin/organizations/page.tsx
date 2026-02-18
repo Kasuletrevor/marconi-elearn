@@ -325,7 +325,7 @@ export default function SuperadminOrganizationsPage() {
                     <input
                       value={newOrgName}
                       onChange={(e) => setNewOrgName(e.target.value)}
-                      placeholder="e.g. CEDAT — Marconi Lab"
+                      placeholder="e.g. CEDAT — Marc-Elearn Lab"
                       autoFocus
                       required
                       className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"

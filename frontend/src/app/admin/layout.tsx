@@ -192,7 +192,7 @@ function SidebarContent({
           </div>
           <div>
             <span className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] block">
-              Marconi
+              Marc-Elearn
             </span>
             <span className="text-xs text-[var(--muted-foreground)]">
               Organization Admin
