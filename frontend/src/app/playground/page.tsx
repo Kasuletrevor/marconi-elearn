@@ -120,7 +120,8 @@ export default function PlaygroundPage() {
         stdin: "",
       });
 
-      const statusLabel = res.compile_output.trim()
+      const isCompileFailure = res.outcome === 11;
+      const statusLabel = isCompileFailure
         ? "Compile error"
         : res.stderr.trim()
           ? "Runtime error"
@@ -132,9 +133,13 @@ export default function PlaygroundPage() {
       if (res.compile_output.trim()) {
         parts.push(res.compile_output.trimEnd());
       }
-      parts.push("Running...");
-      if (res.stdout.trim()) parts.push(res.stdout.trimEnd());
-      if (res.stderr.trim()) parts.push(res.stderr.trimEnd());
+      if (isCompileFailure) {
+        parts.push("Compilation failed.");
+      } else {
+        parts.push("Running...");
+        if (res.stdout.trim()) parts.push(res.stdout.trimEnd());
+        if (res.stderr.trim()) parts.push(res.stderr.trimEnd());
+      }
       parts.push(`\nOutcome code: ${res.outcome}`);
       setOutput(parts.join("\n\n"));
     } catch (err) {
