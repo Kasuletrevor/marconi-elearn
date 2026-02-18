@@ -107,6 +107,13 @@ function firstLine(text: string): string {
   return text.trim().split(/\r?\n/)[0] ?? "";
 }
 
+function getFileExtension(fileName: string): string {
+  const normalized = fileName.trim().toLowerCase();
+  const lastDotIndex = normalized.lastIndexOf(".");
+  if (lastDotIndex <= 0 || lastDotIndex === normalized.length - 1) return "";
+  return normalized.slice(lastDotIndex);
+}
+
 interface StudentAssignmentDetailClientProps {
   courseId: number;
   assignmentId: number;
@@ -147,8 +154,8 @@ export default function StudentAssignmentDetailClient({
   const acceptAttr = allowedExtensions.join(",");
 
   const validateAndSetFile = useCallback((file: File) => {
-    const fileName = file.name.toLowerCase();
-    const isValid = allowedExtensions.some((ext) => fileName.endsWith(ext));
+    const extension = getFileExtension(file.name);
+    const isValid = allowedExtensions.includes(extension);
 
     if (!isValid) {
       setUploadError(`Please upload ${allowsZip ? "a .c, .cpp, or .zip" : "a .c or .cpp"} file`);
