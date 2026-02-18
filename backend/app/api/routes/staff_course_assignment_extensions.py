@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.course_permissions import require_course_staff
-from app.crud.audit import create_audit_event
+from app.crud.audit import enqueue_audit_event
 from app.crud.assignment_extensions import (
     delete_assignment_extension,
     get_assignment_extension,
@@ -22,8 +21,6 @@ from app.models.course import Course
 from app.models.course_membership import CourseMembership, CourseRole
 from app.models.user import User
 from app.schemas.assignment_extension import AssignmentExtensionOut, AssignmentExtensionUpsert
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/staff/courses/{course_id}/assignments/{assignment_id}/extensions",
@@ -104,25 +101,20 @@ async def upsert_extension(
         user_id=user_id,
         extended_due_date=payload.extended_due_date,
     )
-    try:
-        course = await db.get(Course, course_id)
-        await create_audit_event(
-            db,
-            organization_id=None if course is None else course.organization_id,
-            actor_user_id=current_user.id,
-            action="assignment_extension.upserted",
-            target_type="assignment",
-            target_id=assignment_id,
-            metadata={"student_user_id": user_id, "extended_due_date": str(payload.extended_due_date)},
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event assignment_extension.upserted. course_id=%s assignment_id=%s actor_user_id=%s student_user_id=%s",
-            course_id,
-            assignment_id,
-            current_user.id,
-            user_id,
-        )
+    course = await db.get(Course, course_id)
+    enqueue_audit_event(
+        organization_id=None if course is None else course.organization_id,
+        actor_user_id=current_user.id,
+        action="assignment_extension.upserted",
+        target_type="assignment",
+        target_id=assignment_id,
+        metadata={"student_user_id": user_id, "extended_due_date": str(payload.extended_due_date)},
+        context={
+            "course_id": course_id,
+            "assignment_id": assignment_id,
+            "student_user_id": user_id,
+        },
+    )
     return updated
 
 
@@ -140,23 +132,18 @@ async def delete_extension(
     if ext is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Extension not found")
     await delete_assignment_extension(db, extension=ext)
-    try:
-        course = await db.get(Course, course_id)
-        await create_audit_event(
-            db,
-            organization_id=None if course is None else course.organization_id,
-            actor_user_id=current_user.id,
-            action="assignment_extension.deleted",
-            target_type="assignment",
-            target_id=assignment_id,
-            metadata={"student_user_id": user_id},
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event assignment_extension.deleted. course_id=%s assignment_id=%s actor_user_id=%s student_user_id=%s",
-            course_id,
-            assignment_id,
-            current_user.id,
-            user_id,
-        )
+    course = await db.get(Course, course_id)
+    enqueue_audit_event(
+        organization_id=None if course is None else course.organization_id,
+        actor_user_id=current_user.id,
+        action="assignment_extension.deleted",
+        target_type="assignment",
+        target_id=assignment_id,
+        metadata={"student_user_id": user_id},
+        context={
+            "course_id": course_id,
+            "assignment_id": assignment_id,
+            "student_user_id": user_id,
+        },
+    )
     return None
