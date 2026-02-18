@@ -269,8 +269,10 @@ export default function StudentAssignmentDetailClient({
 
   if (!assignment || !course) return null;
 
-  const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;   
+  const dueDateRaw = assignment.effective_due_date ?? assignment.due_date;
+  const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
   const isPastDue = dueDate && dueDate < new Date();
+  const hasExtension = Boolean(assignment.has_extension && assignment.effective_due_date);
   const latestSubmission = submissions[0];
   const hasGradedSubmission = submissions.some((s) => s.status === "graded");   
   const latePolicy = resolveLatePolicy(course, assignment);
@@ -342,6 +344,11 @@ export default function StudentAssignmentDetailClient({
                 })}
               </span>
             </div>
+          )}
+          {hasExtension && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--secondary)]/10 text-[var(--secondary)] text-xs font-medium">
+              Deadline extension
+            </span>
           )}
           <div className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
             <Award className="w-4 h-4" />

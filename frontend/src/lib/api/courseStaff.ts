@@ -1,5 +1,5 @@
 import { API_BASE, ApiError, handleResponse } from "./core";
-import type { Assignment, AssignmentCreate, AssignmentUpdate, Course, CourseMembership, CourseMembershipCreate, CourseMembershipUpdate, CourseNotificationPreferences, CourseStudentInviteByEmail, CourseUpdate, ImportCsvResult, MissingStudentOut, MissingSubmissionsSummaryItem, Module, ModuleCreate, ModuleResource, ModuleResourceLinkCreate, ModuleResourceUpdate, ModuleUpdate, OrgMembership, StaffCalendarEvent, TestCase, TestCaseCreate, TestCaseUpdate } from "./types";
+import type { Assignment, AssignmentCreate, AssignmentExtension, AssignmentExtensionUpsert, AssignmentUpdate, Course, CourseMembership, CourseMembershipCreate, CourseMembershipUpdate, CourseNotificationPreferences, CourseStudentInviteByEmail, CourseUpdate, ImportCsvResult, MissingStudentOut, MissingSubmissionsSummaryItem, Module, ModuleCreate, ModuleResource, ModuleResourceLinkCreate, ModuleResourceUpdate, ModuleUpdate, OrgMembership, StaffCalendarEvent, TestCase, TestCaseCreate, TestCaseUpdate } from "./types";
 
 export const courseStaff = {
   async listCourses(offset = 0, limit = 100): Promise<Course[]> {
@@ -134,6 +134,52 @@ export const courseStaff = {
       method: "DELETE",
       credentials: "include",
     });
+    return handleResponse<void>(res);
+  },
+
+  async listAssignmentExtensions(
+    courseId: number,
+    assignmentId: number,
+    offset = 0,
+    limit = 200
+  ): Promise<AssignmentExtension[]> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/assignments/${assignmentId}/extensions?offset=${offset}&limit=${limit}`,
+      { credentials: "include" }
+    );
+    return handleResponse<AssignmentExtension[]>(res);
+  },
+
+  async upsertAssignmentExtension(
+    courseId: number,
+    assignmentId: number,
+    userId: number,
+    data: AssignmentExtensionUpsert
+  ): Promise<AssignmentExtension> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/assignments/${assignmentId}/extensions/${userId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse<AssignmentExtension>(res);
+  },
+
+  async deleteAssignmentExtension(
+    courseId: number,
+    assignmentId: number,
+    userId: number
+  ): Promise<void> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/staff/courses/${courseId}/assignments/${assignmentId}/extensions/${userId}`,
+      {
+        method: "DELETE",
+        credentials: "include",
+      }
+    );
     return handleResponse<void>(res);
   },
 

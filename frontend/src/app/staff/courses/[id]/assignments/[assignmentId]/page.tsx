@@ -20,9 +20,11 @@ import {
 } from "lucide-react";
 import {
   ApiError,
+  type AssignmentExtension,
   courseStaff,
   type Assignment,
   type Course,
+  type CourseMembership,
   type TestCase,
 } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -53,6 +55,21 @@ function sortByPosition(a: TestCase, b: TestCase): number {
   return a.id - b.id;
 }
 
+function toDateTimeLocalValue(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(raw: string): string | null {
+  if (!raw.trim()) return null;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
 export default function StaffAssignmentDetailPage() {
   const params = useParams();
   const courseId = Number(params.id);
@@ -68,6 +85,13 @@ export default function StaffAssignmentDetailPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [extensionError, setExtensionError] = useState("");
+  const [students, setStudents] = useState<CourseMembership[]>([]);
+  const [extensions, setExtensions] = useState<AssignmentExtension[]>([]);
+  const [extensionDraftsByUserId, setExtensionDraftsByUserId] = useState<Record<number, string>>(
+    {}
+  );
+  const [busyExtensionUserId, setBusyExtensionUserId] = useState<number | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -92,6 +116,9 @@ export default function StaffAssignmentDetailPage() {
     () => [...testCases].sort(sortByPosition),
     [testCases]
   );
+  const extensionByUserId = useMemo(() => {
+    return new Map<number, AssignmentExtension>(extensions.map((ext) => [ext.user_id, ext]));
+  }, [extensions]);
 
   const [draftName, setDraftName] = useState("");
   const [draftPoints, setDraftPoints] = useState("0");
@@ -127,16 +154,38 @@ export default function StaffAssignmentDetailPage() {
 
     try {
       setError("");
+      setExtensionError("");
       setIsLoading(true);
-      const [c, a, tcs] = await Promise.all([
+      const [c, a, tcs, memberships, assignmentExtensions] = await Promise.all([
         courseStaff.getCourse(courseId),
         courseStaff.getAssignment(courseId, assignmentId),
         courseStaff.listTestCases(courseId, assignmentId),
+        courseStaff.listMemberships(courseId),
+        courseStaff.listAssignmentExtensions(courseId, assignmentId),
       ]);
       setCourse(c);
       setAssignment(a);
       const sorted = [...tcs].sort(sortByPosition);
       setTestCases(sorted);
+      const studentsOnly = memberships
+        .filter((membership) => membership.role === "student")
+        .sort((left, right) => {
+          const leftEmail = (left.user_email || "").toLowerCase();
+          const rightEmail = (right.user_email || "").toLowerCase();
+          return leftEmail.localeCompare(rightEmail);
+        });
+      setStudents(studentsOnly);
+      setExtensions(assignmentExtensions);
+      const nextDrafts: Record<number, string> = {};
+      const extensionMap = new Map<number, AssignmentExtension>(
+        assignmentExtensions.map((extension) => [extension.user_id, extension])
+      );
+      for (const membership of studentsOnly) {
+        nextDrafts[membership.user_id] = toDateTimeLocalValue(
+          extensionMap.get(membership.user_id)?.extended_due_date
+        );
+      }
+      setExtensionDraftsByUserId(nextDrafts);
       setSelectedId((prev) => {
         if (prev && sorted.some((t) => t.id === prev)) return prev;
         return sorted[0]?.id ?? null;
@@ -250,6 +299,54 @@ export default function StaffAssignmentDetailPage() {
       else setSaveError("Failed to reorder test cases");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function saveExtension(userId: number) {
+    setExtensionError("");
+    const raw = extensionDraftsByUserId[userId] ?? "";
+    const isoDateTime = toIsoDateTime(raw);
+    if (!isoDateTime) {
+      setExtensionError("Provide a valid extension date and time before saving.");
+      return;
+    }
+
+    setBusyExtensionUserId(userId);
+    try {
+      const updated = await courseStaff.upsertAssignmentExtension(courseId, assignmentId, userId, {
+        extended_due_date: isoDateTime,
+      });
+      setExtensions((prev) => {
+        const withoutUser = prev.filter((extension) => extension.user_id !== userId);
+        return [...withoutUser, updated].sort((left, right) => left.user_id - right.user_id);
+      });
+      setExtensionDraftsByUserId((prev) => ({
+        ...prev,
+        [userId]: toDateTimeLocalValue(updated.extended_due_date),
+      }));
+    } catch (err) {
+      reportError("Failed to save assignment extension", err);
+      if (err instanceof ApiError) setExtensionError(err.detail);
+      else setExtensionError("Failed to save assignment extension");
+    } finally {
+      setBusyExtensionUserId(null);
+    }
+  }
+
+  async function clearExtension(userId: number) {
+    setExtensionError("");
+    if (!extensionByUserId.get(userId)) return;
+    setBusyExtensionUserId(userId);
+    try {
+      await courseStaff.deleteAssignmentExtension(courseId, assignmentId, userId);
+      setExtensions((prev) => prev.filter((extension) => extension.user_id !== userId));
+      setExtensionDraftsByUserId((prev) => ({ ...prev, [userId]: "" }));
+    } catch (err) {
+      reportError("Failed to clear assignment extension", err);
+      if (err instanceof ApiError) setExtensionError(err.detail);
+      else setExtensionError("Failed to clear assignment extension");
+    } finally {
+      setBusyExtensionUserId(null);
     }
   }
 
@@ -439,6 +536,99 @@ export default function StaffAssignmentDetailPage() {
                   <li>Trailing EOF whitespace is ignored</li>
                   <li>Internal whitespace is strict</li>
                 </ul>
+              </div>
+
+              <div className="mt-4 p-4 rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                <p className="text-xs uppercase tracking-wider text-[var(--muted-foreground)] mb-2">
+                  Per-student deadline overrides
+                </p>
+                <p className="text-sm text-[var(--foreground)] mb-3">
+                  Set assignment-specific extension deadlines for individual students.
+                  {dueDate
+                    ? ` Base due date: ${dueDate.toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}.`
+                    : " This assignment currently has no base due date."}
+                </p>
+
+                {extensionError ? (
+                  <div className="mb-3 rounded-xl border border-[var(--secondary)]/20 bg-[var(--secondary)]/10 px-3 py-2 text-xs text-[var(--secondary)]">
+                    {extensionError}
+                  </div>
+                ) : null}
+
+                {students.length === 0 ? (
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    No student enrollments yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {students.map((studentMembership) => {
+                      const extension = extensionByUserId.get(studentMembership.user_id);
+                      const isBusy = busyExtensionUserId === studentMembership.user_id;
+                      return (
+                        <div
+                          key={studentMembership.id}
+                          className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                                {studentMembership.user_email ?? `User #${studentMembership.user_id}`}
+                              </p>
+                              <p className="text-[11px] text-[var(--muted-foreground)]">
+                                ID {studentMembership.user_id}
+                                {studentMembership.student_number
+                                  ? ` • ${studentMembership.student_number}`
+                                  : ""}
+                              </p>
+                            </div>
+                            {extension ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] text-[11px] font-medium">
+                                Extended
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <input
+                              type="datetime-local"
+                              value={extensionDraftsByUserId[studentMembership.user_id] ?? ""}
+                              onChange={(event) =>
+                                setExtensionDraftsByUserId((prev) => ({
+                                  ...prev,
+                                  [studentMembership.user_id]: event.target.value,
+                                }))
+                              }
+                              disabled={isBusy}
+                              className="flex-1 min-w-[210px] px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void saveExtension(studentMembership.user_id)}
+                              disabled={isBusy}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+                            >
+                              {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void clearExtension(studentMembership.user_id)}
+                              disabled={isBusy || !extension}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
