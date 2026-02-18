@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin, require_org_member
-from app.crud.audit import create_audit_event
+from app.crud.audit import enqueue_audit_event
 from app.crud.invites import create_org_member_invite
 from app.crud.org_memberships import (
     OrgMembershipExistsError,
@@ -27,8 +26,6 @@ from app.schemas.org_membership import (
     OrgMembershipUpdate,
 )
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/orgs/{org_id}/memberships")
 
 
@@ -44,23 +41,15 @@ async def add_member(
         membership = await add_membership(
             db, organization_id=org_id, user_id=payload.user_id, role=payload.role
         )
-        try:
-            await create_audit_event(
-                db,
-                organization_id=org_id,
-                actor_user_id=_current_user.id,
-                action="org_membership.added",
-                target_type="user",
-                target_id=membership.user_id,
-                metadata={"role": membership.role},
-            )
-        except Exception:
-            logger.exception(
-                "Failed to write audit event org_membership.added. org_id=%s actor_user_id=%s target_user_id=%s",
-                org_id,
-                _current_user.id,
-                membership.user_id,
-            )
+        enqueue_audit_event(
+            organization_id=org_id,
+            actor_user_id=_current_user.id,
+            action="org_membership.added",
+            target_type="user",
+            target_id=membership.user_id,
+            metadata={"role": membership.role},
+            context={"org_id": org_id, "target_user_id": membership.user_id},
+        )
         return membership
     except OrgMembershipExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in organization") from exc
@@ -89,23 +78,15 @@ async def add_member_by_email(
         token = await create_org_member_invite(db, organization_id=org_id, email=email, expires_in_days=7)
         invite_link = f"/invite/{token}"
 
-    try:
-        await create_audit_event(
-            db,
-            organization_id=org_id,
-            actor_user_id=_current_user.id,
-            action="org_membership.invited",
-            target_type="user",
-            target_id=membership.user_id,
-            metadata={"email": email, "role": membership.role, "invite": bool(invite_link)},
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event org_membership.invited. org_id=%s actor_user_id=%s target_user_id=%s",
-            org_id,
-            _current_user.id,
-            membership.user_id,
-        )
+    enqueue_audit_event(
+        organization_id=org_id,
+        actor_user_id=_current_user.id,
+        action="org_membership.invited",
+        target_type="user",
+        target_id=membership.user_id,
+        metadata={"email": email, "role": membership.role, "invite": bool(invite_link)},
+        context={"org_id": org_id, "target_user_id": membership.user_id},
+    )
 
     return OrgMembershipInviteOut(
         id=membership.id,
@@ -143,23 +124,15 @@ async def update_member(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
 
     updated = await update_membership(db, membership=membership, role=payload.role)
-    try:
-        await create_audit_event(
-            db,
-            organization_id=org_id,
-            actor_user_id=_current_user.id,
-            action="org_membership.updated",
-            target_type="user",
-            target_id=updated.user_id,
-            metadata={"role": updated.role},
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event org_membership.updated. org_id=%s actor_user_id=%s target_user_id=%s",
-            org_id,
-            _current_user.id,
-            updated.user_id,
-        )
+    enqueue_audit_event(
+        organization_id=org_id,
+        actor_user_id=_current_user.id,
+        action="org_membership.updated",
+        target_type="user",
+        target_id=updated.user_id,
+        metadata={"role": updated.role},
+        context={"org_id": org_id, "target_user_id": updated.user_id},
+    )
     return updated
 
 
@@ -176,21 +149,13 @@ async def remove_member(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membership not found")
 
     await delete_membership(db, membership=membership)
-    try:
-        await create_audit_event(
-            db,
-            organization_id=org_id,
-            actor_user_id=_current_user.id,
-            action="org_membership.removed",
-            target_type="user",
-            target_id=membership.user_id,
-            metadata={"role": membership.role},
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event org_membership.removed. org_id=%s actor_user_id=%s target_user_id=%s",
-            org_id,
-            _current_user.id,
-            membership.user_id,
-        )
+    enqueue_audit_event(
+        organization_id=org_id,
+        actor_user_id=_current_user.id,
+        action="org_membership.removed",
+        target_type="user",
+        target_id=membership.user_id,
+        metadata={"role": membership.role},
+        context={"org_id": org_id, "target_user_id": membership.user_id},
+    )
     return None

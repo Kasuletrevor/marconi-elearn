@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin
 from app.api.deps.superadmin import require_superadmin
-from app.crud.audit import create_audit_event
+from app.crud.audit import enqueue_audit_event
 from app.crud.organizations import (
     OrgNameTakenError,
     create_organization,
@@ -21,7 +20,6 @@ from app.models.user import User
 from app.schemas.organization import OrganizationCreate, OrganizationOut, OrganizationUpdate
 
 router = APIRouter(prefix="/orgs")
-logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=OrganizationOut, status_code=status.HTTP_201_CREATED)
@@ -32,18 +30,15 @@ async def create_org(
 ) -> OrganizationOut:
     try:
         org = await create_organization(db, name=payload.name)
-        try:
-            await create_audit_event(
-                db,
-                organization_id=org.id,
-                actor_user_id=current_user.id,
-                action="org.created",
-                target_type="organization",
-                target_id=org.id,
-                metadata={"name": org.name},
-            )
-        except Exception:
-            logger.exception("Failed to write audit event org.created")
+        enqueue_audit_event(
+            organization_id=org.id,
+            actor_user_id=current_user.id,
+            action="org.created",
+            target_type="organization",
+            target_id=org.id,
+            metadata={"name": org.name},
+            context={"org_id": org.id},
+        )
         return org
     except OrgNameTakenError as exc:
         raise HTTPException(
@@ -112,18 +107,15 @@ async def delete_org(
     if org is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
 
-    try:
-        await create_audit_event(
-            db,
-            organization_id=org.id,
-            actor_user_id=_current_user.id,
-            action="org.deleted",
-            target_type="organization",
-            target_id=org.id,
-            metadata={"name": org.name},
-        )
-    except Exception:
-        logger.exception("Failed to write audit event org.deleted")
+    enqueue_audit_event(
+        organization_id=org.id,
+        actor_user_id=_current_user.id,
+        action="org.deleted",
+        target_type="organization",
+        target_id=org.id,
+        metadata={"name": org.name},
+        context={"org_id": org.id},
+    )
 
     await delete_organization(db, org=org)
     return None

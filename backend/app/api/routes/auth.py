@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -13,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from app.crud.course_memberships import CourseMembershipExistsError, add_course_membership
 from app.crud.invites import get_invite_by_token, mark_invite_used
 from app.crud.sessions import create_session, delete_session, get_session_by_token
-from app.crud.audit import create_audit_event
+from app.crud.audit import enqueue_audit_event
 from app.crud.users import create_user, get_user_by_email
 from app.db.deps import get_db
 from app.models.user import User
@@ -30,8 +29,6 @@ from app.schemas.auth import (
     MeResponse,
     OrgRoleItem,
 )
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
 login_rate_limit = make_rate_limit_dependency(
@@ -188,23 +185,15 @@ async def accept_invite(
                 ) from exc
 
     await mark_invite_used(db, invite=invite)
-    try:
-        await create_audit_event(
-            db,
-            organization_id=invite.organization_id,
-            actor_user_id=user.id,
-            action="invite.accepted",
-            target_type="user",
-            target_id=user.id,
-            metadata={"course_id": invite.course_id, "email": user.email},
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event for invite acceptance. invite_id=%s course_id=%s user_id=%s",
-            invite.id,
-            invite.course_id,
-            user.id,
-        )
+    enqueue_audit_event(
+        organization_id=invite.organization_id,
+        actor_user_id=user.id,
+        action="invite.accepted",
+        target_type="user",
+        target_id=user.id,
+        metadata={"course_id": invite.course_id, "email": user.email},
+        context={"invite_id": invite.id, "course_id": invite.course_id, "user_id": user.id},
+    )
 
     token, _ = await create_session(db, user_id=user.id)
     response.set_cookie(
