@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
-from app.crud.audit import create_audit_event
+from app.crud.audit import enqueue_audit_event
 from app.crud.notifications import create_notification
 from app.crud.staff_submissions import (
     count_staff_submission_rows,
@@ -150,22 +150,15 @@ async def bulk_update_submissions(
 
     await db.commit()
 
-    try:
-        await create_audit_event(
-            db,
-            organization_id=rows[0].course.organization_id if rows else None,
-            actor_user_id=current_user.id,
-            action="submissions.bulk_updated",
-            target_type="submission",
-            target_id=None,
-            metadata={"count": len(rows), "action": payload.action.value},
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event submissions.bulk_updated. actor_user_id=%s submission_ids=%s",
-            current_user.id,
-            payload.submission_ids,
-        )
+    enqueue_audit_event(
+        organization_id=rows[0].course.organization_id if rows else None,
+        actor_user_id=current_user.id,
+        action="submissions.bulk_updated",
+        target_type="submission",
+        target_id=None,
+        metadata={"count": len(rows), "action": payload.action.value},
+        context={"actor_user_id": current_user.id, "submission_ids": payload.submission_ids},
+    )
 
     if target_status == SubmissionStatus.graded:
         for r in rows:
@@ -274,25 +267,18 @@ async def update_submission(
     await db.commit()
     await db.refresh(submission)
 
-    try:
-        await create_audit_event(
-            db,
-            organization_id=row.course.organization_id,
-            actor_user_id=current_user.id,
-            action="submission.updated",
-            target_type="submission",
-            target_id=submission.id,
-            metadata={
-                "status": submission.status.value,
-                "score": submission.score,
-            },
-        )
-    except Exception:
-        logger.exception(
-            "Failed to write audit event submission.updated. actor_user_id=%s submission_id=%s",
-            current_user.id,
-            submission.id,
-        )
+    enqueue_audit_event(
+        organization_id=row.course.organization_id,
+        actor_user_id=current_user.id,
+        action="submission.updated",
+        target_type="submission",
+        target_id=submission.id,
+        metadata={
+            "status": submission.status.value,
+            "score": submission.score,
+        },
+        context={"actor_user_id": current_user.id, "submission_id": submission.id},
+    )
 
     if prior_status != SubmissionStatus.graded and submission.status == SubmissionStatus.graded:
         link = f"/dashboard/courses/{row.course.id}/assignments/{row.assignment.id}"
