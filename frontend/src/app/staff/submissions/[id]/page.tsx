@@ -32,6 +32,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
+import { truncateOutput } from "@/lib/truncateOutput";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 14 },
@@ -513,7 +514,7 @@ export default function StaffSubmissionDetailPage() {
                         Compile output
                       </p>
                       <pre className="text-xs whitespace-pre-wrap text-[var(--foreground)] font-mono">
-                        {compileOutput}
+                        {truncateOutput(compileOutput)}
                       </pre>
                     </div>
                   ) : null}
@@ -566,7 +567,7 @@ export default function StaffSubmissionDetailPage() {
                               <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
                                 <p className="text-xs text-[var(--muted-foreground)] mb-2">Actual stdout</p>
                                 <pre className="text-xs whitespace-pre-wrap text-[var(--foreground)] font-mono">
-                                  {r.stdout}
+                                  {truncateOutput(r.stdout)}
                                 </pre>
                               </div>
                               <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
@@ -578,7 +579,7 @@ export default function StaffSubmissionDetailPage() {
                               <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
                                 <p className="text-xs text-[var(--muted-foreground)] mb-2">Actual stderr</p>
                                 <pre className="text-xs whitespace-pre-wrap text-[var(--foreground)] font-mono">
-                                  {r.stderr}
+                                  {truncateOutput(r.stderr)}
                                 </pre>
                               </div>
                             </div>

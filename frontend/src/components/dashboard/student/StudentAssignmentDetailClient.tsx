@@ -31,6 +31,7 @@ import {
   type StudentSubmissionTests,
   ApiError,
 } from "@/lib/api";
+import { truncateOutput } from "@/lib/truncateOutput";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -770,7 +771,7 @@ function SubmissionCard({
                   <div className="mt-3">
                     <div className="text-[11px] text-[var(--muted-foreground)] mb-1">Compile output</div>
                     <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
-                      {testsData.compile_output}
+                      {truncateOutput(testsData.compile_output)}
                     </pre>
                   </div>
                 ) : null}
@@ -848,7 +849,7 @@ function SubmissionCard({
                                 <div>
                                   <div className="text-[11px] text-[var(--muted-foreground)] mb-1">Your stdout</div>
                                   <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
-                                    {t.stdout || "∅"}
+                                    {truncateOutput(t.stdout) || "∅"}
                                   </pre>
                                 </div>
                               </div>
@@ -868,7 +869,7 @@ function SubmissionCard({
                                       Your stderr
                                     </div>
                                     <pre className="text-[11px] whitespace-pre-wrap bg-[var(--muted)]/30 rounded-lg p-2 border border-[var(--border)] overflow-x-auto">
-                                      {t.stderr || "∅"}
+                                      {truncateOutput(t.stderr) || "∅"}
                                     </pre>
                                   </div>
                                 </div>
