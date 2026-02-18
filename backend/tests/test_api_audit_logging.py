@@ -8,6 +8,8 @@ from app.crud import audit as audit_crud
 
 @pytest.mark.asyncio
 async def test_audit_failure_is_non_blocking_and_logged(client, monkeypatch, caplog):
+    audit_crud.set_audit_dispatch_enabled(True)
+
     async def _failing_create_audit_event(*args, **kwargs):
         raise RuntimeError("audit write failed")
 
