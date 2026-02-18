@@ -57,6 +57,8 @@ export interface Assignment {
   title: string;
   description: string | null;
   due_date: string | null;
+  effective_due_date?: string | null;
+  has_extension?: boolean;
   max_points: number;
   module_id: number | null;
   late_policy?: LatePolicy | null;
@@ -156,6 +158,19 @@ export interface TestCaseUpdate {
   stdin?: string;
   expected_stdout?: string;
   expected_stderr?: string;
+}
+
+export interface AssignmentExtension {
+  id: number;
+  assignment_id: number;
+  user_id: number;
+  extended_due_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssignmentExtensionUpsert {
+  extended_due_date: string;
 }
 
 export interface SubmissionTestResult {
