@@ -1,7 +1,5 @@
 import { cookies } from "next/headers";
-import { ApiError } from "@/lib/api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE, ApiError } from "./core";
 
 export async function serverApiFetch<T>(
   path: string,
