@@ -669,8 +669,10 @@ interface AssignmentRowProps {
 }
 
 function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
-  const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;
+  const dueDateRaw = assignment.effective_due_date ?? assignment.due_date;
+  const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
   const nowMs = NOW_MS;
+  const hasExtension = Boolean(assignment.has_extension && assignment.effective_due_date);
 
   const isPastDue = dueDate ? dueDate.getTime() < nowMs : false;
   const isUpcoming = dueDate
@@ -730,6 +732,11 @@ function AssignmentRow({ assignment, courseId }: AssignmentRowProps) {
           <span className="text-xs text-[var(--muted-foreground)]">
             {assignment.max_points} pts
           </span>
+          {hasExtension && (
+            <span className="text-xs font-medium text-[var(--secondary)] bg-[var(--secondary)]/12 px-1.5 py-0.5 rounded">
+              Extension
+            </span>
+          )}
         </div>
       </div>
 
