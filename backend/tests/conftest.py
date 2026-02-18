@@ -2,6 +2,7 @@ import asyncio
 import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
+from collections.abc import Generator
 from uuid import uuid4
 
 import pytest
@@ -38,10 +39,12 @@ def _async_db_url() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
         raise RuntimeError("DATABASE_URL is required for tests")
-    if url.startswith("postgresql+asyncpg://"):
+    if url.startswith("postgresql+psycopg://"):
         return url
+    if url.startswith("postgresql+asyncpg://"):
+        return url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
     if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
     return url
 
 
@@ -73,6 +76,7 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture()
 async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     from sqlalchemy import text
+    from app.crud.audit import drain_audit_tasks
     from app.db.deps import get_db
 
     async def _override_get_db():
@@ -85,4 +89,16 @@ async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
             await db.execute(text("SELECT 1"))
             yield c
     finally:
+        await drain_audit_tasks()
         app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def disable_async_audit_dispatch() -> Generator[None, None, None]:
+    from app.crud.audit import set_audit_dispatch_enabled
+
+    set_audit_dispatch_enabled(False)
+    try:
+        yield
+    finally:
+        set_audit_dispatch_enabled(True)

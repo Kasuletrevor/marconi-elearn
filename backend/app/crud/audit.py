@@ -12,6 +12,8 @@ from app.models.audit_event import AuditEvent
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
+_audit_tasks: set[asyncio.Task[None]] = set()
+_audit_dispatch_enabled = True
 
 
 async def create_audit_event(
@@ -81,6 +83,9 @@ def enqueue_audit_event(
     metadata: dict[str, Any] | None = None,
     context: dict[str, Any] | None = None,
 ) -> None:
+    if not _audit_dispatch_enabled:
+        return
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -92,7 +97,7 @@ def enqueue_audit_event(
         )
         return
 
-    loop.create_task(
+    task = loop.create_task(
         _write_audit_event_async(
             organization_id=organization_id,
             actor_user_id=actor_user_id,
@@ -103,6 +108,26 @@ def enqueue_audit_event(
             context=None if context is None else dict(context),
         )
     )
+    _audit_tasks.add(task)
+    task.add_done_callback(_audit_tasks.discard)
+
+
+async def drain_audit_tasks(*, timeout_seconds: float = 2.0) -> None:
+    if not _audit_tasks:
+        return
+    pending = tuple(_audit_tasks)
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*pending, return_exceptions=True),
+            timeout=timeout_seconds,
+        )
+    except TimeoutError:
+        logger.warning("Timed out waiting for %s audit task(s) to finish", len(_audit_tasks))
+
+
+def set_audit_dispatch_enabled(enabled: bool) -> None:
+    global _audit_dispatch_enabled
+    _audit_dispatch_enabled = enabled
 
 
 async def list_audit_events(
