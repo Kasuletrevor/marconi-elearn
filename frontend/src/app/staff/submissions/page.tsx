@@ -135,7 +135,7 @@ export default function StaffSubmissionsQueuePage() {
 
   useEffect(() => {
     resetPaging();
-  }, [selectedCourseId, selectedStatus]);
+  }, [resetPaging, selectedCourseId, selectedStatus]);
 
   useEffect(() => {
     if (!hasHydratedFiltersFromQuery) return;

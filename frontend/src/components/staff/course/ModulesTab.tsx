@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDown,
@@ -277,14 +277,7 @@ function ModuleCard(
     setEditPosition(module.position);
   }, [module.id, module.title, module.position]);
 
-  // Fetch resources when expanded
-  useEffect(() => {
-    if (isExpanded && resources.length === 0) {
-      fetchResources();
-    }
-  }, [isExpanded]);
-
-  async function fetchResources() {
+  const fetchResources = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
@@ -299,7 +292,14 @@ function ModuleCard(
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [courseId, module.id]);
+
+  // Fetch resources when expanded
+  useEffect(() => {
+    if (isExpanded && resources.length === 0) {
+      void fetchResources();
+    }
+  }, [fetchResources, isExpanded, resources.length]);
 
   async function saveModule() {
     const title = editTitle.trim();

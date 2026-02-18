@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -101,9 +101,10 @@ export default function StudentSubmissionsPage() {
     );
   }, [items, search]);
 
-  async function fetchData(refresh = false) {
+  const fetchData = useCallback(async (refresh = false) => {
     setError("");
-    refresh ? setIsRefreshing(true) : setIsLoading(true);
+    if (refresh) setIsRefreshing(true);
+    else setIsLoading(true);
     try {
       const [courseRows, submissions] = await Promise.all([
         student.getCourses(),
@@ -119,14 +120,14 @@ export default function StudentSubmissionsPage() {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load submissions");
     } finally {
-      refresh ? setIsRefreshing(false) : setIsLoading(false);
+      if (refresh) setIsRefreshing(false);
+      else setIsLoading(false);
     }
-  }
+  }, [limit, offset, selectedCourseId]);
 
   useEffect(() => {
-    fetchData(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCourseId, offset, limit]);
+    void fetchData(false);
+  }, [fetchData]);
 
   useEffect(() => {
     setOffset(0);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -139,8 +139,28 @@ export default function StudentAssignmentDetailClient({
 
   const allowsZip = Boolean(assignment?.allows_zip);
   const expectedZipFile = assignment?.expected_filename ?? null;
-  const allowedExtensions = allowsZip ? [".c", ".cpp", ".zip"] : [".c", ".cpp"];
+  const allowedExtensions = useMemo(
+    () => (allowsZip ? [".c", ".cpp", ".zip"] : [".c", ".cpp"]),
+    [allowsZip]
+  );
   const acceptAttr = allowedExtensions.join(",");
+
+  const validateAndSetFile = useCallback((file: File) => {
+    const fileName = file.name.toLowerCase();
+    const isValid = allowedExtensions.some((ext) => fileName.endsWith(ext));
+
+    if (!isValid) {
+      setUploadError(`Please upload ${allowsZip ? "a .c, .cpp, or .zip" : "a .c or .cpp"} file`);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File size must be less than 5MB");
+      return;
+    }
+
+    setSelectedFile(file);
+  }, [allowedExtensions, allowsZip]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -162,31 +182,14 @@ export default function StudentAssignmentDetailClient({
     if (files.length > 0) {
       validateAndSetFile(files[0]);
     }
-  }, []);
+  }, [validateAndSetFile]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError("");
     if (e.target.files && e.target.files.length > 0) {
       validateAndSetFile(e.target.files[0]);
     }
-  }, []);
-
-  const validateAndSetFile = (file: File) => {
-    const fileName = file.name.toLowerCase();
-    const isValid = allowedExtensions.some((ext) => fileName.endsWith(ext));
-
-    if (!isValid) {
-      setUploadError(`Please upload ${allowsZip ? "a .c, .cpp, or .zip" : "a .c or .cpp"} file`);
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("File size must be less than 5MB");
-      return;
-    }
-
-    setSelectedFile(file);
-  };
+  }, [validateAndSetFile]);
 
   const clearFile = () => {
     setSelectedFile(null);

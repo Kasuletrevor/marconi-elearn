@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ClipboardList, Loader2, RefreshCw, Search } from "lucide-react";
@@ -32,7 +32,7 @@ export default function AdminAuditPage() {
     );
   }, [events, search]);
 
-  async function loadOrganizations() {
+  const loadOrganizations = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
     setError("");
@@ -61,11 +61,12 @@ export default function AdminAuditPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [adminOrgIds, searchParams, user]);
 
-  async function loadEvents(refresh = false) {
+  const loadEvents = useCallback(async (refresh = false) => {
     if (!selectedOrgId) return;
-    refresh ? setIsRefreshing(true) : setIsLoading(true);
+    if (refresh) setIsRefreshing(true);
+    else setIsLoading(true);
     setError("");
     try {
       const rows = await audit.listOrgEvents(selectedOrgId, offset, limit);
@@ -74,14 +75,14 @@ export default function AdminAuditPage() {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load activity log");
     } finally {
-      refresh ? setIsRefreshing(false) : setIsLoading(false);
+      if (refresh) setIsRefreshing(false);
+      else setIsLoading(false);
     }
-  }
+  }, [limit, offset, selectedOrgId]);
 
   useEffect(() => {
-    loadOrganizations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    void loadOrganizations();
+  }, [loadOrganizations]);
 
   useEffect(() => {
     if (selectedOrgId && typeof window !== "undefined") {
@@ -90,10 +91,11 @@ export default function AdminAuditPage() {
   }, [selectedOrgId]);
 
   useEffect(() => {
-    if (selectedOrgId) loadEvents(false);
+    if (selectedOrgId) {
+      void loadEvents(false);
+    }
     else setEvents([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOrgId, offset, limit]);
+  }, [selectedOrgId, loadEvents]);
 
   useEffect(() => {
     setOffset(0);

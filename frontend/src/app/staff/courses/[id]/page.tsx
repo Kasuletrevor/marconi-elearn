@@ -869,7 +869,7 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StaffSubmissionQueueItem["status"] | "all">("pending");
   const [offset, setOffset] = useState(0);
-  const [limit, setLimit] = useState(25);
+  const limit = 25;
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isNavigatingNext, setIsNavigatingNext] = useState(false);
@@ -883,10 +883,6 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
 
   const canGoPrev = offset > 0;
   const canGoNext = offset + items.length < total;
-
-  function resetPaging() {
-    setOffset(0);
-  }
 
   async function goNextUngraded() {
     setIsNavigatingNext(true);
@@ -942,10 +938,11 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
     }
   }
 
-  async function fetchQueue(refresh = false) {
+  const fetchQueue = useCallback(async (refresh = false) => {
     try {
       setError("");
-      refresh ? setIsRefreshing(true) : setIsLoading(true);
+      if (refresh) setIsRefreshing(true);
+      else setIsLoading(true);
       const page = await staffSubmissions.listPage({
         course_id: courseId,
         status: statusFilter === "all" ? undefined : statusFilter,
@@ -958,18 +955,17 @@ function CourseSubmissionsTab({ courseId }: CourseSubmissionsTabProps) {
       if (err instanceof ApiError) setError(err.detail);
       else setError("Failed to load submissions");
     } finally {
-      refresh ? setIsRefreshing(false) : setIsLoading(false);
+      if (refresh) setIsRefreshing(false);
+      else setIsLoading(false);
     }
-  }
+  }, [courseId, limit, offset, statusFilter]);
 
   useEffect(() => {
-    fetchQueue(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId, statusFilter, offset, limit]);
+    void fetchQueue(false);
+  }, [fetchQueue]);
 
   useEffect(() => {
-    resetPaging();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setOffset(0);
   }, [statusFilter]);
 
   useEffect(() => {
