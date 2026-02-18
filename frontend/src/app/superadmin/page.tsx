@@ -139,7 +139,7 @@ export default function SuperadminPage() {
     <div className="max-w-6xl mx-auto space-y-10">
       <PageHeader
         title="Platform Control Deck"
-        description="Global oversight and infrastructure management for Marconi Elearn."
+        description="Global oversight and infrastructure management for Marc-Elearn."
       />
 
       {/* Metrics Grid */}

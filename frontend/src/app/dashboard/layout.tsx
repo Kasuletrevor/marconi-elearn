@@ -124,7 +124,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <GraduationCap className="w-4 h-4 text-white" />
             </div>
             <span className="font-[family-name:var(--font-display)] text-lg font-bold">
-              Marconi
+              Marc-Elearn
             </span>
           </Link>
           <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ function SidebarContent({
             <GraduationCap className="w-5 h-5 text-white" />
           </div>
           <span className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)]">
-            Marconi
+            Marc-Elearn
           </span>
         </Link>
         <div className="flex items-center gap-1">

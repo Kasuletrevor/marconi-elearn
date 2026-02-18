@@ -21,7 +21,7 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marconi Elearn | Modern Learning Management",
+  title: "Marc-Elearn | Modern Learning Management",
   description:
     "A modern Learning Management System for lecturers to manage courses, assignments, and provide AI-powered feedback on student code submissions.",
 };

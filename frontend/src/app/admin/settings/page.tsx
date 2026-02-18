@@ -182,7 +182,7 @@ export default function AdminSettingsPage() {
           <input
             value={orgName}
             onChange={(e) => setOrgName(e.target.value)}
-            placeholder="e.g. CEDAT — Marconi Lab"
+            placeholder="e.g. CEDAT — Marc-Elearn Lab"
             className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
           />
           <p className="text-xs text-[var(--muted-foreground)] mt-2">
@@ -230,7 +230,7 @@ export default function AdminSettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-              GitHub organization (one per Marconi org)
+              GitHub organization (one per Marc-Elearn org)
             </label>
             <input
               value={githubOrgLogin}
