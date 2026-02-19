@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 from threading import Lock
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, Awaitable, Callable, Iterable, TypeVar
 
 import httpx
 
@@ -11,6 +11,32 @@ from app.core.config import settings
 
 JOBE_OUTCOME_OK = 15
 T = TypeVar("T")
+
+
+def _normalize_base_url(base_url: str) -> str:
+    return base_url.strip().rstrip("/")
+
+
+def _unique_preserving_order(items: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def parse_jobe_base_urls(*, base_url: str, base_urls: str) -> list[str]:
+    raw: list[str] = []
+    if base_urls.strip():
+        raw.extend(part for part in base_urls.split(","))
+    if base_url.strip():
+        raw.append(base_url)
+    return _unique_preserving_order(
+        normalized for normalized in (_normalize_base_url(item) for item in raw) if normalized
+    )
 
 
 class JobeError(RuntimeError):
@@ -58,17 +84,32 @@ class _CircuitState:
 class JobeClient:
     _circuit_lock = Lock()
     _circuit_states: dict[str, _CircuitState] = {}
+    _selection_lock = Lock()
+    _next_start_index_by_pool: dict[str, int] = {}
 
-    def __init__(self, *, base_url: str, timeout_seconds: float, api_key: str = "") -> None:
-        base_url = base_url.strip().rstrip("/")
-        if not base_url:
+    def __init__(
+        self,
+        *,
+        base_url: str = "",
+        base_urls: list[str] | None = None,
+        timeout_seconds: float,
+        api_key: str = "",
+    ) -> None:
+        raw_urls = list(base_urls or [])
+        if base_url.strip():
+            raw_urls.append(base_url)
+        normalized_urls = _unique_preserving_order(
+            normalized for normalized in (_normalize_base_url(url) for url in raw_urls) if normalized
+        )
+        if not normalized_urls:
             raise JobeMisconfiguredError("JOBE base URL is not configured")
-        self._base_url = base_url
+        self._base_urls: tuple[str, ...] = tuple(normalized_urls)
+        self._pool_key = "|".join(self._base_urls)
         self._timeout = httpx.Timeout(timeout_seconds)
         self._api_key = api_key.strip()
 
-    def _client_kwargs(self) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {"base_url": self._base_url, "timeout": self._timeout}
+    def _client_kwargs(self, *, base_url: str) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {"base_url": base_url, "timeout": self._timeout}
         if self._api_key:
             kwargs["headers"] = {"X-API-KEY": self._api_key}
         return kwargs
@@ -77,23 +118,35 @@ class JobeClient:
     def reset_circuit_breaker_state_for_tests(cls) -> None:
         with cls._circuit_lock:
             cls._circuit_states.clear()
+        with cls._selection_lock:
+            cls._next_start_index_by_pool.clear()
 
     def _circuit_enabled(self) -> bool:
         return bool(settings.jobe_circuit_breaker_enabled)
 
-    def _get_or_create_circuit_state(self) -> _CircuitState:
-        state = self._circuit_states.get(self._base_url)
+    def _get_or_create_circuit_state(self, *, base_url: str) -> _CircuitState:
+        state = self._circuit_states.get(base_url)
         if state is None:
             state = _CircuitState()
-            self._circuit_states[self._base_url] = state
+            self._circuit_states[base_url] = state
         return state
 
-    def _before_circuit_request(self) -> None:
+    def _candidate_base_urls(self) -> list[str]:
+        if len(self._base_urls) <= 1:
+            return list(self._base_urls)
+
+        with self._selection_lock:
+            start = int(self._next_start_index_by_pool.get(self._pool_key, 0)) % len(self._base_urls)
+            self._next_start_index_by_pool[self._pool_key] = (start + 1) % len(self._base_urls)
+        ordered = list(self._base_urls[start:]) + list(self._base_urls[:start])
+        return ordered
+
+    def _before_circuit_request(self, *, base_url: str) -> None:
         if not self._circuit_enabled():
             return
 
         with self._circuit_lock:
-            state = self._get_or_create_circuit_state()
+            state = self._get_or_create_circuit_state(base_url=base_url)
             now = time.monotonic()
 
             if state.state == "open":
@@ -114,23 +167,23 @@ class JobeClient:
                     )
                 state.half_open_probe_active = True
 
-    def _record_circuit_success(self) -> None:
+    def _record_circuit_success(self, *, base_url: str) -> None:
         if not self._circuit_enabled():
             return
 
         with self._circuit_lock:
-            state = self._get_or_create_circuit_state()
+            state = self._get_or_create_circuit_state(base_url=base_url)
             state.state = "closed"
             state.consecutive_failures = 0
             state.opened_at_monotonic = 0.0
             state.half_open_probe_active = False
 
-    def _record_circuit_failure(self) -> None:
+    def _record_circuit_failure(self, *, base_url: str) -> None:
         if not self._circuit_enabled():
             return
 
         with self._circuit_lock:
-            state = self._get_or_create_circuit_state()
+            state = self._get_or_create_circuit_state(base_url=base_url)
             threshold = int(settings.jobe_circuit_breaker_failure_threshold)
             now = time.monotonic()
 
@@ -147,23 +200,36 @@ class JobeClient:
                 state.opened_at_monotonic = now
                 state.half_open_probe_active = False
 
-    async def _execute_with_circuit(self, op: Callable[[], Awaitable[T]]) -> T:
-        self._before_circuit_request()
-        try:
-            result = await op()
-        except JobeCircuitOpenError:
-            raise
-        except Exception:
-            self._record_circuit_failure()
-            raise
-        else:
-            self._record_circuit_success()
+    async def _execute_with_circuit(self, op: Callable[[str], Awaitable[T]]) -> T:
+        last_error: Exception | None = None
+        for base_url in self._candidate_base_urls():
+            try:
+                self._before_circuit_request(base_url=base_url)
+            except JobeCircuitOpenError as exc:
+                last_error = exc
+                continue
+
+            try:
+                result = await op(base_url)
+            except JobeCircuitOpenError as exc:
+                last_error = exc
+                continue
+            except Exception as exc:
+                self._record_circuit_failure(base_url=base_url)
+                last_error = exc
+                continue
+
+            self._record_circuit_success(base_url=base_url)
             return result
 
+        if last_error is not None:
+            raise last_error
+        raise JobeTransientError("No JOBE backends configured")
+
     async def list_languages(self) -> list[JobeLanguage]:
-        async def _op() -> list[JobeLanguage]:
+        async def _op(base_url: str) -> list[JobeLanguage]:
             try:
-                async with httpx.AsyncClient(**self._client_kwargs()) as client:
+                async with httpx.AsyncClient(**self._client_kwargs(base_url=base_url)) as client:
                     resp = await client.get("/languages")
                     resp.raise_for_status()
                     data = resp.json()
@@ -203,7 +269,7 @@ class JobeClient:
         memorylimit: int | None = None,
         streamsize: float | None = None,
     ) -> JobeRunResult:
-        async def _op() -> JobeRunResult:
+        async def _op(base_url: str) -> JobeRunResult:
             run_spec: dict[str, Any] = {
                 "language_id": language_id,
                 "sourcecode": source_code,
@@ -226,7 +292,7 @@ class JobeClient:
             payload: dict[str, Any] = {"run_spec": run_spec}
 
             try:
-                async with httpx.AsyncClient(**self._client_kwargs()) as client:
+                async with httpx.AsyncClient(**self._client_kwargs(base_url=base_url)) as client:
                     resp = await client.post("/runs", json=payload)
                     resp.raise_for_status()
                     data = resp.json()
@@ -264,9 +330,9 @@ class JobeClient:
         return await self._execute_with_circuit(_op)
 
     async def check_file(self, *, file_id: str) -> bool:
-        async def _op() -> bool:
+        async def _op(base_url: str) -> bool:
             try:
-                async with httpx.AsyncClient(**self._client_kwargs()) as client:
+                async with httpx.AsyncClient(**self._client_kwargs(base_url=base_url)) as client:
                     resp = await client.head(f"/files/{file_id}")
             except httpx.TimeoutException as exc:
                 raise JobeTransientError("JOBE request timed out") from exc
@@ -282,9 +348,9 @@ class JobeClient:
         return await self._execute_with_circuit(_op)
 
     async def put_file(self, *, file_id: str, content: bytes) -> None:
-        async def _op() -> None:
+        async def _op(base_url: str) -> None:
             try:
-                async with httpx.AsyncClient(**self._client_kwargs()) as client:
+                async with httpx.AsyncClient(**self._client_kwargs(base_url=base_url)) as client:
                     resp = await client.put(f"/files/{file_id}", content=content)
             except httpx.TimeoutException as exc:
                 raise JobeTransientError("JOBE request timed out") from exc

@@ -7,6 +7,7 @@ from app.integrations.jobe import (
     JobeClient,
     JobeTransientError,
     JobeUpstreamError,
+    parse_jobe_base_urls,
 )
 
 
@@ -240,3 +241,105 @@ async def test_jobe_circuit_breaker_half_open_probe_closes_on_success(
     assert recovered_again[0].id == "c"
 
     assert calls["count"] == 3
+
+
+def test_parse_jobe_base_urls_uses_list_and_fallback() -> None:
+    urls = parse_jobe_base_urls(
+        base_url="http://fallback/restapi",
+        base_urls="http://a/restapi, http://b/restapi, http://a/restapi",
+    )
+    assert urls == [
+        "http://a/restapi",
+        "http://b/restapi",
+        "http://fallback/restapi",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_jobe_client_round_robins_across_backends(monkeypatch):
+    called_base_urls: list[str] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [["c", "11.4.0"]]
+
+    class _FakeClient:
+        def __init__(self, base_url: str):
+            self._base_url = base_url
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, path):
+            called_base_urls.append(self._base_url)
+            return _FakeResponse()
+
+    monkeypatch.setattr(
+        "app.integrations.jobe.httpx.AsyncClient",
+        lambda **kwargs: _FakeClient(kwargs["base_url"]),
+    )
+
+    jobe = JobeClient(
+        base_urls=["http://jobe-a/restapi", "http://jobe-b/restapi"],
+        timeout_seconds=1,
+    )
+    await jobe.list_languages()
+    await jobe.list_languages()
+    await jobe.list_languages()
+
+    assert called_base_urls == [
+        "http://jobe-a/restapi",
+        "http://jobe-b/restapi",
+        "http://jobe-a/restapi",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_jobe_client_fails_over_to_next_backend(monkeypatch):
+    called_base_urls: list[str] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [["c", "11.4.0"]]
+
+    class _FakeClient:
+        def __init__(self, base_url: str):
+            self._base_url = base_url
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, path):
+            called_base_urls.append(self._base_url)
+            if self._base_url.endswith("jobe-a/restapi"):
+                raise httpx.ReadTimeout("timeout")
+            return _FakeResponse()
+
+    monkeypatch.setattr(
+        "app.integrations.jobe.httpx.AsyncClient",
+        lambda **kwargs: _FakeClient(kwargs["base_url"]),
+    )
+
+    jobe = JobeClient(
+        base_urls=["http://jobe-a/restapi", "http://jobe-b/restapi"],
+        timeout_seconds=1,
+    )
+    result = await jobe.list_languages()
+
+    assert result[0].id == "c"
+    assert called_base_urls == [
+        "http://jobe-a/restapi",
+        "http://jobe-b/restapi",
+    ]
