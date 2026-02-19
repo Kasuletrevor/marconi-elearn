@@ -86,6 +86,105 @@ async def test_run_test_case_passes_only_when_outcome_is_ok_and_output_matches()
 
 
 @pytest.mark.asyncio
+async def test_run_test_case_exact_mode_requires_identical_trailing_whitespace() -> None:
+    prepared = PreparedJobeRun(
+        language_id="c",
+        source_code="int main(){return 0;}",
+        source_filename="main.c",
+        file_list=None,
+        parameters=None,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
+    )
+    fake_jobe = _FakeJobeClient(
+        JobeRunResult(
+            outcome=JOBE_OUTCOME_OK,
+            compile_output="",
+            stdout="ok\n",
+            stderr="",
+        )
+    )
+
+    result = await run_test_case(
+        fake_jobe,
+        prepared=prepared,
+        stdin="",
+        expected_stdout="ok",
+        expected_stderr="",
+        comparison_mode="exact",
+    )
+
+    assert result.passed is False
+
+
+@pytest.mark.asyncio
+async def test_run_test_case_ignore_whitespace_mode_collapses_spacing() -> None:
+    prepared = PreparedJobeRun(
+        language_id="c",
+        source_code="int main(){return 0;}",
+        source_filename="main.c",
+        file_list=None,
+        parameters=None,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
+    )
+    fake_jobe = _FakeJobeClient(
+        JobeRunResult(
+            outcome=JOBE_OUTCOME_OK,
+            compile_output="",
+            stdout="value   42\n",
+            stderr="",
+        )
+    )
+
+    result = await run_test_case(
+        fake_jobe,
+        prepared=prepared,
+        stdin="",
+        expected_stdout="value 42",
+        expected_stderr="",
+        comparison_mode="ignore_whitespace",
+    )
+
+    assert result.passed is True
+
+
+@pytest.mark.asyncio
+async def test_run_test_case_ignore_case_mode_is_case_insensitive() -> None:
+    prepared = PreparedJobeRun(
+        language_id="c",
+        source_code="int main(){return 0;}",
+        source_filename="main.c",
+        file_list=None,
+        parameters=None,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
+    )
+    fake_jobe = _FakeJobeClient(
+        JobeRunResult(
+            outcome=JOBE_OUTCOME_OK,
+            compile_output="",
+            stdout="HELLO MARCONI\n",
+            stderr="",
+        )
+    )
+
+    result = await run_test_case(
+        fake_jobe,
+        prepared=prepared,
+        stdin="",
+        expected_stdout="hello marconi",
+        expected_stderr="",
+        comparison_mode="ignore_case",
+    )
+
+    assert result.passed is True
+
+
+@pytest.mark.asyncio
 async def test_prepare_jobe_run_applies_default_resource_caps(tmp_path) -> None:
     source_path = tmp_path / "main.c"
     source_path.write_text("int main(){return 0;}\n", encoding="utf-8")

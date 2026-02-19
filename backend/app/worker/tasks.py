@@ -297,6 +297,7 @@ async def _grade_submission_impl(
                     stdin=tc.stdin,
                     expected_stdout=tc.expected_stdout,
                     expected_stderr=tc.expected_stderr,
+                    comparison_mode=getattr(tc, "comparison_mode", "trim") or "trim",
                 )
             except JobeCircuitOpenError:
                 submission.status = SubmissionStatus.error

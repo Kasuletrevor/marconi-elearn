@@ -19,6 +19,7 @@ async def create_test_case(
     stdin: str,
     expected_stdout: str,
     expected_stderr: str,
+    comparison_mode: str,
     created_by_user_id: int | None = None,
 ) -> TestCase:
     tc = TestCase(
@@ -30,6 +31,7 @@ async def create_test_case(
         stdin=stdin,
         expected_stdout=expected_stdout,
         expected_stderr=expected_stderr,
+        comparison_mode=comparison_mode,
     )
     db.add(tc)
     await db.flush()
@@ -83,6 +85,7 @@ async def update_test_case(
     stdin: str | None,
     expected_stdout: str | None,
     expected_stderr: str | None,
+    comparison_mode: str | None,
     updated_by_user_id: int | None = None,
 ) -> TestCase:
     if name is not None:
@@ -99,6 +102,8 @@ async def update_test_case(
         test_case.expected_stdout = expected_stdout
     if expected_stderr is not None:
         test_case.expected_stderr = expected_stderr
+    if comparison_mode is not None:
+        test_case.comparison_mode = comparison_mode
 
     assignment = await db.get(Assignment, test_case.assignment_id)
     if assignment is None:

@@ -37,6 +37,13 @@ const fadeInUp = {
   visible: { opacity: 1, y: 0 },
 };
 
+const comparisonModeOptions = [
+  { value: "trim", label: "Trim edges (default)" },
+  { value: "exact", label: "Exact output" },
+  { value: "ignore_whitespace", label: "Ignore whitespace" },
+  { value: "ignore_case", label: "Ignore case" },
+] as const;
+
 function clampInt(raw: string, fallback: number): number {
   const n = Number(raw);
   if (!Number.isFinite(n)) return fallback;
@@ -126,6 +133,9 @@ export default function StaffAssignmentDetailPage() {
   const [draftStdin, setDraftStdin] = useState("");
   const [draftStdout, setDraftStdout] = useState("");
   const [draftStderr, setDraftStderr] = useState("");
+  const [draftComparisonMode, setDraftComparisonMode] = useState<
+    "trim" | "exact" | "ignore_whitespace" | "ignore_case"
+  >("trim");
 
   const hasDraftSelection = selected !== null;
 
@@ -136,6 +146,7 @@ export default function StaffAssignmentDetailPage() {
     setDraftStdin(tc.stdin ?? "");
     setDraftStdout(tc.expected_stdout ?? "");
     setDraftStderr(tc.expected_stderr ?? "");
+    setDraftComparisonMode(tc.comparison_mode ?? "trim");
   }, []);
 
   useEffect(() => {
@@ -214,6 +225,7 @@ export default function StaffAssignmentDetailPage() {
         stdin: "",
         expected_stdout: "",
         expected_stderr: "",
+        comparison_mode: "trim",
       });
       const next = [...testCases, created].sort(sortByPosition);
       setTestCases(next);
@@ -239,6 +251,7 @@ export default function StaffAssignmentDetailPage() {
         stdin: draftStdin,
         expected_stdout: draftStdout,
         expected_stderr: draftStderr,
+        comparison_mode: draftComparisonMode,
       });
       setTestCases((prev) => prev.map((t) => (t.id === updated.id ? updated : t)).sort(sortByPosition));
     } catch (err) {
@@ -532,9 +545,10 @@ export default function StaffAssignmentDetailPage() {
                   Comparison rules
                 </p>
                 <ul className="space-y-1 text-sm text-[var(--foreground)]">
-                  <li>CRLF is normalized to LF</li>
-                  <li>Trailing EOF whitespace is ignored</li>
-                  <li>Internal whitespace is strict</li>
+                  <li>Trim edges: normalize CRLF + ignore trailing whitespace</li>
+                  <li>Exact: requires byte-for-byte newline-aware match</li>
+                  <li>Ignore whitespace: collapses all spacing before compare</li>
+                  <li>Ignore case: compares normalized lowercase text</li>
                 </ul>
               </div>
 
@@ -703,6 +717,30 @@ export default function StaffAssignmentDetailPage() {
                           className="w-full px-3 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                           placeholder="e.g., 10"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">
+                          Comparison mode
+                        </label>
+                        <select
+                          value={draftComparisonMode}
+                          onChange={(e) =>
+                            setDraftComparisonMode(
+                              e.target.value as
+                                | "trim"
+                                | "exact"
+                                | "ignore_whitespace"
+                                | "ignore_case"
+                            )
+                          }
+                          className="w-full px-3 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        >
+                          {comparisonModeOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 

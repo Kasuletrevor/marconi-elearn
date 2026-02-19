@@ -67,6 +67,7 @@ async def create_autograde_version_snapshot(
             AssignmentAutogradeTestCaseSnapshot.stdin,
             AssignmentAutogradeTestCaseSnapshot.expected_stdout,
             AssignmentAutogradeTestCaseSnapshot.expected_stderr,
+            AssignmentAutogradeTestCaseSnapshot.comparison_mode,
         ],
         select(
             version_row.id,
@@ -78,6 +79,7 @@ async def create_autograde_version_snapshot(
             TestCase.stdin,
             TestCase.expected_stdout,
             TestCase.expected_stderr,
+            TestCase.comparison_mode,
         ).where(TestCase.assignment_id == assignment.id),
     )
     await db.execute(stmt)

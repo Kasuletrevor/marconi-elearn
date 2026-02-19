@@ -80,6 +80,7 @@ async def test_autograde_versions_snapshot_and_lock(client, db):
     assert len(snapshots) == 1
     assert snapshots[0].test_case_id == test_case_id
     assert snapshots[0].is_hidden is False
+    assert snapshots[0].comparison_mode == "trim"
 
     # Lock the assignment by setting final_autograde_enqueued_at; test case edits should be rejected.
     assignment.final_autograde_enqueued_at = datetime.now(timezone.utc)
