@@ -12,7 +12,13 @@ from taskiq import TaskiqEvents
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.integrations.jobe import JobeClient, JobeError, JobeMisconfiguredError, JobeTransientError
+from app.integrations.jobe import (
+    JobeCircuitOpenError,
+    JobeClient,
+    JobeError,
+    JobeMisconfiguredError,
+    JobeTransientError,
+)
 from app.models.assignment import Assignment
 from app.models.assignment_autograde_test_case_snapshot import AssignmentAutogradeTestCaseSnapshot
 from app.models.assignment_autograde_version import AssignmentAutogradeVersion
@@ -225,6 +231,12 @@ async def _grade_submission_impl(
                 submission_path=submission_path,
                 assignment=assignment_config,
             )
+        except JobeCircuitOpenError:
+            submission.status = SubmissionStatus.error
+            submission.score = 0
+            submission.feedback = "Grading infrastructure unavailable (JOBE circuit breaker open)."
+            await db.commit()
+            return {"status": "error", "reason": "jobe_circuit_open", "phase": phase}
         except ZipExtractionError as exc:
             submission.status = SubmissionStatus.error
             submission.score = 0
@@ -286,6 +298,12 @@ async def _grade_submission_impl(
                     expected_stdout=tc.expected_stdout,
                     expected_stderr=tc.expected_stderr,
                 )
+            except JobeCircuitOpenError:
+                submission.status = SubmissionStatus.error
+                submission.score = 0
+                submission.feedback = "Grading infrastructure unavailable (JOBE circuit breaker open)."
+                await db.commit()
+                return {"status": "error", "reason": "jobe_circuit_open", "phase": phase}
             except JobeTransientError as exc:
                 _mark_jobe_unhealthy(exc=exc, context="run_test_case")
                 if attempt < max_attempts - 1:
