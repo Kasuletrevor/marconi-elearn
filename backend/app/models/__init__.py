@@ -13,6 +13,7 @@ from app.models.module import Module
 from app.models.module_resource import ModuleResource
 from app.models.course_notification_preference import CourseNotificationPreference
 from app.models.github_oauth_state import GitHubOAuthState
+from app.models.grading_event import GradingEvent
 from app.models.notification import Notification
 from app.models.org_github_admin_token import OrgGitHubAdminToken
 from app.models.submission import Submission
@@ -33,6 +34,7 @@ __all__ = [
     "CourseMembership",
     "CourseNotificationPreference",
     "GitHubOAuthState",
+    "GradingEvent",
     "InviteToken",
     "Module",
     "ModuleResource",
