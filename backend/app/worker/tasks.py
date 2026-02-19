@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 from sqlalchemy import select, update
+from taskiq import TaskiqEvents
 
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -22,6 +24,11 @@ from app.worker.zip_extract import ZipExtractionError
 
 logger = logging.getLogger(__name__)
 
+_jobe_health_lock = asyncio.Lock()
+_jobe_health_last_checked_monotonic = 0.0
+_jobe_health_is_healthy = True
+_jobe_health_last_error: str | None = None
+
 
 def _jobe_client() -> JobeClient:
     return JobeClient(
@@ -29,6 +36,68 @@ def _jobe_client() -> JobeClient:
         timeout_seconds=settings.jobe_timeout_seconds,
         api_key=settings.jobe_api_key,
     )
+
+
+def _set_jobe_health(*, healthy: bool, error: str | None) -> None:
+    global _jobe_health_is_healthy, _jobe_health_last_checked_monotonic, _jobe_health_last_error
+    _jobe_health_is_healthy = healthy
+    _jobe_health_last_error = error
+    _jobe_health_last_checked_monotonic = time.monotonic()
+
+
+async def _refresh_jobe_health(*, force: bool = False) -> tuple[bool, str | None]:
+    now = time.monotonic()
+    interval_seconds = settings.jobe_worker_health_check_interval_seconds
+    if (
+        not force
+        and _jobe_health_last_checked_monotonic > 0
+        and (now - _jobe_health_last_checked_monotonic) < interval_seconds
+    ):
+        return _jobe_health_is_healthy, _jobe_health_last_error
+
+    async with _jobe_health_lock:
+        now = time.monotonic()
+        if (
+            not force
+            and _jobe_health_last_checked_monotonic > 0
+            and (now - _jobe_health_last_checked_monotonic) < interval_seconds
+        ):
+            return _jobe_health_is_healthy, _jobe_health_last_error
+
+        try:
+            jobe = _jobe_client()
+            await jobe.list_languages()
+        except Exception as exc:
+            message = str(exc) or exc.__class__.__name__
+            _set_jobe_health(healthy=False, error=message)
+            logger.warning("JOBE health check failed: %s", message)
+            return False, message
+
+        if not _jobe_health_is_healthy:
+            logger.info("JOBE health check recovered")
+        _set_jobe_health(healthy=True, error=None)
+        return True, None
+
+
+async def _ensure_jobe_healthy(*, force: bool = False) -> None:
+    healthy, error = await _refresh_jobe_health(force=force)
+    if healthy:
+        return
+    raise JobeTransientError(error or "JOBE health check failed")
+
+
+def _mark_jobe_unhealthy(*, exc: Exception, context: str) -> None:
+    message = f"{context}: {str(exc) or exc.__class__.__name__}"
+    _set_jobe_health(healthy=False, error=message)
+
+
+@broker.on_event(TaskiqEvents.WORKER_STARTUP)
+async def _worker_startup_health_check(_state: Any) -> None:
+    if not settings.jobe_worker_startup_healthcheck_required:
+        logger.info("JOBE startup health check is disabled")
+        return
+    await _ensure_jobe_healthy(force=True)
+    logger.info("JOBE startup health check passed")
 
 
 async def _grade_submission_impl(
@@ -54,6 +123,20 @@ async def _grade_submission_impl(
         if row is None:
             return {"status": "skipped"}
         await db.commit()
+
+    try:
+        await _ensure_jobe_healthy()
+    except (JobeTransientError, JobeMisconfiguredError):
+        async with session_factory() as db:
+            submission = await db.get(Submission, submission_id)
+            if submission is None:
+                return {"status": "missing"}
+            submission.status = SubmissionStatus.error
+            submission.score = 0
+            submission.feedback = "Grading infrastructure unavailable (JOBE health check failed)."
+            await db.commit()
+        logger.warning("Fail-fast grading due to JOBE health gate. submission_id=%s", submission_id)
+        return {"status": "error", "reason": "jobe_unhealthy", "phase": phase}
 
     max_attempts = 3
     attempt = max(0, int(attempt))
@@ -148,7 +231,8 @@ async def _grade_submission_impl(
             submission.feedback = str(exc)
             await db.commit()
             return {"status": "error", "reason": "invalid_submission", "phase": phase}
-        except JobeTransientError:
+        except JobeTransientError as exc:
+            _mark_jobe_unhealthy(exc=exc, context="prepare_jobe_run")
             if attempt < max_attempts - 1:
                 submission.status = SubmissionStatus.pending
                 submission.feedback = (
@@ -202,7 +286,8 @@ async def _grade_submission_impl(
                     expected_stdout=tc.expected_stdout,
                     expected_stderr=tc.expected_stderr,
                 )
-            except JobeTransientError:
+            except JobeTransientError as exc:
+                _mark_jobe_unhealthy(exc=exc, context="run_test_case")
                 if attempt < max_attempts - 1:
                     submission.status = SubmissionStatus.pending
                     submission.feedback = (
