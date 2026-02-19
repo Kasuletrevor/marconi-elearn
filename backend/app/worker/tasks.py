@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import logging
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Awaitable, Callable, TypeVar
 
 from sqlalchemy import select, update
 from taskiq import TaskiqEvents
@@ -29,11 +30,15 @@ from app.worker.grading import prepare_jobe_run, run_test_case
 from app.worker.zip_extract import ZipExtractionError
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 _jobe_health_lock = asyncio.Lock()
 _jobe_health_last_checked_monotonic = 0.0
 _jobe_health_is_healthy = True
 _jobe_health_last_error: str | None = None
+_jobe_concurrency_semaphore = asyncio.Semaphore(
+    max(1, int(settings.jobe_worker_max_concurrent_requests))
+)
 
 
 def _jobe_client() -> JobeClient:
@@ -72,7 +77,7 @@ async def _refresh_jobe_health(*, force: bool = False) -> tuple[bool, str | None
 
         try:
             jobe = _jobe_client()
-            await jobe.list_languages()
+            await _run_with_jobe_slot(context="health_check", op=jobe.list_languages)
         except Exception as exc:
             message = str(exc) or exc.__class__.__name__
             _set_jobe_health(healthy=False, error=message)
@@ -95,6 +100,38 @@ async def _ensure_jobe_healthy(*, force: bool = False) -> None:
 def _mark_jobe_unhealthy(*, exc: Exception, context: str) -> None:
     message = f"{context}: {str(exc) or exc.__class__.__name__}"
     _set_jobe_health(healthy=False, error=message)
+
+
+def _reset_jobe_concurrency_semaphore_for_tests(limit: int | None = None) -> None:
+    global _jobe_concurrency_semaphore
+    max_concurrent = (
+        max(1, int(limit))
+        if limit is not None
+        else max(1, int(settings.jobe_worker_max_concurrent_requests))
+    )
+    _jobe_concurrency_semaphore = asyncio.Semaphore(max_concurrent)
+
+
+@asynccontextmanager
+async def _acquire_jobe_slot(*, context: str):
+    wait_started = time.monotonic()
+    await _jobe_concurrency_semaphore.acquire()
+    wait_seconds = time.monotonic() - wait_started
+    if wait_seconds >= 1.0:
+        logger.info(
+            "JOBE concurrency slot acquired after waiting %.2fs (context=%s)",
+            wait_seconds,
+            context,
+        )
+    try:
+        yield
+    finally:
+        _jobe_concurrency_semaphore.release()
+
+
+async def _run_with_jobe_slot(*, context: str, op: Callable[[], Awaitable[T]]) -> T:
+    async with _acquire_jobe_slot(context=context):
+        return await op()
 
 
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
@@ -226,10 +263,16 @@ async def _grade_submission_impl(
 
         submission_path = Path(submission.storage_path)
         try:
-            prepared = await prepare_jobe_run(
-                jobe,
-                submission_path=submission_path,
-                assignment=assignment_config,
+            async def _prepare() -> Any:
+                return await prepare_jobe_run(
+                    jobe,
+                    submission_path=submission_path,
+                    assignment=assignment_config,
+                )
+
+            prepared = await _run_with_jobe_slot(
+                context="prepare_jobe_run",
+                op=_prepare,
             )
         except JobeCircuitOpenError:
             submission.status = SubmissionStatus.error
@@ -291,14 +334,17 @@ async def _grade_submission_impl(
 
         for tc in tests:
             try:
-                check = await run_test_case(
-                    jobe,
-                    prepared=prepared,
-                    stdin=tc.stdin,
-                    expected_stdout=tc.expected_stdout,
-                    expected_stderr=tc.expected_stderr,
-                    comparison_mode=getattr(tc, "comparison_mode", "trim") or "trim",
-                )
+                async def _run() -> Any:
+                    return await run_test_case(
+                        jobe,
+                        prepared=prepared,
+                        stdin=tc.stdin,
+                        expected_stdout=tc.expected_stdout,
+                        expected_stderr=tc.expected_stderr,
+                        comparison_mode=getattr(tc, "comparison_mode", "trim") or "trim",
+                    )
+
+                check = await _run_with_jobe_slot(context="run_test_case", op=_run)
             except JobeCircuitOpenError:
                 submission.status = SubmissionStatus.error
                 submission.score = 0
