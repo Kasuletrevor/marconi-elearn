@@ -13,9 +13,27 @@ from app.models.assignment import Assignment
 from app.worker.zip_extract import ZipExtractionError, safe_extract_zip
 
 
-def _normalize_output(s: str) -> str:
-    # Normalize Windows newlines + trailing EOF whitespace. Do not strip internal whitespace.
-    return s.replace("\r\n", "\n").rstrip()
+def _normalize_newlines(s: str) -> str:
+    return s.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _normalize_output(s: str, *, comparison_mode: str) -> str:
+    normalized = _normalize_newlines(s)
+    if comparison_mode == "exact":
+        return normalized
+    if comparison_mode == "ignore_whitespace":
+        return " ".join(normalized.split())
+    if comparison_mode == "ignore_case":
+        return normalized.rstrip().casefold()
+    # Default "trim"
+    return normalized.rstrip()
+
+
+def _outputs_match(*, actual: str, expected: str, comparison_mode: str) -> bool:
+    return _normalize_output(actual, comparison_mode=comparison_mode) == _normalize_output(
+        expected,
+        comparison_mode=comparison_mode,
+    )
 
 
 def _language_id_for_path(path: Path) -> str | None:
@@ -297,6 +315,7 @@ async def run_test_case(
     stdin: str,
     expected_stdout: str,
     expected_stderr: str,
+    comparison_mode: str = "trim",
 ) -> RunCheck:
     result = await jobe.run(
         language_id=prepared.language_id,
@@ -322,8 +341,16 @@ async def run_test_case(
 
     passed = (
         result.outcome == JOBE_OUTCOME_OK
-        and _normalize_output(result.stdout) == _normalize_output(expected_stdout)
-        and _normalize_output(result.stderr) == _normalize_output(expected_stderr)
+        and _outputs_match(
+            actual=result.stdout,
+            expected=expected_stdout,
+            comparison_mode=comparison_mode,
+        )
+        and _outputs_match(
+            actual=result.stderr,
+            expected=expected_stderr,
+            comparison_mode=comparison_mode,
+        )
     )
     return RunCheck(
         passed=passed,

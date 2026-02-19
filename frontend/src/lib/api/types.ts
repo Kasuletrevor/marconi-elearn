@@ -137,6 +137,7 @@ export interface TestCase {
   stdin: string;
   expected_stdout: string;
   expected_stderr: string;
+  comparison_mode: "trim" | "exact" | "ignore_whitespace" | "ignore_case";
   created_at: string;
 }
 
@@ -148,6 +149,7 @@ export interface TestCaseCreate {
   stdin?: string;
   expected_stdout?: string;
   expected_stderr?: string;
+  comparison_mode?: "trim" | "exact" | "ignore_whitespace" | "ignore_case";
 }
 
 export interface TestCaseUpdate {
@@ -158,6 +160,7 @@ export interface TestCaseUpdate {
   stdin?: string;
   expected_stdout?: string;
   expected_stderr?: string;
+  comparison_mode?: "trim" | "exact" | "ignore_whitespace" | "ignore_case";
 }
 
 export interface AssignmentExtension {

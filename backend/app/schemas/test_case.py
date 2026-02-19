@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+TestCaseComparisonMode = Literal["trim", "exact", "ignore_whitespace", "ignore_case"]
 
 
 class TestCaseCreate(BaseModel):
@@ -13,6 +16,7 @@ class TestCaseCreate(BaseModel):
     stdin: str = Field(default="", max_length=200_000)
     expected_stdout: str = Field(default="", max_length=200_000)
     expected_stderr: str = Field(default="", max_length=200_000)
+    comparison_mode: TestCaseComparisonMode = "trim"
 
 
 class TestCaseUpdate(BaseModel):
@@ -23,6 +27,7 @@ class TestCaseUpdate(BaseModel):
     stdin: str | None = Field(default=None, max_length=200_000)
     expected_stdout: str | None = Field(default=None, max_length=200_000)
     expected_stderr: str | None = Field(default=None, max_length=200_000)
+    comparison_mode: TestCaseComparisonMode | None = None
 
 
 class TestCaseOut(BaseModel):
@@ -37,5 +42,5 @@ class TestCaseOut(BaseModel):
     stdin: str
     expected_stdout: str
     expected_stderr: str
+    comparison_mode: TestCaseComparisonMode
     created_at: datetime
-

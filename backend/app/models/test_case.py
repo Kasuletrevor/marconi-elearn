@@ -20,5 +20,5 @@ class TestCase(Base):
     stdin: Mapped[str] = mapped_column(Text, default="")
     expected_stdout: Mapped[str] = mapped_column(Text, default="")
     expected_stderr: Mapped[str] = mapped_column(Text, default="")
+    comparison_mode: Mapped[str] = mapped_column(String(32), default="trim", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-

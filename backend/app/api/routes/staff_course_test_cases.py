@@ -72,6 +72,7 @@ async def create_assignment_test_case(
             stdin=payload.stdin,
             expected_stdout=payload.expected_stdout,
             expected_stderr=payload.expected_stderr,
+            comparison_mode=payload.comparison_mode,
             created_by_user_id=current_user.id,
         )
     except ValueError as exc:
@@ -103,6 +104,7 @@ async def update_assignment_test_case(
             stdin=payload.stdin,
             expected_stdout=payload.expected_stdout,
             expected_stderr=payload.expected_stderr,
+            comparison_mode=payload.comparison_mode,
             updated_by_user_id=current_user.id,
         )
     except ValueError as exc:
