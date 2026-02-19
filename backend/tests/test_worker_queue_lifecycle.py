@@ -248,3 +248,70 @@ async def test_grade_submission_fail_fast_when_health_gate_is_unhealthy(client, 
     ).scalars().all()
     assert [event.event_type for event in events] == ["error"]
     assert events[0].reason == "jobe_unhealthy"
+
+
+@pytest.mark.asyncio
+async def test_grade_submission_defers_practice_when_final_backlog_exists(client, db, monkeypatch) -> None:
+    submission_id = await _setup_submission(client)
+    session_factory = await _session_factory_for_schema(db)
+
+    submission = (await db.execute(select(Submission).where(Submission.id == submission_id))).scalar_one()
+    assert submission.status == SubmissionStatus.pending
+
+    backlog_submission = Submission(
+        assignment_id=submission.assignment_id,
+        user_id=submission.user_id,
+        file_name="main.c",
+        content_type="text/x-c",
+        size_bytes=1,
+        storage_path=submission.storage_path,
+        status=SubmissionStatus.pending,
+        final_autograde_version_id=999,
+    )
+    db.add(backlog_submission)
+    await db.commit()
+
+    async def _fake_health_gate(*, force: bool = False):
+        return None
+
+    captured_kiq_args: dict[str, int | str] = {}
+
+    class _FakeTask:
+        async def kiq(self, **kwargs):
+            captured_kiq_args.update(kwargs)
+
+    original_priority_enabled = settings.grading_priority_enabled
+    original_max_defers = settings.grading_priority_max_defer_attempts
+    settings.grading_priority_enabled = True
+    settings.grading_priority_max_defer_attempts = 3
+    monkeypatch.setattr("app.worker.tasks._ensure_jobe_healthy", _fake_health_gate)
+    monkeypatch.setattr("app.worker.tasks._jobe_client", lambda: object())
+    monkeypatch.setattr("app.worker.tasks.grade_submission", _FakeTask())
+
+    try:
+        result = await _grade_submission_impl(
+            submission_id=submission_id,
+            phase="practice",
+            attempt=0,
+            priority_defer_count=0,
+            session_factory=session_factory,
+        )
+    finally:
+        settings.grading_priority_enabled = original_priority_enabled
+        settings.grading_priority_max_defer_attempts = original_max_defers
+
+    assert result["status"] == "deferred"
+    assert captured_kiq_args["submission_id"] == submission_id
+    assert captured_kiq_args["phase"] == "practice"
+    assert captured_kiq_args["priority_defer_count"] == 1
+
+    await db.refresh(submission)
+    assert submission.status == SubmissionStatus.pending
+    assert submission.feedback == "Deferred while processing deadline-priority final grading."
+
+    events = (
+        await db.execute(
+            select(GradingEvent).where(GradingEvent.submission_id == submission_id).order_by(GradingEvent.id.asc())
+        )
+    ).scalars().all()
+    assert [event.event_type for event in events] == ["started", "deferred"]
