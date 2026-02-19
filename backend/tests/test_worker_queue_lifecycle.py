@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.integrations.jobe import JOBE_OUTCOME_OK
+from app.integrations.jobe import JOBE_OUTCOME_OK, JobeTransientError
 from app.core.config import settings
 from app.models.submission import Submission, SubmissionStatus
 from app.worker.grading import PreparedJobeRun, RunCheck
@@ -121,6 +121,10 @@ async def test_grade_submission_transitions_pending_to_graded(client, db, monkey
             stderr="",
         )
 
+    async def _fake_health_gate(*, force: bool = False):
+        return None
+
+    monkeypatch.setattr("app.worker.tasks._ensure_jobe_healthy", _fake_health_gate)
     monkeypatch.setattr("app.worker.tasks._jobe_client", lambda: object())
     monkeypatch.setattr("app.worker.tasks.prepare_jobe_run", _fake_prepare)
     monkeypatch.setattr("app.worker.tasks.run_test_case", _fake_run_test_case)
@@ -160,6 +164,10 @@ async def test_grade_submission_transitions_pending_to_error(client, db, monkeyp
             stderr="",
         )
 
+    async def _fake_health_gate(*, force: bool = False):
+        return None
+
+    monkeypatch.setattr("app.worker.tasks._ensure_jobe_healthy", _fake_health_gate)
     monkeypatch.setattr("app.worker.tasks._jobe_client", lambda: object())
     monkeypatch.setattr("app.worker.tasks.prepare_jobe_run", _fake_prepare)
     monkeypatch.setattr("app.worker.tasks.run_test_case", _fake_run_test_case)
@@ -197,3 +205,32 @@ async def test_grade_submission_skips_non_pending_items(client, db) -> None:
 
     await db.refresh(submission)
     assert submission.status == SubmissionStatus.grading
+
+
+@pytest.mark.asyncio
+async def test_grade_submission_fail_fast_when_health_gate_is_unhealthy(client, db, monkeypatch) -> None:
+    submission_id = await _setup_submission(client)
+    session_factory = await _session_factory_for_schema(db)
+
+    submission = (await db.execute(select(Submission).where(Submission.id == submission_id))).scalar_one()
+    assert submission.status == SubmissionStatus.pending
+
+    async def _failing_health_gate(*, force: bool = False):
+        raise JobeTransientError("health probe failed")
+
+    monkeypatch.setattr("app.worker.tasks._ensure_jobe_healthy", _failing_health_gate)
+
+    result = await _grade_submission_impl(
+        submission_id=submission_id,
+        phase="practice",
+        attempt=0,
+        session_factory=session_factory,
+    )
+
+    assert result["status"] == "error"
+    assert result["reason"] == "jobe_unhealthy"
+
+    await db.refresh(submission)
+    assert submission.status == SubmissionStatus.error
+    assert submission.score == 0
+    assert submission.feedback == "Grading infrastructure unavailable (JOBE health check failed)."

@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     jobe_grading_memorylimit_mb: int = 256
     # 64 KB ~= 0.064 MB (JOBE interprets streamsize in MB).
     jobe_grading_streamsize_mb: float = 0.064
+    jobe_worker_health_check_interval_seconds: int = 30
+    jobe_worker_startup_healthcheck_required: bool = True
     # Optional API key for JOBE upstream auth (if enabled on the JOBE deployment).
     jobe_api_key: str = ""
     # Comma-separated list. If empty, no filtering is applied.
@@ -91,6 +93,10 @@ class Settings(BaseSettings):
         self.jobe_grading_cputime_seconds = max(1, int(self.jobe_grading_cputime_seconds))
         self.jobe_grading_memorylimit_mb = max(1, int(self.jobe_grading_memorylimit_mb))
         self.jobe_grading_streamsize_mb = max(0.001, float(self.jobe_grading_streamsize_mb))
+        self.jobe_worker_health_check_interval_seconds = max(
+            1,
+            int(self.jobe_worker_health_check_interval_seconds),
+        )
 
         return self
 
