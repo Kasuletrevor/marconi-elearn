@@ -23,9 +23,9 @@ async def test_run_test_case_fails_when_runtime_outcome_is_not_ok() -> None:
         source_filename="main.c",
         file_list=None,
         parameters=None,
-        timelimit=10,
-        memorylimit=268435456,
-        streamsize=65536,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
     )
     fake_jobe = _FakeJobeClient(
         JobeRunResult(
@@ -56,9 +56,9 @@ async def test_run_test_case_passes_only_when_outcome_is_ok_and_output_matches()
         source_filename="main.c",
         file_list=None,
         parameters=None,
-        timelimit=10,
-        memorylimit=268435456,
-        streamsize=65536,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
     )
     fake_jobe = _FakeJobeClient(
         JobeRunResult(
@@ -80,9 +80,9 @@ async def test_run_test_case_passes_only_when_outcome_is_ok_and_output_matches()
     assert result.passed is True
     assert result.outcome == JOBE_OUTCOME_OK
     assert fake_jobe.last_run_kwargs is not None
-    assert fake_jobe.last_run_kwargs["timelimit"] == 10
-    assert fake_jobe.last_run_kwargs["memorylimit"] == 268435456
-    assert fake_jobe.last_run_kwargs["streamsize"] == 65536
+    assert fake_jobe.last_run_kwargs["cputime"] == 10
+    assert fake_jobe.last_run_kwargs["memorylimit"] == 256
+    assert fake_jobe.last_run_kwargs["streamsize"] == 0.064
 
 
 @pytest.mark.asyncio
@@ -104,6 +104,6 @@ async def test_prepare_jobe_run_applies_default_resource_caps(tmp_path) -> None:
         assignment=None,
     )
 
-    assert prepared.timelimit == settings.jobe_grading_timelimit_seconds
-    assert prepared.memorylimit == settings.jobe_grading_memorylimit_bytes
-    assert prepared.streamsize == settings.jobe_grading_streamsize_bytes
+    assert prepared.cputime == settings.jobe_grading_cputime_seconds
+    assert prepared.memorylimit == settings.jobe_grading_memorylimit_mb
+    assert prepared.streamsize == settings.jobe_grading_streamsize_mb

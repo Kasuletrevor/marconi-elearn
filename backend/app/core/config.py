@@ -33,9 +33,11 @@ class Settings(BaseSettings):
     jobe_base_url: str = ""
     jobe_timeout_seconds: float = 20.0
     # Explicit JOBE run caps for grading workers.
-    jobe_grading_timelimit_seconds: int = 10
-    jobe_grading_memorylimit_bytes: int = 268435456  # 256 MB
-    jobe_grading_streamsize_bytes: int = 65536  # 64 KB output cap
+    # JOBE expects cputime (seconds), memorylimit (MB), and streamsize (MB).
+    jobe_grading_cputime_seconds: int = 10
+    jobe_grading_memorylimit_mb: int = 256
+    # 64 KB ~= 0.064 MB (JOBE interprets streamsize in MB).
+    jobe_grading_streamsize_mb: float = 0.064
     # Optional API key for JOBE upstream auth (if enabled on the JOBE deployment).
     jobe_api_key: str = ""
     # Comma-separated list. If empty, no filtering is applied.
@@ -86,9 +88,9 @@ class Settings(BaseSettings):
         if not self.uploads_dir.strip():
             self.uploads_dir = str((Path(__file__).resolve().parents[3] / "var" / "uploads"))
 
-        self.jobe_grading_timelimit_seconds = max(1, int(self.jobe_grading_timelimit_seconds))
-        self.jobe_grading_memorylimit_bytes = max(1024, int(self.jobe_grading_memorylimit_bytes))
-        self.jobe_grading_streamsize_bytes = max(1024, int(self.jobe_grading_streamsize_bytes))
+        self.jobe_grading_cputime_seconds = max(1, int(self.jobe_grading_cputime_seconds))
+        self.jobe_grading_memorylimit_mb = max(1, int(self.jobe_grading_memorylimit_mb))
+        self.jobe_grading_streamsize_mb = max(0.001, float(self.jobe_grading_streamsize_mb))
 
         return self
 

@@ -82,9 +82,9 @@ def _prepared_run() -> PreparedJobeRun:
         source_filename="main.c",
         file_list=None,
         parameters=None,
-        timelimit=settings.jobe_grading_timelimit_seconds,
-        memorylimit=settings.jobe_grading_memorylimit_bytes,
-        streamsize=settings.jobe_grading_streamsize_bytes,
+        cputime=settings.jobe_grading_cputime_seconds,
+        memorylimit=settings.jobe_grading_memorylimit_mb,
+        streamsize=settings.jobe_grading_streamsize_mb,
     )
 
 

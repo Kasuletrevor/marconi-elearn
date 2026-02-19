@@ -117,13 +117,13 @@ async def test_jobe_client_includes_resource_caps_in_run_parameters(monkeypatch)
         source_code="int main(){return 0;}",
         stdin="",
         parameters={"compileargs": "-Wall"},
-        timelimit=10,
-        memorylimit=268435456,
-        streamsize=65536,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
     )
 
     run_parameters = captured_payload["run_spec"]["parameters"]
     assert run_parameters["compileargs"] == "-Wall"
-    assert run_parameters["timelimit"] == 10
-    assert run_parameters["memorylimit"] == 268435456
-    assert run_parameters["streamsize"] == 65536
+    assert run_parameters["cputime"] == 10
+    assert run_parameters["memorylimit"] == 256
+    assert run_parameters["streamsize"] == 0.064
