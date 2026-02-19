@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +19,35 @@ execution_rate_limit = make_rate_limit_dependency(
     bucket="playground.run",
     limit=settings.rate_limit_execution_per_minute,
 )
+_playground_run_semaphore = asyncio.Semaphore(max(1, int(settings.playground_max_concurrent_runs)))
+
+
+def _reset_playground_run_semaphore_for_tests(limit: int | None = None) -> None:
+    global _playground_run_semaphore
+    max_concurrent = (
+        max(1, int(limit))
+        if limit is not None
+        else max(1, int(settings.playground_max_concurrent_runs))
+    )
+    _playground_run_semaphore = asyncio.Semaphore(max_concurrent)
+
+
+@asynccontextmanager
+async def _acquire_playground_run_slot():
+    try:
+        await asyncio.wait_for(
+            _playground_run_semaphore.acquire(),
+            timeout=float(settings.playground_queue_wait_seconds),
+        )
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Playground is busy. Please try again shortly.",
+        ) from exc
+    try:
+        yield
+    finally:
+        _playground_run_semaphore.release()
 
 
 def _allowed_language_ids() -> set[str]:
@@ -55,11 +86,12 @@ async def run_code(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Language not allowed")
 
     try:
-        result = await jobe.run(
-            language_id=payload.language_id,
-            source_code=payload.source_code,
-            stdin=payload.stdin,
-        )
+        async with _acquire_playground_run_slot():
+            result = await jobe.run(
+                language_id=payload.language_id,
+                source_code=payload.source_code,
+                stdin=payload.stdin,
+            )
     except HTTPStatusError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="JOBE error") from exc
     except JobeError as exc:

@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     rate_limit_login_per_minute: int = 10
     rate_limit_execution_per_minute: int = 30
     rate_limit_uploads_per_minute: int = 20
+    # Playground isolation controls
+    playground_max_concurrent_runs: int = 2
+    playground_queue_wait_seconds: float = 0.25
 
     # Third-party integrations
     # Symmetric encryption key (Fernet). Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -112,6 +115,14 @@ class Settings(BaseSettings):
         self.jobe_circuit_breaker_cooldown_seconds = max(
             1,
             int(self.jobe_circuit_breaker_cooldown_seconds),
+        )
+        self.playground_max_concurrent_runs = max(
+            1,
+            int(self.playground_max_concurrent_runs),
+        )
+        self.playground_queue_wait_seconds = max(
+            0.001,
+            float(self.playground_queue_wait_seconds),
         )
 
         return self
