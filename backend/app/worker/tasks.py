@@ -141,6 +141,19 @@ async def _run_with_jobe_slot(*, context: str, op: Callable[[], Awaitable[T]]) -
         return await op()
 
 
+async def _has_final_priority_backlog(db: Any, *, exclude_submission_id: int) -> bool:
+    result = await db.execute(
+        select(Submission.id)
+        .where(
+            Submission.status == SubmissionStatus.pending,
+            Submission.final_autograde_version_id.is_not(None),
+            Submission.id != exclude_submission_id,
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 def _log_grading_event(
     *,
     submission_id: int,
@@ -212,6 +225,7 @@ async def _grade_submission_impl(
     submission_id: int,
     phase: str = "practice",
     attempt: int = 0,
+    priority_defer_count: int = 0,
     *,
     session_factory=SessionLocal,
 ) -> dict[str, Any]:
@@ -219,6 +233,7 @@ async def _grade_submission_impl(
     if phase not in {GradingPhase.practice.value, GradingPhase.final.value}:
         phase = GradingPhase.practice.value
     attempt = max(0, int(attempt))
+    priority_defer_count = max(0, int(priority_defer_count))
     started_at = time.monotonic()
     max_attempts = 3
 
@@ -325,6 +340,38 @@ async def _grade_submission_impl(
             )
             await db.commit()
             return {"status": "error", "reason": "assignment_missing", "phase": phase}
+
+        should_defer_for_priority = (
+            settings.grading_priority_enabled
+            and phase == GradingPhase.practice.value
+            and priority_defer_count < settings.grading_priority_max_defer_attempts
+        )
+        if should_defer_for_priority and await _has_final_priority_backlog(
+            db, exclude_submission_id=submission_id
+        ):
+            submission.status = SubmissionStatus.pending
+            submission.feedback = "Deferred while processing deadline-priority final grading."
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="deferred",
+                attempt=attempt,
+                reason="final_priority_backlog",
+            )
+            await db.commit()
+            await db.close()
+            await grade_submission.kiq(
+                submission_id=submission_id,
+                phase=phase,
+                attempt=attempt,
+                priority_defer_count=priority_defer_count + 1,
+            )
+            return {
+                "status": "deferred",
+                "phase": phase,
+                "priority_defer_count": priority_defer_count + 1,
+            }
 
         if phase == GradingPhase.practice.value:
             version_id = submission.practice_autograde_version_id or assignment.active_autograde_version_id
@@ -471,7 +518,12 @@ async def _grade_submission_impl(
                 await db.commit()
                 await db.close()
                 await asyncio.sleep(min(2**attempt, 10))
-                await grade_submission.kiq(submission_id=submission_id, phase=phase, attempt=attempt + 1)
+                await grade_submission.kiq(
+                    submission_id=submission_id,
+                    phase=phase,
+                    attempt=attempt + 1,
+                    priority_defer_count=priority_defer_count,
+                )
                 return {"status": "retrying", "attempt": attempt + 1, "phase": phase}
 
             submission.status = SubmissionStatus.error
@@ -586,7 +638,12 @@ async def _grade_submission_impl(
                     await db.commit()
                     await db.close()
                     await asyncio.sleep(min(2**attempt, 10))
-                    await grade_submission.kiq(submission_id=submission_id, phase=phase, attempt=attempt + 1)
+                    await grade_submission.kiq(
+                        submission_id=submission_id,
+                        phase=phase,
+                        attempt=attempt + 1,
+                        priority_defer_count=priority_defer_count,
+                    )
                     return {"status": "retrying", "attempt": attempt + 1, "phase": phase}
 
                 submission.status = SubmissionStatus.error
@@ -717,5 +774,15 @@ async def _grade_submission_impl(
 
 
 @broker.task
-async def grade_submission(submission_id: int, phase: str = "practice", attempt: int = 0) -> dict[str, Any]:
-    return await _grade_submission_impl(submission_id=submission_id, phase=phase, attempt=attempt)
+async def grade_submission(
+    submission_id: int,
+    phase: str = "practice",
+    attempt: int = 0,
+    priority_defer_count: int = 0,
+) -> dict[str, Any]:
+    return await _grade_submission_impl(
+        submission_id=submission_id,
+        phase=phase,
+        attempt=attempt,
+        priority_defer_count=priority_defer_count,
+    )

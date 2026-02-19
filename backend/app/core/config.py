@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     # Playground isolation controls
     playground_max_concurrent_runs: int = 2
     playground_queue_wait_seconds: float = 0.25
+    grading_priority_enabled: bool = True
+    grading_priority_max_defer_attempts: int = 5
 
     # Third-party integrations
     # Symmetric encryption key (Fernet). Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -125,6 +127,10 @@ class Settings(BaseSettings):
         self.playground_queue_wait_seconds = max(
             0.001,
             float(self.playground_queue_wait_seconds),
+        )
+        self.grading_priority_max_defer_attempts = max(
+            0,
+            int(self.grading_priority_max_defer_attempts),
         )
 
         return self
