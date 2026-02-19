@@ -8,6 +8,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.integrations.jobe import JOBE_OUTCOME_OK
+from app.core.config import settings
 from app.models.submission import Submission, SubmissionStatus
 from app.worker.grading import PreparedJobeRun, RunCheck
 from app.worker.tasks import _grade_submission_impl
@@ -81,6 +82,9 @@ def _prepared_run() -> PreparedJobeRun:
         source_filename="main.c",
         file_list=None,
         parameters=None,
+        timelimit=settings.jobe_grading_timelimit_seconds,
+        memorylimit=settings.jobe_grading_memorylimit_bytes,
+        streamsize=settings.jobe_grading_streamsize_bytes,
     )
 
 

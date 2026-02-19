@@ -79,3 +79,51 @@ async def test_jobe_client_sends_api_key_header(monkeypatch):
     )
     await jobe.list_languages()
     assert captured_headers == {"X-API-KEY": "test-key"}
+
+
+@pytest.mark.asyncio
+async def test_jobe_client_includes_resource_caps_in_run_parameters(monkeypatch):
+    captured_payload: dict = {}
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "outcome": 15,
+                "cmpinfo": "",
+                "stdout": "ok\n",
+                "stderr": "",
+            }
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, path, json):
+            nonlocal captured_payload
+            captured_payload = json
+            return _FakeResponse()
+
+    monkeypatch.setattr("app.integrations.jobe.httpx.AsyncClient", lambda **kwargs: _FakeClient())
+
+    jobe = JobeClient(base_url="http://example.com/restapi", timeout_seconds=1)
+    await jobe.run(
+        language_id="c",
+        source_code="int main(){return 0;}",
+        stdin="",
+        parameters={"compileargs": "-Wall"},
+        timelimit=10,
+        memorylimit=268435456,
+        streamsize=65536,
+    )
+
+    run_parameters = captured_payload["run_spec"]["parameters"]
+    assert run_parameters["compileargs"] == "-Wall"
+    assert run_parameters["timelimit"] == 10
+    assert run_parameters["memorylimit"] == 268435456
+    assert run_parameters["streamsize"] == 65536

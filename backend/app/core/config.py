@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     cors_allow_origins: str = "http://localhost:3000"
     jobe_base_url: str = ""
     jobe_timeout_seconds: float = 20.0
+    # Explicit JOBE run caps for grading workers.
+    jobe_grading_timelimit_seconds: int = 10
+    jobe_grading_memorylimit_bytes: int = 268435456  # 256 MB
+    jobe_grading_streamsize_bytes: int = 65536  # 64 KB output cap
     # Optional API key for JOBE upstream auth (if enabled on the JOBE deployment).
     jobe_api_key: str = ""
     # Comma-separated list. If empty, no filtering is applied.
@@ -81,6 +85,10 @@ class Settings(BaseSettings):
 
         if not self.uploads_dir.strip():
             self.uploads_dir = str((Path(__file__).resolve().parents[3] / "var" / "uploads"))
+
+        self.jobe_grading_timelimit_seconds = max(1, int(self.jobe_grading_timelimit_seconds))
+        self.jobe_grading_memorylimit_bytes = max(1024, int(self.jobe_grading_memorylimit_bytes))
+        self.jobe_grading_streamsize_bytes = max(1024, int(self.jobe_grading_streamsize_bytes))
 
         return self
 
