@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     superadmin_password: str = ""
     cors_allow_origins: str = "http://localhost:3000"
     jobe_base_url: str = ""
+    # Optional comma-separated JOBE endpoints for load distribution/failover.
+    jobe_base_urls: str = ""
     jobe_timeout_seconds: float = 20.0
     # Explicit JOBE run caps for grading workers.
     # JOBE expects cputime (seconds), memorylimit (MB), and streamsize (MB).

@@ -20,6 +20,7 @@ from app.integrations.jobe import (
     JobeError,
     JobeMisconfiguredError,
     JobeTransientError,
+    parse_jobe_base_urls,
 )
 from app.models.assignment import Assignment
 from app.models.assignment_autograde_test_case_snapshot import AssignmentAutogradeTestCaseSnapshot
@@ -44,8 +45,12 @@ _jobe_concurrency_semaphore = asyncio.Semaphore(
 
 
 def _jobe_client() -> JobeClient:
-    return JobeClient(
+    base_urls = parse_jobe_base_urls(
         base_url=settings.jobe_base_url,
+        base_urls=settings.jobe_base_urls,
+    )
+    return JobeClient(
+        base_urls=base_urls,
         timeout_seconds=settings.jobe_timeout_seconds,
         api_key=settings.jobe_api_key,
     )
