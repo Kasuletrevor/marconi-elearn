@@ -71,7 +71,7 @@ class PreparedJobeRun:
 
 
 def _file_id_for_content(content: bytes) -> str:
-    return hashlib.md5(content).hexdigest()  # nosec - non-cryptographic ID
+    return hashlib.sha256(content).hexdigest()
 
 
 def _dedupe_preserving_order(items: list[str]) -> list[str]:
