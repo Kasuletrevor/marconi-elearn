@@ -1,8 +1,14 @@
 import pytest
+import hashlib
 
 from app.integrations.jobe import JOBE_OUTCOME_OK, JobeRunResult
 from app.core.config import settings
-from app.worker.grading import PreparedJobeRun, prepare_jobe_run, run_test_case
+from app.worker.grading import (
+    PreparedJobeRun,
+    _file_id_for_content,
+    prepare_jobe_run,
+    run_test_case,
+)
 
 
 class _FakeJobeClient:
@@ -206,3 +212,10 @@ async def test_prepare_jobe_run_applies_default_resource_caps(tmp_path) -> None:
     assert prepared.cputime == settings.jobe_grading_cputime_seconds
     assert prepared.memorylimit == settings.jobe_grading_memorylimit_mb
     assert prepared.streamsize == settings.jobe_grading_streamsize_mb
+
+
+def test_file_id_for_content_uses_sha256() -> None:
+    content = b"int main(){return 0;}\n"
+    file_id = _file_id_for_content(content)
+    assert file_id == hashlib.sha256(content).hexdigest()
+    assert len(file_id) == 64
