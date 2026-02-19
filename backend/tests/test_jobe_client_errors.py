@@ -1,7 +1,33 @@
 import httpx
 import pytest
 
-from app.integrations.jobe import JobeClient, JobeTransientError, JobeUpstreamError
+from app.core.config import settings
+from app.integrations.jobe import (
+    JobeCircuitOpenError,
+    JobeClient,
+    JobeTransientError,
+    JobeUpstreamError,
+)
+
+
+@pytest.fixture(autouse=True)
+def reset_jobe_circuit_state():
+    JobeClient.reset_circuit_breaker_state_for_tests()
+    yield
+    JobeClient.reset_circuit_breaker_state_for_tests()
+
+
+@pytest.fixture
+def override_circuit_breaker_settings():
+    original_enabled = settings.jobe_circuit_breaker_enabled
+    original_threshold = settings.jobe_circuit_breaker_failure_threshold
+    original_cooldown = settings.jobe_circuit_breaker_cooldown_seconds
+    try:
+        yield
+    finally:
+        settings.jobe_circuit_breaker_enabled = original_enabled
+        settings.jobe_circuit_breaker_failure_threshold = original_threshold
+        settings.jobe_circuit_breaker_cooldown_seconds = original_cooldown
 
 
 @pytest.mark.asyncio
@@ -127,3 +153,90 @@ async def test_jobe_client_includes_resource_caps_in_run_parameters(monkeypatch)
     assert run_parameters["cputime"] == 10
     assert run_parameters["memorylimit"] == 256
     assert run_parameters["streamsize"] == 0.064
+
+
+@pytest.mark.asyncio
+async def test_jobe_circuit_breaker_opens_after_consecutive_failures(
+    monkeypatch,
+    override_circuit_breaker_settings,
+):
+    settings.jobe_circuit_breaker_enabled = True
+    settings.jobe_circuit_breaker_failure_threshold = 2
+    settings.jobe_circuit_breaker_cooldown_seconds = 60
+
+    calls = {"count": 0}
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, path):
+            calls["count"] += 1
+            raise httpx.ReadTimeout("timeout")
+
+    monkeypatch.setattr("app.integrations.jobe.httpx.AsyncClient", lambda **kwargs: _FakeClient())
+
+    jobe = JobeClient(base_url="http://example.com/restapi", timeout_seconds=1)
+    with pytest.raises(JobeTransientError):
+        await jobe.list_languages()
+    with pytest.raises(JobeTransientError):
+        await jobe.list_languages()
+    with pytest.raises(JobeCircuitOpenError):
+        await jobe.list_languages()
+
+    assert calls["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_jobe_circuit_breaker_half_open_probe_closes_on_success(
+    monkeypatch,
+    override_circuit_breaker_settings,
+):
+    settings.jobe_circuit_breaker_enabled = True
+    settings.jobe_circuit_breaker_failure_threshold = 1
+    settings.jobe_circuit_breaker_cooldown_seconds = 1
+
+    class _FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    calls = {"count": 0}
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, path):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise httpx.ReadTimeout("timeout")
+            return _FakeResponse([["c", "11.4.0"]])
+
+    monkeypatch.setattr("app.integrations.jobe.httpx.AsyncClient", lambda **kwargs: _FakeClient())
+    monotonic_values = iter([0.0, 0.0, 2.0])
+    monkeypatch.setattr(
+        "app.integrations.jobe.time.monotonic",
+        lambda: next(monotonic_values, 2.0),
+    )
+
+    jobe = JobeClient(base_url="http://example.com/restapi", timeout_seconds=1)
+    with pytest.raises(JobeTransientError):
+        await jobe.list_languages()
+    recovered = await jobe.list_languages()
+    assert recovered[0].id == "c"
+    recovered_again = await jobe.list_languages()
+    assert recovered_again[0].id == "c"
+
+    assert calls["count"] == 3
