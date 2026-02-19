@@ -1,0 +1,28 @@
+groups:
+  - name: marconi-grading-alerts
+    interval: 30s
+    rules:
+      - alert: MarconiGradingHighFailureRate
+        expr: |
+          (
+            sum(rate(marconi_grading_jobs_total{result="error"}[10m]))
+            /
+            clamp_min(sum(rate(marconi_grading_jobs_total[10m])), 0.001)
+          ) > 0.15
+        for: 15m
+        labels:
+          severity: warning
+          service: marconi-grading
+        annotations:
+          summary: "Grading failure rate is elevated"
+          description: "Failure rate has stayed above 15% for 15 minutes."
+
+      - alert: MarconiGradingQueueBacklogHigh
+        expr: marconi_grading_queue_depth{status="pending"} > 60
+        for: 10m
+        labels:
+          severity: warning
+          service: marconi-grading
+        annotations:
+          summary: "Grading queue backlog is high"
+          description: "Pending submissions exceeded 60 for at least 10 minutes."

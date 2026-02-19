@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+import json
 import logging
 import time
 from pathlib import Path
@@ -23,6 +24,7 @@ from app.integrations.jobe import (
 from app.models.assignment import Assignment
 from app.models.assignment_autograde_test_case_snapshot import AssignmentAutogradeTestCaseSnapshot
 from app.models.assignment_autograde_version import AssignmentAutogradeVersion
+from app.models.grading_event import GradingEvent
 from app.models.submission import Submission, SubmissionStatus
 from app.models.submission_test_result import GradingPhase, SubmissionTestResult
 from app.worker.broker import broker
@@ -134,6 +136,64 @@ async def _run_with_jobe_slot(*, context: str, op: Callable[[], Awaitable[T]]) -
         return await op()
 
 
+def _log_grading_event(
+    *,
+    submission_id: int,
+    phase: str,
+    event_type: str,
+    attempt: int,
+    reason: str | None = None,
+    context: str | None = None,
+    duration_ms: int | None = None,
+) -> None:
+    payload: dict[str, Any] = {
+        "submission_id": submission_id,
+        "phase": phase,
+        "event_type": event_type,
+        "attempt": attempt,
+    }
+    if reason is not None:
+        payload["reason"] = reason
+    if context is not None:
+        payload["context"] = context
+    if duration_ms is not None:
+        payload["duration_ms"] = duration_ms
+    logger.info("grading_event %s", json.dumps(payload, sort_keys=True))
+
+
+def _record_grading_event(
+    db: Any,
+    *,
+    submission_id: int,
+    phase: str,
+    event_type: str,
+    attempt: int,
+    reason: str | None = None,
+    context: str | None = None,
+    duration_ms: int | None = None,
+) -> None:
+    db.add(
+        GradingEvent(
+            submission_id=submission_id,
+            phase=phase,
+            event_type=event_type,
+            attempt=attempt,
+            reason=reason,
+            context=context,
+            duration_ms=duration_ms,
+        )
+    )
+    _log_grading_event(
+        submission_id=submission_id,
+        phase=phase,
+        event_type=event_type,
+        attempt=attempt,
+        reason=reason,
+        context=context,
+        duration_ms=duration_ms,
+    )
+
+
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
 async def _worker_startup_health_check(_state: Any) -> None:
     if not settings.jobe_worker_startup_healthcheck_required:
@@ -153,6 +213,12 @@ async def _grade_submission_impl(
     phase = str(phase or "practice").strip().lower()
     if phase not in {GradingPhase.practice.value, GradingPhase.final.value}:
         phase = GradingPhase.practice.value
+    attempt = max(0, int(attempt))
+    started_at = time.monotonic()
+    max_attempts = 3
+
+    def _elapsed_ms() -> int:
+        return int((time.monotonic() - started_at) * 1000)
 
     # Idempotency: only one worker transitions pending -> grading.
     async with session_factory() as db:
@@ -164,6 +230,13 @@ async def _grade_submission_impl(
         )
         row = result.first()
         if row is None:
+            _log_grading_event(
+                submission_id=submission_id,
+                phase=phase,
+                event_type="skipped",
+                attempt=attempt,
+                reason="not_pending",
+            )
             return {"status": "skipped"}
         await db.commit()
 
@@ -177,12 +250,20 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.error
             submission.score = 0
             submission.feedback = "Grading infrastructure unavailable (JOBE health check failed)."
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="jobe_unhealthy",
+                context="health_gate",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
         logger.warning("Fail-fast grading due to JOBE health gate. submission_id=%s", submission_id)
         return {"status": "error", "reason": "jobe_unhealthy", "phase": phase}
 
-    max_attempts = 3
-    attempt = max(0, int(attempt))
     try:
         jobe = _jobe_client()
     except JobeMisconfiguredError as exc:
@@ -193,19 +274,52 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.error
             submission.score = 0
             submission.feedback = str(exc)
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="misconfigured",
+                context="client_init",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
         return {"status": "error", "reason": "misconfigured"}
 
     async with session_factory() as db:
         submission = await db.get(Submission, submission_id)
         if submission is None:
+            _log_grading_event(
+                submission_id=submission_id,
+                phase=phase,
+                event_type="missing",
+                attempt=attempt,
+                reason="submission_missing",
+            )
             return {"status": "missing"}
+        _record_grading_event(
+            db,
+            submission_id=submission_id,
+            phase=phase,
+            event_type="started",
+            attempt=attempt,
+        )
         assignment = await db.get(Assignment, submission.assignment_id)
         if assignment is None:
             submission.status = SubmissionStatus.error
             submission.feedback = "Assignment missing"
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="assignment_missing",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
-            return {"status": "error"}
+            return {"status": "error", "reason": "assignment_missing", "phase": phase}
 
         if phase == GradingPhase.practice.value:
             version_id = submission.practice_autograde_version_id or assignment.active_autograde_version_id
@@ -217,6 +331,15 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.error
             submission.score = 0
             submission.feedback = "Autograde configuration missing. Ask staff to configure autograding for this assignment."
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="autograde_config_missing",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "error", "score": 0, "tests": 0, "phase": phase}
 
@@ -225,6 +348,15 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.error
             submission.score = 0
             submission.feedback = "Autograde configuration missing. Ask staff to configure autograding for this assignment."
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="autograde_version_missing",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "error", "score": 0, "tests": 0, "phase": phase}
 
@@ -251,6 +383,15 @@ async def _grade_submission_impl(
                 submission.feedback = (
                     "No final tests configured. Ask staff to add test cases for this assignment."
                 )
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="no_tests_configured",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "error", "score": 0, "tests": 0, "phase": phase}
 
@@ -278,12 +419,32 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.error
             submission.score = 0
             submission.feedback = "Grading infrastructure unavailable (JOBE circuit breaker open)."
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="jobe_circuit_open",
+                context="prepare",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "error", "reason": "jobe_circuit_open", "phase": phase}
         except ZipExtractionError as exc:
             submission.status = SubmissionStatus.error
             submission.score = 0
             submission.feedback = str(exc)
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="invalid_submission",
+                context="prepare",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "error", "reason": "invalid_submission", "phase": phase}
         except JobeTransientError as exc:
@@ -292,6 +453,15 @@ async def _grade_submission_impl(
                 submission.status = SubmissionStatus.pending
                 submission.feedback = (
                     f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
+                )
+                _record_grading_event(
+                    db,
+                    submission_id=submission_id,
+                    phase=phase,
+                    event_type="retry",
+                    attempt=attempt,
+                    reason="jobe_transient",
+                    context="prepare",
                 )
                 await db.commit()
                 await db.close()
@@ -302,6 +472,16 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.error
             submission.score = 0
             submission.feedback = "Grading infrastructure temporarily unavailable. Please retry."
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="jobe_transient",
+                context="prepare",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "error", "reason": "jobe_transient", "phase": phase}
         except JobeError:
@@ -312,6 +492,16 @@ async def _grade_submission_impl(
                 "Grading failed due to JOBE error during prepare. submission_id=%s attempt=%s",
                 submission_id,
                 attempt,
+            )
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="jobe_error",
+                context="prepare",
+                duration_ms=_elapsed_ms(),
             )
             await db.commit()
             return {"status": "error", "reason": "jobe_error", "phase": phase}
@@ -324,6 +514,16 @@ async def _grade_submission_impl(
                 submission_id,
                 attempt,
             )
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="error",
+                attempt=attempt,
+                reason="internal_error",
+                context="prepare",
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "error", "reason": "internal_error", "phase": phase}
 
@@ -331,6 +531,7 @@ async def _grade_submission_impl(
         passed_points = 0
         max_points = sum(int(tc.points) for tc in tests)
         cap_points = int(settings_snapshot.get("max_points", getattr(assignment, "max_points", 0)) or 0)
+        terminal_reason: str | None = None
 
         for tc in tests:
             try:
@@ -349,6 +550,16 @@ async def _grade_submission_impl(
                 submission.status = SubmissionStatus.error
                 submission.score = 0
                 submission.feedback = "Grading infrastructure unavailable (JOBE circuit breaker open)."
+                _record_grading_event(
+                    db,
+                    submission_id=submission_id,
+                    phase=phase,
+                    event_type="error",
+                    attempt=attempt,
+                    reason="jobe_circuit_open",
+                    context="run_test_case",
+                    duration_ms=_elapsed_ms(),
+                )
                 await db.commit()
                 return {"status": "error", "reason": "jobe_circuit_open", "phase": phase}
             except JobeTransientError as exc:
@@ -357,6 +568,15 @@ async def _grade_submission_impl(
                     submission.status = SubmissionStatus.pending
                     submission.feedback = (
                         f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
+                    )
+                    _record_grading_event(
+                        db,
+                        submission_id=submission_id,
+                        phase=phase,
+                        event_type="retry",
+                        attempt=attempt,
+                        reason="jobe_transient",
+                        context="run_test_case",
                     )
                     await db.commit()
                     await db.close()
@@ -367,6 +587,16 @@ async def _grade_submission_impl(
                 submission.status = SubmissionStatus.error
                 submission.score = 0
                 submission.feedback = "Grading infrastructure temporarily unavailable. Please retry."
+                _record_grading_event(
+                    db,
+                    submission_id=submission_id,
+                    phase=phase,
+                    event_type="error",
+                    attempt=attempt,
+                    reason="jobe_transient",
+                    context="run_test_case",
+                    duration_ms=_elapsed_ms(),
+                )
                 await db.commit()
                 return {"status": "error", "reason": "jobe_transient", "phase": phase}
             except JobeError:
@@ -379,6 +609,16 @@ async def _grade_submission_impl(
                     tc.test_case_id,
                     attempt,
                 )
+                _record_grading_event(
+                    db,
+                    submission_id=submission_id,
+                    phase=phase,
+                    event_type="error",
+                    attempt=attempt,
+                    reason="jobe_error",
+                    context="run_test_case",
+                    duration_ms=_elapsed_ms(),
+                )
                 await db.commit()
                 return {"status": "error", "reason": "jobe_error", "phase": phase}
             except Exception:
@@ -390,6 +630,16 @@ async def _grade_submission_impl(
                     submission_id,
                     tc.test_case_id,
                     attempt,
+                )
+                _record_grading_event(
+                    db,
+                    submission_id=submission_id,
+                    phase=phase,
+                    event_type="error",
+                    attempt=attempt,
+                    reason="internal_error",
+                    context="run_test_case",
+                    duration_ms=_elapsed_ms(),
                 )
                 await db.commit()
                 return {"status": "error", "reason": "internal_error", "phase": phase}
@@ -410,6 +660,7 @@ async def _grade_submission_impl(
                 submission.status = SubmissionStatus.error
                 submission.score = 0
                 submission.feedback = check.compile_output
+                terminal_reason = "compile_error"
                 break
 
             if check.passed:
@@ -431,11 +682,33 @@ async def _grade_submission_impl(
             submission.score = min(passed_points, cap_points if cap_points > 0 else passed_points)
             prefix = "Final" if phase == GradingPhase.final.value else "Practice"
             submission.feedback = f"{prefix}: Passed {passed_points}/{max_points} points across {len(tests)} tests."
+            _record_grading_event(
+                db,
+                submission_id=submission_id,
+                phase=phase,
+                event_type="graded",
+                attempt=attempt,
+                duration_ms=_elapsed_ms(),
+            )
             await db.commit()
             return {"status": "graded", "score": submission.score, "tests": len(tests), "phase": phase}
 
+        _record_grading_event(
+            db,
+            submission_id=submission_id,
+            phase=phase,
+            event_type="error",
+            attempt=attempt,
+            reason=terminal_reason or "grading_failed",
+            duration_ms=_elapsed_ms(),
+        )
         await db.commit()
-        return {"status": "error", "tests": len(tests), "phase": phase}
+        return {
+            "status": "error",
+            "reason": terminal_reason or "grading_failed",
+            "tests": len(tests),
+            "phase": phase,
+        }
 
 
 @broker.task

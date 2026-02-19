@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.integrations.jobe import JOBE_OUTCOME_OK, JobeTransientError
 from app.core.config import settings
+from app.models.grading_event import GradingEvent
 from app.models.submission import Submission, SubmissionStatus
 from app.worker.grading import PreparedJobeRun, RunCheck
 from app.worker.tasks import _grade_submission_impl
@@ -142,6 +143,12 @@ async def test_grade_submission_transitions_pending_to_graded(client, db, monkey
     assert submission.score == 7
     assert submission.feedback is not None
     assert submission.feedback.startswith("Practice: Passed 7/7 points across 1 tests.")
+    events = (
+        await db.execute(
+            select(GradingEvent).where(GradingEvent.submission_id == submission_id).order_by(GradingEvent.id.asc())
+        )
+    ).scalars().all()
+    assert [event.event_type for event in events] == ["started", "graded"]
 
 
 @pytest.mark.asyncio
@@ -234,3 +241,10 @@ async def test_grade_submission_fail_fast_when_health_gate_is_unhealthy(client, 
     assert submission.status == SubmissionStatus.error
     assert submission.score == 0
     assert submission.feedback == "Grading infrastructure unavailable (JOBE health check failed)."
+    events = (
+        await db.execute(
+            select(GradingEvent).where(GradingEvent.submission_id == submission_id).order_by(GradingEvent.id.asc())
+        )
+    ).scalars().all()
+    assert [event.event_type for event in events] == ["error"]
+    assert events[0].reason == "jobe_unhealthy"
