@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     jobe_grading_streamsize_mb: float = 0.064
     jobe_worker_health_check_interval_seconds: int = 30
     jobe_worker_startup_healthcheck_required: bool = True
+    jobe_worker_max_concurrent_requests: int = 4
     jobe_circuit_breaker_enabled: bool = True
     jobe_circuit_breaker_failure_threshold: int = 5
     jobe_circuit_breaker_cooldown_seconds: int = 30
@@ -99,6 +100,10 @@ class Settings(BaseSettings):
         self.jobe_worker_health_check_interval_seconds = max(
             1,
             int(self.jobe_worker_health_check_interval_seconds),
+        )
+        self.jobe_worker_max_concurrent_requests = max(
+            1,
+            int(self.jobe_worker_max_concurrent_requests),
         )
         self.jobe_circuit_breaker_failure_threshold = max(
             1,
