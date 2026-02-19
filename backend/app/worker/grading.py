@@ -7,6 +7,7 @@ import shlex
 import tempfile
 from typing import Any
 
+from app.core.config import settings
 from app.integrations.jobe import JOBE_OUTCOME_OK, JobeClient
 from app.models.assignment import Assignment
 from app.worker.zip_extract import ZipExtractionError, safe_extract_zip
@@ -46,6 +47,9 @@ class PreparedJobeRun:
     source_filename: str
     file_list: list[tuple[str, str]] | None
     parameters: dict[str, Any] | None
+    cputime: int
+    memorylimit: int
+    streamsize: float
 
 
 def _file_id_for_content(content: bytes) -> str:
@@ -214,6 +218,9 @@ async def prepare_jobe_run(
             source_filename=submission_path.name,
             file_list=None,
             parameters=None,
+            cputime=settings.jobe_grading_cputime_seconds,
+            memorylimit=settings.jobe_grading_memorylimit_mb,
+            streamsize=settings.jobe_grading_streamsize_mb,
         )
 
     if assignment is None:
@@ -277,6 +284,9 @@ async def prepare_jobe_run(
             source_filename=primary_name,
             file_list=file_list or None,
             parameters=parameters or None,
+            cputime=settings.jobe_grading_cputime_seconds,
+            memorylimit=settings.jobe_grading_memorylimit_mb,
+            streamsize=settings.jobe_grading_streamsize_mb,
         )
 
 
@@ -295,6 +305,9 @@ async def run_test_case(
         source_filename=prepared.source_filename,
         file_list=prepared.file_list,
         parameters=prepared.parameters,
+        cputime=prepared.cputime,
+        memorylimit=prepared.memorylimit,
+        streamsize=prepared.streamsize,
     )
 
     # Compile error -> always fail

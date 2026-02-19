@@ -1,14 +1,17 @@
 import pytest
 
 from app.integrations.jobe import JOBE_OUTCOME_OK, JobeRunResult
-from app.worker.grading import PreparedJobeRun, run_test_case
+from app.core.config import settings
+from app.worker.grading import PreparedJobeRun, prepare_jobe_run, run_test_case
 
 
 class _FakeJobeClient:
     def __init__(self, result: JobeRunResult) -> None:
         self._result = result
+        self.last_run_kwargs: dict | None = None
 
     async def run(self, **kwargs) -> JobeRunResult:
+        self.last_run_kwargs = kwargs
         return self._result
 
 
@@ -20,6 +23,9 @@ async def test_run_test_case_fails_when_runtime_outcome_is_not_ok() -> None:
         source_filename="main.c",
         file_list=None,
         parameters=None,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
     )
     fake_jobe = _FakeJobeClient(
         JobeRunResult(
@@ -50,6 +56,9 @@ async def test_run_test_case_passes_only_when_outcome_is_ok_and_output_matches()
         source_filename="main.c",
         file_list=None,
         parameters=None,
+        cputime=10,
+        memorylimit=256,
+        streamsize=0.064,
     )
     fake_jobe = _FakeJobeClient(
         JobeRunResult(
@@ -70,3 +79,31 @@ async def test_run_test_case_passes_only_when_outcome_is_ok_and_output_matches()
 
     assert result.passed is True
     assert result.outcome == JOBE_OUTCOME_OK
+    assert fake_jobe.last_run_kwargs is not None
+    assert fake_jobe.last_run_kwargs["cputime"] == 10
+    assert fake_jobe.last_run_kwargs["memorylimit"] == 256
+    assert fake_jobe.last_run_kwargs["streamsize"] == 0.064
+
+
+@pytest.mark.asyncio
+async def test_prepare_jobe_run_applies_default_resource_caps(tmp_path) -> None:
+    source_path = tmp_path / "main.c"
+    source_path.write_text("int main(){return 0;}\n", encoding="utf-8")
+    fake_jobe = _FakeJobeClient(
+        JobeRunResult(
+            outcome=JOBE_OUTCOME_OK,
+            compile_output="",
+            stdout="",
+            stderr="",
+        )
+    )
+
+    prepared = await prepare_jobe_run(
+        fake_jobe,
+        submission_path=source_path,
+        assignment=None,
+    )
+
+    assert prepared.cputime == settings.jobe_grading_cputime_seconds
+    assert prepared.memorylimit == settings.jobe_grading_memorylimit_mb
+    assert prepared.streamsize == settings.jobe_grading_streamsize_mb

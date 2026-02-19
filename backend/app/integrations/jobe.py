@@ -89,6 +89,9 @@ class JobeClient:
         source_filename: str | None = None,
         file_list: list[tuple[str, str]] | None = None,
         parameters: dict[str, Any] | None = None,
+        cputime: int | None = None,
+        memorylimit: int | None = None,
+        streamsize: float | None = None,
     ) -> JobeRunResult:
         run_spec: dict[str, Any] = {
             "language_id": language_id,
@@ -99,8 +102,15 @@ class JobeClient:
             run_spec["sourcefilename"] = source_filename
         if file_list:
             run_spec["file_list"] = [[file_id, file_name] for file_id, file_name in file_list]
-        if parameters:
-            run_spec["parameters"] = parameters
+        run_parameters: dict[str, Any] = dict(parameters or {})
+        if cputime is not None:
+            run_parameters["cputime"] = int(cputime)
+        if memorylimit is not None:
+            run_parameters["memorylimit"] = int(memorylimit)
+        if streamsize is not None:
+            run_parameters["streamsize"] = float(streamsize)
+        if run_parameters:
+            run_spec["parameters"] = run_parameters
 
         payload: dict[str, Any] = {"run_spec": run_spec}
 
