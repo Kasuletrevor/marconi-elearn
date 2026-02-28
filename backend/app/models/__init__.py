@@ -16,6 +16,9 @@ from app.models.github_oauth_state import GitHubOAuthState
 from app.models.grading_event import GradingEvent
 from app.models.notification import Notification
 from app.models.org_github_admin_token import OrgGitHubAdminToken
+from app.models.password_reset_token import PasswordResetToken
+from app.models.plagiarism_run import PlagiarismRun
+from app.models.plagiarism_pair import PlagiarismPair
 from app.models.submission import Submission
 from app.models.submission_test_result import SubmissionTestResult
 from app.models.student_profile import StudentProfile
@@ -42,6 +45,9 @@ __all__ = [
     "OrgGitHubAdminToken",
     "Organization",
     "OrganizationMembership",
+    "PasswordResetToken",
+    "PlagiarismPair",
+    "PlagiarismRun",
     "Session",
     "StudentProfile",
     "Submission",

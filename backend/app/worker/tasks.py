@@ -25,10 +25,14 @@ from app.integrations.jobe import (
 from app.models.assignment import Assignment
 from app.models.assignment_autograde_test_case_snapshot import AssignmentAutogradeTestCaseSnapshot
 from app.models.assignment_autograde_version import AssignmentAutogradeVersion
+from app.models.course import Course
 from app.models.grading_event import GradingEvent
+from app.models.notification import NotificationKind
 from app.models.submission import Submission, SubmissionStatus
 from app.models.submission_test_result import GradingPhase, SubmissionTestResult
+from app.models.user import User
 from app.worker.broker import broker
+from app.worker import plagiarism as _plagiarism_tasks  # noqa: F401
 from app.worker.grading import prepare_jobe_run, run_test_case
 from app.worker.zip_extract import ZipExtractionError
 
@@ -221,6 +225,46 @@ async def _worker_startup_health_check(_state: Any) -> None:
     logger.info("JOBE startup health check passed")
 
 
+def _frontend_base() -> str:
+    origins = settings.cors_allow_origins.split(",")
+    return origins[0].strip().rstrip("/") if origins else "http://localhost:3000"
+
+
+def _send_graded_email_bg(
+    *,
+    student_email: str,
+    student_name: str,
+    course_name: str,
+    assignment_title: str,
+    score: int | None,
+    max_points: int | None,
+    course_id: int,
+    assignment_id: int,
+) -> None:
+    """Fire-and-forget: schedule a graded email send in the running event loop."""
+    from app.integrations.email import send_email
+    from app.integrations.email_templates import submission_graded_email
+
+    base = _frontend_base()
+    detail_url = f"{base}/dashboard/courses/{course_id}/assignments/{assignment_id}"
+    subject, html, text = submission_graded_email(
+        student_name=student_name,
+        course_name=course_name,
+        assignment_title=assignment_title,
+        score=score,
+        max_points=max_points,
+        detail_url=detail_url,
+    )
+
+    async def _do_send() -> None:
+        try:
+            await send_email(to=student_email, subject=subject, html_body=html, text_body=text)
+        except Exception:
+            logger.exception("Failed to send graded email to=%s", student_email)
+
+    asyncio.ensure_future(_do_send())
+
+
 async def _grade_submission_impl(
     submission_id: int,
     phase: str = "practice",
@@ -374,10 +418,14 @@ async def _grade_submission_impl(
             }
 
         if phase == GradingPhase.practice.value:
-            version_id = submission.practice_autograde_version_id or assignment.active_autograde_version_id
+            version_id = (
+                submission.practice_autograde_version_id or assignment.active_autograde_version_id
+            )
             submission.practice_autograde_version_id = version_id
         else:
-            version_id = assignment.final_autograde_version_id or submission.final_autograde_version_id
+            version_id = (
+                assignment.final_autograde_version_id or submission.final_autograde_version_id
+            )
             submission.final_autograde_version_id = version_id
         if version_id is None:
             submission.status = SubmissionStatus.error
@@ -428,9 +476,7 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.error
             submission.score = 0
             if phase == GradingPhase.practice.value:
-                submission.feedback = (
-                    "No visible practice tests configured. Ask staff to add at least one visible test case."
-                )
+                submission.feedback = "No visible practice tests configured. Ask staff to add at least one visible test case."
             else:
                 submission.feedback = (
                     "No final tests configured. Ask staff to add test cases for this assignment."
@@ -449,13 +495,20 @@ async def _grade_submission_impl(
 
         settings_snapshot = version.grading_settings or {}
         assignment_config = SimpleNamespace(
-            allows_zip=bool(settings_snapshot.get("allows_zip", bool(getattr(assignment, "allows_zip", False)))),
-            expected_filename=settings_snapshot.get("expected_filename", getattr(assignment, "expected_filename", None)),
-            compile_command=settings_snapshot.get("compile_command", getattr(assignment, "compile_command", None)),
+            allows_zip=bool(
+                settings_snapshot.get("allows_zip", bool(getattr(assignment, "allows_zip", False)))
+            ),
+            expected_filename=settings_snapshot.get(
+                "expected_filename", getattr(assignment, "expected_filename", None)
+            ),
+            compile_command=settings_snapshot.get(
+                "compile_command", getattr(assignment, "compile_command", None)
+            ),
         )
 
         submission_path = Path(submission.storage_path)
         try:
+
             async def _prepare() -> Any:
                 return await prepare_jobe_run(
                     jobe,
@@ -503,9 +556,7 @@ async def _grade_submission_impl(
             _mark_jobe_unhealthy(exc=exc, context="prepare_jobe_run")
             if attempt < max_attempts - 1:
                 submission.status = SubmissionStatus.pending
-                submission.feedback = (
-                    f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
-                )
+                submission.feedback = f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
                 _record_grading_event(
                     db,
                     submission_id=submission_id,
@@ -587,11 +638,14 @@ async def _grade_submission_impl(
         results: list[SubmissionTestResult] = []
         passed_points = 0
         max_points = sum(int(tc.points) for tc in tests)
-        cap_points = int(settings_snapshot.get("max_points", getattr(assignment, "max_points", 0)) or 0)
+        cap_points = int(
+            settings_snapshot.get("max_points", getattr(assignment, "max_points", 0)) or 0
+        )
         terminal_reason: str | None = None
 
         for tc in tests:
             try:
+
                 async def _run() -> Any:
                     return await run_test_case(
                         jobe,
@@ -606,7 +660,9 @@ async def _grade_submission_impl(
             except JobeCircuitOpenError:
                 submission.status = SubmissionStatus.error
                 submission.score = 0
-                submission.feedback = "Grading infrastructure unavailable (JOBE circuit breaker open)."
+                submission.feedback = (
+                    "Grading infrastructure unavailable (JOBE circuit breaker open)."
+                )
                 _record_grading_event(
                     db,
                     submission_id=submission_id,
@@ -623,9 +679,7 @@ async def _grade_submission_impl(
                 _mark_jobe_unhealthy(exc=exc, context="run_test_case")
                 if attempt < max_attempts - 1:
                     submission.status = SubmissionStatus.pending
-                    submission.feedback = (
-                        f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
-                    )
+                    submission.feedback = f"Grading infrastructure temporarily unavailable. Retrying ({attempt + 1}/{max_attempts})."
                     _record_grading_event(
                         db,
                         submission_id=submission_id,
@@ -648,7 +702,9 @@ async def _grade_submission_impl(
 
                 submission.status = SubmissionStatus.error
                 submission.score = 0
-                submission.feedback = "Grading infrastructure temporarily unavailable. Please retry."
+                submission.feedback = (
+                    "Grading infrastructure temporarily unavailable. Please retry."
+                )
                 _record_grading_event(
                     db,
                     submission_id=submission_id,
@@ -743,7 +799,9 @@ async def _grade_submission_impl(
             submission.status = SubmissionStatus.graded
             submission.score = min(passed_points, cap_points if cap_points > 0 else passed_points)
             prefix = "Final" if phase == GradingPhase.final.value else "Practice"
-            submission.feedback = f"{prefix}: Passed {passed_points}/{max_points} points across {len(tests)} tests."
+            submission.feedback = (
+                f"{prefix}: Passed {passed_points}/{max_points} points across {len(tests)} tests."
+            )
             _record_grading_event(
                 db,
                 submission_id=submission_id,
@@ -752,8 +810,54 @@ async def _grade_submission_impl(
                 attempt=attempt,
                 duration_ms=_elapsed_ms(),
             )
+
+            # Create in-app notification for the student.
+            try:
+                from app.crud.notifications import create_notification
+
+                link = f"/dashboard/courses/{assignment.course_id}/assignments/{assignment.id}"
+                await create_notification(
+                    db,
+                    user_id=submission.user_id,
+                    kind=NotificationKind.submission_graded,
+                    title=f"Graded: {assignment.title}",
+                    body=None,
+                    link_url=link,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to create graded notification. submission_id=%s",
+                    submission_id,
+                )
+
             await db.commit()
-            return {"status": "graded", "score": submission.score, "tests": len(tests), "phase": phase}
+
+            # Fire-and-forget email notification (outside the DB transaction).
+            try:
+                user = await db.get(User, submission.user_id)
+                course = await db.get(Course, assignment.course_id)
+                if user is not None and course is not None:
+                    _send_graded_email_bg(
+                        student_email=user.email,
+                        student_name=user.email.split("@")[0],
+                        course_name=course.title,
+                        assignment_title=assignment.title,
+                        score=submission.score,
+                        max_points=assignment.max_points,
+                        course_id=course.id,
+                        assignment_id=assignment.id,
+                    )
+            except Exception:
+                logger.exception(
+                    "Failed to enqueue graded email. submission_id=%s",
+                    submission_id,
+                )
+            return {
+                "status": "graded",
+                "score": submission.score,
+                "tests": len(tests),
+                "phase": phase,
+            }
 
         _record_grading_event(
             db,

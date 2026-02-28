@@ -21,6 +21,9 @@ dependencies = [
   "cryptography>=42.0",
   "taskiq>=0.12.1",
   "taskiq-redis>=1.2.1",
+  "aiosmtplib>=2.0",
+  "fpdf2>=2.7",
+  "mosspy>=1.0.8,<1.1",
 ]
 
 [project.optional-dependencies]

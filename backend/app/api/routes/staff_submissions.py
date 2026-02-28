@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -9,6 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
+from app.core.config import settings
 from app.crud.audit import enqueue_audit_event
 from app.crud.notifications import create_notification
 from app.crud.staff_submissions import (
@@ -18,7 +20,10 @@ from app.crud.staff_submissions import (
     list_staff_submission_rows,
     list_staff_submission_rows_by_ids,
 )
-from app.crud.submission_test_results import delete_submission_test_results, list_submission_test_results
+from app.crud.submission_test_results import (
+    delete_submission_test_results,
+    list_submission_test_results,
+)
 from app.db.deps import get_db
 from app.models.submission import SubmissionStatus
 from app.models.submission_test_result import SubmissionTestResult
@@ -44,6 +49,46 @@ from app.worker.zip_extract import ZipExtractionError, list_zip_contents
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/staff/submissions", dependencies=[Depends(get_current_user)])
+
+
+def _frontend_base() -> str:
+    origins = settings.cors_allow_origins.split(",")
+    return origins[0].strip().rstrip("/") if origins else "http://localhost:3000"
+
+
+def _send_graded_email_bg(
+    *,
+    student_email: str,
+    student_name: str,
+    course_name: str,
+    assignment_title: str,
+    score: int | None,
+    max_points: int | None,
+    course_id: int,
+    assignment_id: int,
+) -> None:
+    """Fire-and-forget email for graded submission."""
+    from app.integrations.email import send_email
+    from app.integrations.email_templates import submission_graded_email
+
+    base = _frontend_base()
+    detail_url = f"{base}/dashboard/courses/{course_id}/assignments/{assignment_id}"
+    subject, html, text = submission_graded_email(
+        student_name=student_name,
+        course_name=course_name,
+        assignment_title=assignment_title,
+        score=score,
+        max_points=max_points,
+        detail_url=detail_url,
+    )
+
+    async def _do_send() -> None:
+        try:
+            await send_email(to=student_email, subject=subject, html_body=html, text_body=text)
+        except Exception:
+            logger.exception("Failed to send graded email to=%s", student_email)
+
+    asyncio.ensure_future(_do_send())
 
 
 def _to_queue_item(row) -> StaffSubmissionQueueItem:
@@ -173,6 +218,16 @@ async def bulk_update_submissions(
                 body=None,
                 link_url=link,
             )
+            _send_graded_email_bg(
+                student_email=r.student.email,
+                student_name=r.student.email.split("@")[0],
+                course_name=r.course.title,
+                assignment_title=r.assignment.title,
+                score=r.submission.score,
+                max_points=r.assignment.max_points,
+                course_id=r.course.id,
+                assignment_id=r.assignment.id,
+            )
 
     return StaffSubmissionsBulkResult(
         updated_ids=sorted(found_ids),
@@ -204,11 +259,17 @@ async def get_submission_detail(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> StaffSubmissionDetail:
-    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    row = await get_staff_submission_row(
+        db, staff_user_id=current_user.id, submission_id=submission_id
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     item = _to_queue_item(row)
-    return StaffSubmissionDetail(**item.model_dump(), content_type=row.submission.content_type, size_bytes=row.submission.size_bytes)
+    return StaffSubmissionDetail(
+        **item.model_dump(),
+        content_type=row.submission.content_type,
+        size_bytes=row.submission.size_bytes,
+    )
 
 
 @router.get("/{submission_id}/zip-contents", response_model=ZipContentsOut)
@@ -217,13 +278,17 @@ async def get_submission_zip_contents(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> ZipContentsOut:
-    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    row = await get_staff_submission_row(
+        db, staff_user_id=current_user.id, submission_id=submission_id
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
 
     storage_path = Path(row.submission.storage_path)
     if storage_path.suffix.lower() != ".zip":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Submission is not a ZIP file")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Submission is not a ZIP file"
+        )
 
     try:
         entries = list_zip_contents(storage_path)
@@ -242,7 +307,9 @@ async def update_submission(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> SubmissionOut:
-    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    row = await get_staff_submission_row(
+        db, staff_user_id=current_user.id, submission_id=submission_id
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
 
@@ -251,7 +318,9 @@ async def update_submission(
     prior_status = submission.status
 
     if payload.score is not None and payload.score > assignment.max_points:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Score exceeds max_points")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Score exceeds max_points"
+        )
 
     if payload.status is not None:
         submission.status = payload.status
@@ -290,6 +359,16 @@ async def update_submission(
             body=None,
             link_url=link,
         )
+        _send_graded_email_bg(
+            student_email=row.student.email,
+            student_name=row.student.email.split("@")[0],
+            course_name=row.course.title,
+            assignment_title=row.assignment.title,
+            score=submission.score,
+            max_points=row.assignment.max_points,
+            course_id=row.course.id,
+            assignment_id=row.assignment.id,
+        )
     return submission
 
 
@@ -299,7 +378,9 @@ async def download_submission(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
-    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    row = await get_staff_submission_row(
+        db, staff_user_id=current_user.id, submission_id=submission_id
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
 
@@ -320,7 +401,9 @@ async def list_submission_tests(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[SubmissionTestResultOut]:
-    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    row = await get_staff_submission_row(
+        db, staff_user_id=current_user.id, submission_id=submission_id
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     # Prefer final-phase tests when available.
@@ -328,7 +411,10 @@ async def list_submission_tests(
 
     has_final = await db.execute(
         select(SubmissionTestResult.id)
-        .where(SubmissionTestResult.submission_id == submission_id, SubmissionTestResult.phase == "final")
+        .where(
+            SubmissionTestResult.submission_id == submission_id,
+            SubmissionTestResult.phase == "final",
+        )
         .limit(1)
     )
     phase = "final" if has_final.scalar_one_or_none() is not None else "practice"
@@ -341,7 +427,9 @@ async def regrade_submission(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> SubmissionOut:
-    row = await get_staff_submission_row(db, staff_user_id=current_user.id, submission_id=submission_id)
+    row = await get_staff_submission_row(
+        db, staff_user_id=current_user.id, submission_id=submission_id
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
 

@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -5,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.permissions import require_org_admin, require_org_member
+from app.core.config import settings
 from app.crud.audit import enqueue_audit_event
 from app.crud.invites import create_org_member_invite
 from app.crud.org_memberships import (
@@ -18,6 +21,8 @@ from app.crud.org_memberships import (
 )
 from app.crud.users import get_user_by_email, create_pending_user
 from app.db.deps import get_db
+from app.integrations.email import send_email
+from app.integrations.email_templates import invite_email
 from app.models.organization_membership import OrgRole
 from app.models.user import User
 from app.schemas.org_membership import (
@@ -27,6 +32,8 @@ from app.schemas.org_membership import (
     OrgMembershipOut,
     OrgMembershipUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orgs/{org_id}/memberships")
 
@@ -54,10 +61,14 @@ async def add_member(
         )
         return membership
     except OrgMembershipExistsError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in organization") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="User already in organization"
+        ) from exc
 
 
-@router.post("/by-email", response_model=OrgMembershipInviteOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/by-email", response_model=OrgMembershipInviteOut, status_code=status.HTTP_201_CREATED
+)
 async def add_member_by_email(
     org_id: int,
     payload: OrgMembershipCreateByEmail,
@@ -71,14 +82,47 @@ async def add_member_by_email(
         user = await create_pending_user(db, email=email)
 
     try:
-        membership = await add_membership(db, organization_id=org_id, user_id=user.id, role=payload.role)
+        membership = await add_membership(
+            db, organization_id=org_id, user_id=user.id, role=payload.role
+        )
     except OrgMembershipExistsError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in organization") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="User already in organization"
+        ) from exc
 
     invite_link: str | None = None
     if user.password_hash is None:
-        token = await create_org_member_invite(db, organization_id=org_id, email=email, expires_in_days=7)
+        token = await create_org_member_invite(
+            db, organization_id=org_id, email=email, expires_in_days=7
+        )
         invite_link = f"/invite/{token}"
+
+        # Send invite email (best-effort, non-blocking).
+        from app.models.organization import Organization
+
+        org = await db.get(Organization, org_id)
+        org_name = org.name if org else "Marconi Elearn"
+
+        def _frontend_base() -> str:
+            origins = settings.cors_allow_origins.split(",")
+            return origins[0].strip().rstrip("/") if origins else "http://localhost:3000"
+
+        base = _frontend_base()
+        invite_url = f"{base}/invite/{token}"
+        subj, html, text = invite_email(
+            recipient_name="",
+            organization_name=org_name,
+            course_name=None,
+            invite_url=invite_url,
+        )
+
+        async def _send() -> None:
+            try:
+                await send_email(to=email, subject=subj, html_body=html, text_body=text)
+            except Exception:
+                logger.exception("Failed to send org invite email to %s", email)
+
+        asyncio.ensure_future(_send())
 
     enqueue_audit_event(
         organization_id=org_id,
@@ -129,7 +173,11 @@ async def update_member(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot change your own organization role",
         )
-    if payload.role is not None and membership.role == OrgRole.admin and payload.role != OrgRole.admin:
+    if (
+        payload.role is not None
+        and membership.role == OrgRole.admin
+        and payload.role != OrgRole.admin
+    ):
         admin_count = await count_admin_memberships(
             db,
             organization_id=org_id,

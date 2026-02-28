@@ -14,6 +14,15 @@ class AcceptInviteRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=500)
+    password: str = Field(min_length=8, max_length=128)
+
+
 class CourseRoleItem(BaseModel):
     course_id: int
     role: CourseRole

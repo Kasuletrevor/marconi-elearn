@@ -31,6 +31,15 @@ class InviteIssue:
 
 
 @dataclass(frozen=True)
+class CreatedInvite:
+    """Bundled invite token + metadata needed to build an email."""
+
+    token: str
+    email: str
+    full_name: str | None = None
+
+
+@dataclass(frozen=True)
 class RosterRow:
     email: str
     full_name: str
@@ -46,8 +55,8 @@ async def create_course_student_invites(
     course_id: int,
     rows: list[RosterRow],
     expires_in_days: int = 7,
-) -> tuple[list[str], int, list[InviteIssue]]:
-    invites: list[str] = []
+) -> tuple[list[CreatedInvite], int, list[InviteIssue]]:
+    invites: list[CreatedInvite] = []
     issues: list[InviteIssue] = []
     expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
     auto_enrolled = 0
@@ -136,7 +145,7 @@ async def create_course_student_invites(
             used_at=None,
         )
         db.add(invite)
-        invites.append(token)
+        invites.append(CreatedInvite(token=token, email=email, full_name=full_name))
 
     await db.commit()
     # Return tokens for non-activated users; activated users are auto-enrolled.
@@ -149,11 +158,7 @@ def parse_roster_from_csv_bytes(data: bytes) -> list[RosterRow]:
     if reader.fieldnames is None:
         raise ValueError("missing_header")
 
-    header_lookup = {
-        name.strip().lower(): name
-        for name in reader.fieldnames
-        if name is not None
-    }
+    header_lookup = {name.strip().lower(): name for name in reader.fieldnames if name is not None}
     normalized = set(header_lookup.keys())
     required = {"email", "name", "student_number", "programme"}
     if not required.issubset(normalized):
@@ -190,7 +195,7 @@ async def get_invite_by_token(db: AsyncSession, *, token: str) -> InviteToken | 
     return result.scalars().first()
 
 
-async def mark_invite_used(db: AsyncSession, *, invite: InviteToken) -> None:   
+async def mark_invite_used(db: AsyncSession, *, invite: InviteToken) -> None:
     invite.used_at = datetime.now(timezone.utc)
     await db.commit()
 

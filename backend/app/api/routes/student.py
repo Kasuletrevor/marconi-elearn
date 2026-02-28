@@ -1,11 +1,12 @@
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,7 @@ from app.api.deps.course_permissions import require_course_student_or_staff
 from app.api.deps.rate_limit import make_rate_limit_dependency
 from app.core.config import settings
 from app.crud.assignments import get_assignment
+from app.crud.courses import get_course
 from app.crud.assignment_extensions import (
     get_assignment_extension,
     list_assignment_extensions_for_user,
@@ -36,16 +38,19 @@ from app.crud.student_submissions import get_student_submission_row, list_studen
 from app.crud.student_views import list_course_assignments, list_course_modules, list_my_courses
 from app.db.deps import get_db
 from app.integrations.jobe import JOBE_OUTCOME_OK
+from app.integrations.pdf_generator import generate_assignment_pdf
 from app.models.course import Course
 from app.models.assignment_autograde_test_case_snapshot import AssignmentAutogradeTestCaseSnapshot
 from app.models.submission_test_result import SubmissionTestResult
-from app.models.test_case import TestCase
 from app.models.user import User
 from app.schemas.assignment import AssignmentOut
 from app.schemas.course import CourseOut
 from app.schemas.module import ModuleOut
 from app.schemas.self_enroll import CourseSelfEnrollRequest
-from app.schemas.student_submission_tests import StudentSubmissionTestsOut, StudentVisibleTestResultOut
+from app.schemas.student_submission_tests import (
+    StudentSubmissionTestsOut,
+    StudentVisibleTestResultOut,
+)
 from app.schemas.student_submissions import StudentSubmissionItem
 from app.schemas.submission import SubmissionOut, SubmissionStudentOut
 from app.worker.enqueue import enqueue_grading
@@ -152,13 +157,22 @@ async def join_course_by_code(
             programme=payload.programme,
         )
     except SelfEnrollInvalidCodeError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid self-enroll code") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid self-enroll code"
+        ) from exc
     except SelfEnrollAlreadyEnrolledError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already enrolled in course") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Already enrolled in course"
+        ) from exc
     except SelfEnrollStudentNumberTakenError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student number already used in this course") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Student number already used in this course",
+        ) from exc
     except SelfEnrollFailedError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not enroll in course") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Could not enroll in course"
+        ) from exc
 
 
 @router.get("/courses/{course_id}", response_model=CourseOut)
@@ -479,7 +493,7 @@ async def download_my_submission(
     return FileResponse(
         path=storage_path,
         filename=row.submission.file_name,
-        media_type=row.submission.content_type or "application/octet-stream",   
+        media_type=row.submission.content_type or "application/octet-stream",
     )
 
 
@@ -576,4 +590,46 @@ async def my_submission_tests(
         submission_id=submission_id,
         compile_output=compile_output,
         tests=tests,
+    )
+
+
+# ── PDF download (students + staff) ──────────────────────────────
+
+
+@router.get(
+    "/courses/{course_id}/assignments/{assignment_id}/pdf",
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def download_assignment_pdf(
+    course_id: int,
+    assignment_id: int,
+    db: AsyncSession = Depends(get_db),
+    _role=Depends(require_course_student_or_staff),
+) -> Response:
+    """Download a PDF of the assignment instructions for offline use."""
+    course = await get_course(db, course_id=course_id)
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    assignment = await get_assignment(db, assignment_id=assignment_id)
+    if assignment is None or assignment.course_id != course_id:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    pdf_bytes = generate_assignment_pdf(
+        course_title=course.title,
+        course_code=course.code,
+        assignment_title=assignment.title,
+        description=assignment.description,
+        due_date=assignment.due_date,
+        max_points=assignment.max_points,
+    )
+
+    safe_code = re.sub(r"[^A-Za-z0-9._-]+", "_", course.code).strip("_") or "course"
+    safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", assignment.title).strip("_") or "assignment"
+    filename = f"{safe_code}_{safe_title[:50]}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

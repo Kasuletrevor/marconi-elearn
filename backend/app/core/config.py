@@ -65,6 +65,19 @@ class Settings(BaseSettings):
     grading_priority_enabled: bool = True
     grading_priority_max_defer_attempts: int = 5
 
+    # Email (SMTP)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    smtp_from_name: str = "Marconi Elearn"
+    smtp_from_email: str = ""
+    smtp_enabled: bool = False
+
+    # Plagiarism detection
+    moss_user_id: str = ""
+    plagiarism_similarity_threshold: float = 0.3
+
     # Third-party integrations
     # Symmetric encryption key (Fernet). Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str = ""
@@ -132,6 +145,12 @@ class Settings(BaseSettings):
             0,
             int(self.grading_priority_max_defer_attempts),
         )
+
+        # Auto-enable SMTP if host and user are both configured.
+        if self.smtp_host.strip() and self.smtp_user.strip():
+            self.smtp_enabled = True
+        if self.smtp_enabled and not self.smtp_from_email.strip():
+            self.smtp_from_email = self.smtp_user
 
         return self
 

@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -33,3 +33,9 @@ async def get_session_by_token(db: AsyncSession, *, token: str) -> Session | Non
 async def delete_session(db: AsyncSession, *, session: Session) -> None:
     await db.delete(session)
     await db.commit()
+
+
+async def delete_sessions_for_user(db: AsyncSession, *, user_id: int) -> int:
+    result = await db.execute(delete(Session).where(Session.user_id == user_id))
+    await db.commit()
+    return int(result.rowcount or 0)

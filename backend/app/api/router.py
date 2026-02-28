@@ -19,6 +19,8 @@ from app.api.routes.staff_course_assignments import router as staff_course_assig
 from app.api.routes.staff_course_assignment_extensions import (
     router as staff_course_assignment_extensions_router,
 )
+from app.api.routes.staff_course_exports import router as staff_course_exports_router
+from app.api.routes.staff_course_plagiarism import router as staff_course_plagiarism_router
 from app.api.routes.staff_course_invites import router as staff_course_invites_router
 from app.api.routes.staff_course_memberships import router as staff_course_memberships_router
 from app.api.routes.staff_course_modules import router as staff_course_modules_router
@@ -50,6 +52,8 @@ api_router.include_router(staff_courses_router, tags=["staff"])
 api_router.include_router(staff_course_modules_router, tags=["staff"])
 api_router.include_router(staff_course_assignments_router, tags=["staff"])
 api_router.include_router(staff_course_assignment_extensions_router, tags=["staff"])
+api_router.include_router(staff_course_exports_router, tags=["staff"])
+api_router.include_router(staff_course_plagiarism_router, tags=["staff"])
 api_router.include_router(staff_course_submissions_router, tags=["staff"])
 api_router.include_router(staff_course_memberships_router, tags=["staff"])
 api_router.include_router(staff_course_invites_router, tags=["staff"])

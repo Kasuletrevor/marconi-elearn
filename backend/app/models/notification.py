@@ -12,6 +12,7 @@ from app.db.base import Base
 class NotificationKind(str, enum.Enum):
     submission_graded = "submission_graded"
     submissions_received = "submissions_received"
+    assignment_due_reminder = "assignment_due_reminder"
 
 
 class Notification(Base):
@@ -19,7 +20,9 @@ class Notification(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[NotificationKind] = mapped_column(Enum(NotificationKind, name="notification_kind"), index=True)
+    kind: Mapped[NotificationKind] = mapped_column(
+        Enum(NotificationKind, name="notification_kind"), index=True
+    )
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     link_url: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)

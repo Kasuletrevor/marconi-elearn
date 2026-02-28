@@ -1,14 +1,25 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
+import logging
 import re
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.crud.course_notification_preferences import get_course_notification_preference
 from app.models.course_membership import CourseMembership, CourseRole
 from app.models.notification import Notification, NotificationKind
+from app.models.user import User
+
+logger = logging.getLogger(__name__)
+
+
+def _frontend_base() -> str:
+    origins = settings.cors_allow_origins.split(",")
+    return origins[0].strip().rstrip("/") if origins else "http://localhost:3000"
 
 
 async def create_notification(
@@ -37,7 +48,9 @@ async def list_notifications(
 ) -> list[Notification]:
     offset = max(0, offset)
     limit = min(max(1, limit), 200)
-    stmt = select(Notification).where(Notification.user_id == user_id).order_by(Notification.id.desc())
+    stmt = (
+        select(Notification).where(Notification.user_id == user_id).order_by(Notification.id.desc())
+    )
     if unread_only:
         stmt = stmt.where(Notification.read_at.is_(None))
     result = await db.execute(stmt.offset(offset).limit(limit))
@@ -151,3 +164,43 @@ async def notify_staff_new_submission_digest(
         )
 
     await db.commit()
+
+    # Fire-and-forget: send digest email to each staff member.
+    try:
+        from app.integrations.email import send_email
+        from app.integrations.email_templates import staff_submission_digest_email
+
+        base = _frontend_base()
+        submissions_url = f"{base}/staff/submissions?course_id={course_id}"
+
+        # Resolve staff emails.
+        user_result = await db.execute(select(User).where(User.id.in_(enabled_user_ids)))
+        staff_users = {u.id: u for u in user_result.scalars().all()}
+
+        for staff_user_id in enabled_user_ids:
+            user = staff_users.get(staff_user_id)
+            if user is None:
+                continue
+            existing = existing_by_user.get(staff_user_id)
+            count = _parse_count_from_title(existing.title) if existing else 1
+
+            subject, html, text = staff_submission_digest_email(
+                staff_name=user.email.split("@")[0],
+                course_code=course_code,
+                count=count,
+                latest_student=student_email,
+                latest_assignment=assignment_title,
+                submissions_url=submissions_url,
+            )
+
+            async def _do_send(
+                addr: str = user.email, subj: str = subject, h: str = html, t: str = text
+            ) -> None:
+                try:
+                    await send_email(to=addr, subject=subj, html_body=h, text_body=t)
+                except Exception:
+                    logger.exception("Failed to send staff digest email to=%s", addr)
+
+            asyncio.ensure_future(_do_send())
+    except Exception:
+        logger.exception("Failed to send staff digest emails for course_id=%s", course_id)

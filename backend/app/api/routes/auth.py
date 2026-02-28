@@ -1,5 +1,8 @@
 from typing import Annotated
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,10 +14,22 @@ from sqlalchemy.exc import IntegrityError
 
 from app.crud.course_memberships import CourseMembershipExistsError, add_course_membership
 from app.crud.invites import get_invite_by_token, mark_invite_used
-from app.crud.sessions import create_session, delete_session, get_session_by_token
+from app.crud.password_reset import (
+    create_password_reset_token,
+    get_valid_reset_token,
+    mark_reset_token_used,
+)
+from app.crud.sessions import (
+    create_session,
+    delete_session,
+    delete_sessions_for_user,
+    get_session_by_token,
+)
 from app.crud.audit import enqueue_audit_event
 from app.crud.users import create_user, get_user_by_email
 from app.db.deps import get_db
+from app.integrations.email import send_email
+from app.integrations.email_templates import password_reset_email
 from app.models.user import User
 from sqlalchemy import select
 
@@ -25,10 +40,14 @@ from app.api.deps.superadmin import is_superadmin
 from app.schemas.auth import (
     AcceptInviteRequest,
     CourseRoleItem,
+    ForgotPasswordRequest,
     LoginRequest,
     MeResponse,
     OrgRoleItem,
+    ResetPasswordRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
 login_rate_limit = make_rate_limit_dependency(
@@ -205,3 +224,75 @@ async def accept_invite(
         path="/",
     )
     return await _build_me_response(db, user=user)
+
+
+def _frontend_base() -> str:
+    origins = settings.cors_allow_origins.split(",")
+    return origins[0].strip().rstrip("/") if origins else "http://localhost:3000"
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    _rate_limit: Annotated[None, Depends(login_rate_limit)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Request a password reset link.
+
+    Always returns 202 to avoid leaking whether the email exists.
+    """
+    user = await get_user_by_email(db, email=str(payload.email))
+    if user is not None and user.password_hash is not None:
+        token = await create_password_reset_token(db, user_id=user.id)
+        if token is not None:
+            base = _frontend_base()
+            reset_url = f"{base}/reset-password/{token}"
+            subj, html, text = password_reset_email(reset_url=reset_url)
+
+            async def _send() -> None:
+                try:
+                    await send_email(to=user.email, subject=subj, html_body=html, text_body=text)
+                except Exception:
+                    logger.exception("Failed to send password reset email to %s", user.email)
+
+            asyncio.ensure_future(_send())
+
+    return {"detail": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Reset the user's password using a valid reset token."""
+    reset_token = await get_valid_reset_token(db, token=payload.token)
+    if reset_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset link",
+        )
+
+    user = await db.get(User, reset_token.user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset link",
+        )
+
+    user.password_hash = hash_password(payload.password)
+    await mark_reset_token_used(db, reset_token=reset_token)
+    await delete_sessions_for_user(db, user_id=user.id)
+
+    token, _ = await create_session(db, user_id=user.id)
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=token,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
+        path="/",
+    )
+
+    return {"detail": "Password has been reset successfully."}
