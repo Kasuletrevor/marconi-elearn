@@ -593,3 +593,47 @@ export interface Notification {
   read_at: string | null;
   created_at: string;
 }
+
+/* ============================================
+   PASSWORD RESET TYPES
+   ============================================ */
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  password: string;
+}
+
+/* ============================================
+   PLAGIARISM TYPES
+   ============================================ */
+
+export type PlagiarismRunStatus = "pending" | "running" | "completed" | "error";
+
+export interface PlagiarismRun {
+  id: number;
+  course_id: number;
+  assignment_id: number;
+  initiated_by_user_id: number;
+  status: PlagiarismRunStatus;
+  moss_report_url: string | null;
+  error_message: string | null;
+  pair_count: number | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface PlagiarismPair {
+  id: number;
+  run_id: number;
+  student_a_user_id: number;
+  student_a_email?: string;
+  student_b_user_id: number;
+  student_b_email?: string;
+  similarity_pct: number;
+  lines_matched: number | null;
+  moss_match_url: string | null;
+}

@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Download,
   EyeOff,
   FileText,
   Loader2,
@@ -22,9 +23,13 @@ import {
   ApiError,
   type AssignmentExtension,
   courseStaff,
+  exports,
+  plagiarism,
   type Assignment,
   type Course,
   type CourseMembership,
+  type PlagiarismRun,
+  type PlagiarismPair,
   type TestCase,
 } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -102,6 +107,14 @@ export default function StaffAssignmentDetailPage() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Plagiarism state
+  const [plagiarismRuns, setPlagiarismRuns] = useState<PlagiarismRun[]>([]);
+  const [plagiarismPairs, setPlagiarismPairs] = useState<PlagiarismPair[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [isStartingRun, setIsStartingRun] = useState(false);
+  const [plagiarismLang, setPlagiarismLang] = useState<string>("c");
+  const [plagiarismError, setPlagiarismError] = useState("");
 
   const selected = useMemo(
     () => testCases.find((t) => t.id === selectedId) ?? null,
@@ -212,6 +225,43 @@ export default function StaffAssignmentDetailPage() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Plagiarism helpers
+  const fetchPlagiarismRuns = useCallback(async () => {
+    try {
+      const runs = await plagiarism.listRuns(courseId, assignmentId);
+      setPlagiarismRuns(runs);
+    } catch {
+      // non-critical
+    }
+  }, [courseId, assignmentId]);
+
+  useEffect(() => {
+    fetchPlagiarismRuns();
+  }, [fetchPlagiarismRuns]);
+
+  const startPlagiarismRun = useCallback(async () => {
+    setIsStartingRun(true);
+    setPlagiarismError("");
+    try {
+      await plagiarism.startRun(courseId, assignmentId, plagiarismLang);
+      await fetchPlagiarismRuns();
+    } catch (err) {
+      setPlagiarismError(err instanceof ApiError ? err.detail : "Failed to start plagiarism check");
+    } finally {
+      setIsStartingRun(false);
+    }
+  }, [courseId, assignmentId, plagiarismLang, fetchPlagiarismRuns]);
+
+  const loadPairs = useCallback(async (runId: number) => {
+    setSelectedRunId(runId);
+    try {
+      const pairs = await plagiarism.getPairs(courseId, assignmentId, runId);
+      setPlagiarismPairs(pairs);
+    } catch {
+      setPlagiarismPairs([]);
+    }
+  }, [courseId, assignmentId]);
 
   async function createNew() {
     setSaveError("");
@@ -402,13 +452,27 @@ export default function StaffAssignmentDetailPage() {
         description={`${course.code} • Autograding test cases`}
         action={
           <div className="flex items-center gap-2">
-            <Link
+             <Link
               href={`/staff/courses/${courseId}`}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
             </Link>
+            <button
+              type="button"
+              onClick={() => {
+                if (assignment) {
+                  exports
+                    .assignmentPdf(Number(courseId), assignment.id, assignment.title)
+                    .catch(() => {});
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              PDF
+            </button>
             <button
               type="button"
               onClick={() => void fetchAll()}
@@ -846,6 +910,202 @@ export default function StaffAssignmentDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+      </motion.div>
+
+      {/* Plagiarism Detection Section */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate="visible"
+        className="mt-8 relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--card)] shadow-sm"
+      >
+        <div className="p-6 md:p-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[var(--secondary)]/10 flex items-center justify-center">
+                <ShieldAlert className="w-5 h-5 text-[var(--secondary)]" />
+              </div>
+              <div>
+                <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--foreground)]">
+                  Plagiarism Detection
+                </h2>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Run Stanford MOSS to check for code similarity
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Start new run */}
+          <div className="flex items-center gap-3 mb-6">
+            <select
+              value={plagiarismLang}
+              onChange={(e) => setPlagiarismLang(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-sm text-[var(--foreground)]"
+            >
+              <option value="c">C</option>
+              <option value="cc">C++</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => void startPlagiarismRun()}
+              disabled={isStartingRun}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--secondary)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              {isStartingRun ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldAlert className="w-4 h-4" />
+              )}
+              Run MOSS Check
+            </button>
+            <button
+              type="button"
+              onClick={() => void fetchPlagiarismRuns()}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--background)] text-sm transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {plagiarismError && (
+            <div className="mb-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
+              {plagiarismError}
+            </div>
+          )}
+
+          {/* Runs list */}
+          {plagiarismRuns.length === 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)]">
+              No plagiarism checks have been run yet for this assignment.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {plagiarismRuns.map((run) => (
+                <div
+                  key={run.id}
+                  className={`p-4 rounded-2xl border transition-colors cursor-pointer ${
+                    selectedRunId === run.id
+                      ? "border-[var(--primary)] bg-[var(--primary)]/5"
+                      : "border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/30"
+                  }`}
+                  onClick={() => void loadPairs(run.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                          run.status === "completed"
+                            ? "bg-green-500/10 text-green-400"
+                            : run.status === "running" || run.status === "pending"
+                            ? "bg-yellow-500/10 text-yellow-400"
+                            : "bg-red-500/10 text-red-400"
+                        }`}
+                      >
+                        {run.status === "running" || run.status === "pending" ? (
+                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                        ) : null}
+                        {run.status}
+                      </span>
+                      <span className="text-sm text-[var(--foreground)]">
+                        Run #{run.id}
+                      </span>
+                      {run.pair_count !== null && (
+                        <span className="text-xs text-[var(--muted-foreground)]">
+                          {run.pair_count} pair{run.pair_count !== 1 ? "s" : ""} flagged
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-[var(--muted-foreground)]">
+                      {new Date(run.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  {run.error_message && (
+                    <p className="mt-2 text-xs text-red-400">{run.error_message}</p>
+                  )}
+                  {run.moss_report_url && (
+                    <a
+                      href={run.moss_report_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-2 inline-block text-xs text-[var(--primary)] hover:underline"
+                    >
+                      View MOSS Report
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pairs detail */}
+          {selectedRunId !== null && plagiarismPairs.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">
+                Similar Pairs (Run #{selectedRunId})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left py-2 px-3 text-[var(--muted-foreground)] font-medium">Student A</th>
+                      <th className="text-left py-2 px-3 text-[var(--muted-foreground)] font-medium">Student B</th>
+                      <th className="text-right py-2 px-3 text-[var(--muted-foreground)] font-medium">Similarity</th>
+                      <th className="text-right py-2 px-3 text-[var(--muted-foreground)] font-medium">Lines</th>
+                      <th className="text-left py-2 px-3 text-[var(--muted-foreground)] font-medium">Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {plagiarismPairs.map((pair) => (
+                      <tr key={pair.id} className="border-b border-[var(--border)]/50">
+                        <td className="py-2 px-3 font-mono text-xs">
+                          {pair.student_a_email || `User #${pair.student_a_user_id}`}
+                        </td>
+                        <td className="py-2 px-3 font-mono text-xs">
+                          {pair.student_b_email || `User #${pair.student_b_user_id}`}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
+                              pair.similarity_pct >= 80
+                                ? "bg-red-500/10 text-red-400"
+                                : pair.similarity_pct >= 50
+                                ? "bg-yellow-500/10 text-yellow-400"
+                                : "bg-green-500/10 text-green-400"
+                            }`}
+                          >
+                            {pair.similarity_pct}%
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right text-[var(--muted-foreground)]">
+                          {pair.lines_matched ?? "—"}
+                        </td>
+                        <td className="py-2 px-3">
+                          {pair.moss_match_url && (
+                            <a
+                              href={pair.moss_match_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-[var(--primary)] hover:underline"
+                            >
+                              View
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {selectedRunId !== null && plagiarismPairs.length === 0 && (
+            <p className="mt-4 text-sm text-[var(--muted-foreground)]">
+              No similar pairs found above the threshold for this run.
+            </p>
+          )}
         </div>
       </motion.div>
 

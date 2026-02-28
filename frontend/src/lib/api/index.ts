@@ -20,3 +20,5 @@ export { courseStaff } from "./courseStaff";
 export { staffSubmissions } from "./staffSubmissions";
 export { invites } from "./invites";
 export { playground } from "./playground";
+export { exports } from "./exports";
+export { plagiarism } from "./plagiarism";

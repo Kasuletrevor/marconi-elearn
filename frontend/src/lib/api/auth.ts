@@ -1,5 +1,5 @@
 import { API_BASE, handleResponse } from "./core";
-import type { AcceptInviteRequest, LoginRequest, User } from "./types";
+import type { AcceptInviteRequest, ForgotPasswordRequest, LoginRequest, ResetPasswordRequest, User } from "./types";
 
 export const auth = {
   async login(data: LoginRequest): Promise<User> {
@@ -35,5 +35,25 @@ export const auth = {
       body: JSON.stringify(data),
     });
     return handleResponse<User>(res);
+  },
+
+  async forgotPassword(data: ForgotPasswordRequest): Promise<{ detail: string }> {
+    const res = await fetch(`${API_BASE}/api/v1/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ detail: string }>(res);
+  },
+
+  async resetPassword(data: ResetPasswordRequest): Promise<{ detail: string }> {
+    const res = await fetch(`${API_BASE}/api/v1/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ detail: string }>(res);
   },
 };

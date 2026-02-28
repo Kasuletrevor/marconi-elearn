@@ -30,10 +30,12 @@ import {
   Beaker,
   X,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import {
   courseStaff,
   staffSubmissions,
+  exports,
   type StaffSubmissionQueueItem,
   type MissingSubmissionsSummaryItem,
   type MissingStudentOut,
@@ -791,6 +793,37 @@ function OverviewTab({
                 Add Module
               </span>
             </button>
+          </div>
+
+          {/* Data Exports */}
+          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--foreground)] mt-6">
+            Data Exports
+          </h3>
+          <div className="grid gap-3">
+            {[
+              { label: "Gradebook CSV", action: () => exports.gradebook(course.id) },
+              { label: "Roster CSV", action: () => exports.roster(course.id) },
+              { label: "Submissions CSV", action: () => exports.submissions(course.id) },
+              { label: "Audit Log CSV", action: () => exports.audit(course.id) },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  item.action().catch((err: unknown) => {
+                    reportError(err instanceof Error ? err : new Error(String(err)));
+                  });
+                }}
+                className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
+                  <Download className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-medium text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
+                  {item.label}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 

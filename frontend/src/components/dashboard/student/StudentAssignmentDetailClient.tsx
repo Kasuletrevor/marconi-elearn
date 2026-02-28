@@ -21,9 +21,11 @@ import {
   Beaker,
   ChevronDown,
   ChevronUp,
+  Download,
 } from "lucide-react";
 import {
   student,
+  exports,
   type Assignment,
   type Submission,
   type Course,
@@ -321,6 +323,18 @@ export default function StudentAssignmentDetailClient({
             <h1 className="font-[family-name:var(--font-display)] text-3xl md:text-4xl font-bold text-[var(--foreground)]">
               {assignment.title}
             </h1>
+            <button
+              type="button"
+              onClick={() => {
+                exports
+                  .assignmentPdf(Number(courseId), assignment.id, assignment.title)
+                  .catch(() => {});
+              }}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--background)] text-[var(--muted-foreground)] transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download PDF
+            </button>
           </div>
         </div>
 

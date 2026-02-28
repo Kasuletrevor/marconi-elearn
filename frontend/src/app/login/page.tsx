@@ -232,7 +232,15 @@ export default function LoginPage() {
           </motion.form>
 
           {/* Footer */}
-          <motion.div variants={fadeInUp} className="mt-8 text-center">
+          <motion.div variants={fadeInUp} className="mt-8 text-center space-y-3">
+            <p className="text-sm text-[var(--muted-foreground)]">
+              <Link
+                href="/forgot-password"
+                className="text-[var(--primary)] hover:underline"
+              >
+                Forgot your password?
+              </Link>
+            </p>
             <p className="text-sm text-[var(--muted-foreground)]">
               First time here?{" "}
               <span className="text-[var(--foreground)]">
