@@ -811,7 +811,7 @@ function OverviewTab({
                 type="button"
                 onClick={() => {
                   item.action().catch((err: unknown) => {
-                    reportError(err instanceof Error ? err : new Error(String(err)));
+                    reportError("Failed to export data", err);
                   });
                 }}
                 className="w-full flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/30 rounded-xl transition-all text-left group"
